@@ -13,8 +13,9 @@ export function ProtectedRoute() {
 
 export function AdminRoute() {
   const { user, loading, isAdmin } = useAuth();
+  const location = useLocation();
 
   if (loading) return <LoadingState label="Checking permissions…" />;
-  if (!user || !isAdmin) return <Navigate to="/login" replace />;
+  if (!user || !isAdmin) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return <Outlet />;
 }
