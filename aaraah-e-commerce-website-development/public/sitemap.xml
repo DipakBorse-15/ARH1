@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Static sitemap skeleton for AARAAH (GitHub Pages compatible static hosting).
+  Because product/category/collection data lives in Supabase and this site is
+  a static SPA, generate/refresh this file periodically (e.g. via a small
+  Node script or Supabase Edge Function export) whenever the catalog changes,
+  and re-deploy. Update the domain below to your live domain.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://aaraah.in/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://aaraah.in/category/saree</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://aaraah.in/category/kurti</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://aaraah.in/category/dress-material</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://aaraah.in/category/kurta-set-with-dupatta</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>
