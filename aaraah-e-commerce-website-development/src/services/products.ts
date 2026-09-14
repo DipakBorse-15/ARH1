@@ -169,7 +169,8 @@ export async function fetchAllProductsAdmin(): Promise<ProductWithVariants[]> {
 }
 
 export async function upsertProduct(product: Partial<Product>) {
-  const { data, error } = await supabase.from("products").upsert(product).select().single();
+  const { category: _category, collection: _collection, variants: _variants, ...payload } = product;
+  const { data, error } = await supabase.from("products").upsert(payload).select().single();
   if (error) throw error;
   return data as Product;
 }
@@ -180,7 +181,8 @@ export async function deleteProduct(id: string) {
 }
 
 export async function upsertVariant(variant: Partial<ProductVariant>) {
-  const { data, error } = await supabase.from("product_variants").upsert(variant).select().single();
+  const { images: _images, ...payload } = variant;
+  const { data, error } = await supabase.from("product_variants").upsert(payload).select().single();
   if (error) throw error;
   return data as ProductVariant;
 }
