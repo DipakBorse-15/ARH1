@@ -10,7 +10,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchProductBySlug, fetchSimilarProducts } from "@/services/products";
+import { fetchProductBySlug, fetchSimilarVariants, type SimilarItem } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
 import type { ProductVariant, ProductWithVariants } from "@/types";
@@ -28,7 +28,7 @@ export default function ProductPage() {
   const { show } = useToast();
 
   const [product, setProduct] = useState<ProductWithVariants | null>(null);
-  const [similar, setSimilar] = useState<ProductWithVariants[]>([]);
+  const [similar, setSimilar] = useState<SimilarItem[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -54,9 +54,12 @@ export default function ProductPage() {
       const activeVariants = data.variants.filter((v) => v.active);
       const requested = searchParams.get("variant");
       const match = requested ? activeVariants.find((v) => colorSlug(v.color) === requested) : null;
-      setSelectedVariant(match || activeVariants[0] || null);
+      const initialVariant = match || activeVariants[0] || null;
+      setSelectedVariant(initialVariant);
       setQuantity(1);
-      fetchSimilarProducts(data).then(setSimilar).catch(() => {});
+      if (initialVariant) {
+        fetchSimilarVariants(initialVariant.id).then(setSimilar).catch(() => {});
+      }
     } catch (err) {
       setError(friendlyError(err, "Could not load this product."));
     } finally {
@@ -251,7 +254,7 @@ export default function ProductPage() {
       {similar.length > 0 && (
         <section className="mt-16">
           <h2 className="mb-6 font-serif text-2xl font-semibold text-stone-900">You may also like</h2>
-          <ProductGrid products={similar} />
+          <ProductGrid items={similar} />
         </section>
       )}
     </div>
