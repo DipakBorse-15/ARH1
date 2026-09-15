@@ -162,7 +162,7 @@ export default function ProductPage() {
         }}
       />
 
-      <div className="grid gap-10 md:grid-cols-2">
+      <div className="grid items-start gap-10 md:grid-cols-2">
         <ProductGallery images={selectedVariant.images || []} alt={`${product.name} - ${selectedVariant.color}`} />
 
         <div>
