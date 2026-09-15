@@ -81,6 +81,23 @@ export default function ProductPage() {
     return variantBullets.length > 0 ? variantBullets : product?.bullet_points ?? [];
   }, [selectedVariant, product]);
 
+  // Description also varies per colour (per the listing sheet); the product's
+  // own description is only a fallback for a variant that doesn't set one.
+  const activeDescription = selectedVariant?.description || product?.description || "";
+
+  // "Product Details" table: only fields the merchant marked as customer-facing
+  // ("Yes" in the listing sheet). Blank fields are simply left out.
+  const detailRows = useMemo(() => {
+    if (!selectedVariant) return [] as [string, string][];
+    const rows: [string, string][] = [];
+    if (selectedVariant.work_type) rows.push(["Work Type", selectedVariant.work_type]);
+    if (selectedVariant.work_pattern) rows.push(["Work Pattern", selectedVariant.work_pattern]);
+    if (selectedVariant.best_for) rows.push(["Best For", selectedVariant.best_for]);
+    if (selectedVariant.manufacturer) rows.push(["Manufacturer", selectedVariant.manufacturer]);
+    if (selectedVariant.included_components) rows.push(["Included Components", selectedVariant.included_components]);
+    return rows;
+  }, [selectedVariant]);
+
   const maxQty = useMemo(() => Math.min(10, selectedVariant?.stock_quantity ?? 0), [selectedVariant]);
   const inStock = !!selectedVariant && selectedVariant.is_available && selectedVariant.stock_quantity > 0;
 
@@ -200,10 +217,24 @@ export default function ProductPage() {
             </div>
           )}
 
-          {product.description && (
+          {activeDescription && (
             <div className="mt-6 border-t border-stone-200 pt-6">
               <h2 className="mb-2 text-sm font-semibold text-stone-900">Product Description</h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600">{product.description}</p>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600">{activeDescription}</p>
+            </div>
+          )}
+
+          {detailRows.length > 0 && (
+            <div className="mt-6 border-t border-stone-200 pt-6">
+              <h2 className="mb-2 text-sm font-semibold text-stone-900">Product Details</h2>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+                {detailRows.map(([label, value]) => (
+                  <div key={label} className="flex gap-2">
+                    <dt className="text-stone-500">{label}:</dt>
+                    <dd className="font-medium text-stone-800">{value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )}
 

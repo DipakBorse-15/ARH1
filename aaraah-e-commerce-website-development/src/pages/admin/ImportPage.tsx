@@ -4,32 +4,44 @@ import { supabase, friendlyError } from "@/lib/supabase";
 import { useToast } from "@/contexts/ToastContext";
 
 /**
- * Bulk import from an Amazon flat-file listing sheet.
+ * Bulk import from the AARAAH "Uploader.xlsx" template (see its Details sheet
+ * for the full column-by-column spec). One row per SKU:
+ *   - a "Parent" row groups colours together (its Item Name is the only one
+ *     ever shown on the storefront; nothing else on the parent row is used)
+ *   - a "Child" row is one purchasable colour, with its own images, price,
+ *     bullets, description, etc.
  *
- * The sheet's row 5 holds Amazon's internal field keys (item_name[...], color[...],
- * bullet_point[...]#3.value, ...). We match on those key prefixes rather than on
- * column positions, so the importer keeps working when Amazon shifts columns around.
+ * Columns are matched by their header text (row 1), not by position, so
+ * reordering columns in the sheet won't break the import. A few headers
+ * repeat (6x "Other Image URL", 5x "Bullet Point") — every occurrence is
+ * read by its column position, left to right.
  */
-
-type RawRow = Record<string, string>;
 
 interface ParsedVariant {
   sku: string;
   color: string;
-  colorHex: string;
-  bullets: string[];
+  colorGroup: string;
   images: string[];
-  mrp: number;
-  salePrice: number | null;
+  description: string;
+  bullets: string[];
+  price: number; // MRP
+  salePrice: number | null; // Selling Price
+  discountPercent: number | null;
+  discountAmount: number | null;
   stock: number;
-  variantInfo: string;
+  workType: string;
+  workPattern: string;
+  bestFor: string;
+  manufacturer: string;
+  includedComponents: string;
+  fabricType: string;
+  searchKeywords: string;
 }
 
 interface ParsedProduct {
   parentSku: string;
   name: string;
-  description: string;
-  bullets: string[];
+  productType: string;
   variants: ParsedVariant[];
 }
 
@@ -51,29 +63,33 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
 }
 
-function num(v: string | undefined): number {
-  const n = Number(String(v ?? "").replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : 0;
+function num(v: string | undefined): number | null {
+  if (v == null || String(v).trim() === "") return null;
+  const n = Number(String(v).replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
-/** Pull the first value whose field key starts with any of the given prefixes. */
-function pick(row: RawRow, ...prefixes: string[]): string {
-  for (const p of prefixes) {
-    for (const key of Object.keys(row)) {
-      if (key.startsWith(p) && String(row[key] ?? "").trim() !== "") return String(row[key]).trim();
-    }
-  }
-  return "";
+/** header text -> its column indices, in sheet order (handles repeated headers). */
+function buildColumnIndex(headerRow: string[]): Map<string, number[]> {
+  const index = new Map<string, number[]>();
+  headerRow.forEach((h, i) => {
+    const key = String(h ?? "").trim();
+    if (!key) return;
+    const list = index.get(key) || [];
+    list.push(i);
+    index.set(key, list);
+  });
+  return index;
 }
 
-/** Pull the first value whose field key contains all of the given fragments. */
-function contains(row: RawRow, ...fragments: string[]): string {
-  for (const key of Object.keys(row)) {
-    if (fragments.every((f) => key.includes(f)) && String(row[key] ?? "").trim() !== "") {
-      return String(row[key]).trim();
-    }
-  }
-  return "";
+function firstValue(arr: string[], colIndex: Map<string, number[]>, header: string): string {
+  const pos = colIndex.get(header)?.[0];
+  return pos == null ? "" : String(arr[pos] ?? "").trim();
+}
+
+function allValues(arr: string[], colIndex: Map<string, number[]>, header: string): string[] {
+  const positions = colIndex.get(header) || [];
+  return positions.map((pos) => String(arr[pos] ?? "").trim()).filter((v) => v !== "");
 }
 
 function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
@@ -81,108 +97,100 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
   const sheet = wb.Sheets[sheetName];
   const grid = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false, defval: "" });
 
-  // Row 5 (index 4) holds the field keys; data starts at row 6 (index 5).
-  const keys = (grid[4] || []).map((k) => String(k ?? "").trim());
-  const rows: RawRow[] = [];
-  for (let r = 5; r < grid.length; r++) {
-    const arr = grid[r] || [];
-    const row: RawRow = {};
-    let hasData = false;
-    keys.forEach((k, i) => {
-      const v = String(arr[i] ?? "").trim();
-      if (k) row[k] = v;
-      if (v) hasData = true;
-    });
-    if (hasData) rows.push(row);
+  const headerRow = (grid[0] || []).map((h) => String(h ?? "").trim());
+  const colIndex = buildColumnIndex(headerRow);
+
+  const dataRows = grid.slice(1).filter((r) => (r || []).some((v) => String(v ?? "").trim() !== ""));
+
+  const parentNames = new Map<string, string>(); // parent SKU -> Item Name
+  const childRows: { sku: string; parentSku: string; arr: string[] }[] = [];
+
+  for (const arr of dataRows) {
+    const sku = firstValue(arr, colIndex, "SKU");
+    if (!sku) continue;
+    const level = firstValue(arr, colIndex, "Parentage Level").toLowerCase();
+    const parentSku = firstValue(arr, colIndex, "Parent SKU");
+    const itemName = firstValue(arr, colIndex, "Item Name");
+
+    if (level === "parent") {
+      parentNames.set(sku, itemName);
+      continue;
+    }
+    childRows.push({ sku, parentSku: parentSku || sku, arr });
   }
 
-  const withSku = rows
-    .map((row) => ({
-      row,
-      sku: pick(row, "contribution_sku", "item_sku"),
-      parentSku: pick(row, "child_parent_sku_relationship"),
-    }))
-    .filter((r) => r.sku && r.sku.toUpperCase() !== "ABC123"); // drop Amazon's sample row
-
-  // Children point at their parent's SKU. Rows nobody points at and that have a
-  // parent of their own are treated as standalone products.
-  const childrenByParent = new Map<string, typeof withSku>();
-  const parentRows = new Map<string, RawRow>();
-
-  withSku.forEach((r) => {
-    if (r.parentSku) {
-      const list = childrenByParent.get(r.parentSku) || [];
-      list.push(r);
-      childrenByParent.set(r.parentSku, list);
-    } else {
-      parentRows.set(r.sku, r.row);
-    }
+  const childrenByParent = new Map<string, typeof childRows>();
+  childRows.forEach((c) => {
+    const list = childrenByParent.get(c.parentSku) || [];
+    list.push(c);
+    childrenByParent.set(c.parentSku, list);
   });
 
   const products: ParsedProduct[] = [];
 
   childrenByParent.forEach((children, parentSku) => {
-    const parentRow = parentRows.get(parentSku) || children[0].row;
-    const first = children[0].row;
+    if (children.length === 0) return;
+    const name = parentNames.get(parentSku) || firstValue(children[0].arr, colIndex, "Item Name");
 
-    const rawName = pick(parentRow, "item_name") || pick(first, "item_name");
-    // Child titles carry a "(SKU_Colour)" suffix; the parent title is the clean one.
-    const name = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    const variants: ParsedVariant[] = children.map(({ sku, arr }) => {
+      const mainImg = firstValue(arr, colIndex, "Main Image URL");
+      const otherImgs = allValues(arr, colIndex, "Other Image URL");
+      const images = [mainImg, ...otherImgs].filter(Boolean);
+      const bullets = allValues(arr, colIndex, "Bullet Point");
 
-    const variants: ParsedVariant[] = children.map((c) => {
-      const row = c.row;
-      const images: string[] = [];
-      const main = pick(row, "main_product_image_locator");
-      if (main) images.push(main);
-      for (let i = 1; i <= 8; i++) {
-        const u = pick(row, `other_product_image_locator_${i}`);
-        if (u && !images.includes(u)) images.push(u);
-      }
-
-      const bullets: string[] = [];
-      for (let i = 1; i <= 5; i++) {
-        const b = Object.keys(row).find((k) => k.startsWith("bullet_point") && k.includes(`#${i}.value`));
-        const val = b ? String(row[b] ?? "").trim() : "";
-        if (val) bullets.push(val);
-      }
-
-      // Amazon's `color` field is a standardised bucket (Teal -> "Turquoise", Peach ->
-      // "Pink"). The real marketing colour sits in the child title's "(SKU_Colour)"
-      // suffix, so prefer that and fall back to the standardised value.
-      const titleSuffix = pick(row, "item_name").match(/\(([^)]*)\)\s*$/)?.[1] ?? "";
-      const color = titleSuffix.includes("_")
-        ? titleSuffix.slice(titleSuffix.indexOf("_") + 1).trim()
-        : pick(row, "color");
-      const mrp = num(contains(row, "maximum_retail_price"));
-      const our = num(contains(row, "our_price"));
-      const stock = num(contains(row, "fulfillment_availability", "quantity"));
-
-      const listPrice = mrp || our;
-      const sale = mrp && our && our < mrp ? our : null;
+      const mrp = num(firstValue(arr, colIndex, "MRP")) ?? 0;
+      const sellingPrice = num(firstValue(arr, colIndex, "Selling Price"));
 
       return {
-        sku: c.sku,
-        color,
-        colorHex: hexFor(color),
-        bullets,
+        sku,
+        color: firstValue(arr, colIndex, "Map Color") || firstValue(arr, colIndex, "Main Color"),
+        colorGroup: firstValue(arr, colIndex, "Main Color"),
         images,
-        mrp: listPrice,
-        salePrice: sale,
-        stock: stock || 0,
-        variantInfo: bullets.find((b) => /colou?r\s*:/i.test(b)) || "",
+        description: firstValue(arr, colIndex, "Product Description"),
+        bullets,
+        price: mrp,
+        salePrice: sellingPrice,
+        discountPercent: num(firstValue(arr, colIndex, "Discount %")),
+        discountAmount: num(firstValue(arr, colIndex, "Discount Amount")),
+        stock: num(firstValue(arr, colIndex, "Stock")) ?? 0,
+        workType: firstValue(arr, colIndex, "Work Type"),
+        workPattern: firstValue(arr, colIndex, "Work Pattern"),
+        bestFor: firstValue(arr, colIndex, "Best For"),
+        manufacturer: firstValue(arr, colIndex, "Manufacturer"),
+        includedComponents: firstValue(arr, colIndex, "Included Components"),
+        fabricType: firstValue(arr, colIndex, "Fabric Type"),
+        searchKeywords: firstValue(arr, colIndex, "Generic Keywords"),
       };
     });
 
     products.push({
       parentSku,
       name,
-      description: pick(parentRow, "product_description") || pick(first, "product_description"),
-      bullets: variants[0]?.bullets ?? [],
+      productType: firstValue(children[0].arr, colIndex, "Product Type"),
       variants,
     });
   });
 
   return products;
+}
+
+/** Find or create a category matching the sheet's "Product Type" (e.g. "SAREE"). */
+async function resolveCategoryId(productType: string): Promise<string | null> {
+  const label = productType.trim();
+  if (!label) return null;
+  const niceName = label.charAt(0) + label.slice(1).toLowerCase(); // "SAREE" -> "Saree"
+  const slug = slugify(niceName);
+
+  const { data: existing } = await supabase.from("categories").select("id").eq("slug", slug).maybeSingle();
+  if (existing) return existing.id;
+
+  const { data: created, error } = await supabase
+    .from("categories")
+    .insert({ name: niceName, slug, active: true })
+    .select()
+    .single();
+  if (error) throw error;
+  return created.id;
 }
 
 export default function ImportPage() {
@@ -206,7 +214,7 @@ export default function ImportPage() {
       const wb = XLSX.read(buf, { type: "array" });
       const products = parseWorkbook(wb);
       if (products.length === 0) {
-        show("No parent/child listings found in this sheet.", "error");
+        show("No SKUs found — check the sheet matches the AARAAH template.", "error");
       }
       setParsed(products);
     } catch (err) {
@@ -221,9 +229,8 @@ export default function ImportPage() {
 
     for (const p of parsed) {
       try {
-        // A product group is identified by its Amazon parent SKU. If a previous
-        // import already created it, attach these colours to that same group
-        // instead of creating a second product page.
+        const categoryId = await resolveCategoryId(p.productType);
+
         const { data: existing, error: findErr } = await supabase
           .from("products")
           .select("id, name")
@@ -232,7 +239,6 @@ export default function ImportPage() {
         if (findErr) throw findErr;
 
         let productId: string;
-
         if (existing) {
           productId = existing.id;
           addLog(`↳ ${existing.name} — existing group found (${p.parentSku})`);
@@ -244,8 +250,7 @@ export default function ImportPage() {
               parent_sku: p.parentSku,
               name: p.name,
               slug: `${slugify(p.name)}-${slugify(p.parentSku)}`,
-              description: p.description,
-              bullet_points: p.bullets,
+              category_id: categoryId,
               active: true,
             })
             .select()
@@ -254,7 +259,6 @@ export default function ImportPage() {
           productId = created.id;
         }
 
-        // Continue the colour ordering after whatever is already in the group.
         const { count } = await supabase
           .from("product_variants")
           .select("id", { count: "exact", head: true })
@@ -271,8 +275,6 @@ export default function ImportPage() {
             .eq("sku", v.sku)
             .maybeSingle();
 
-          // Upserting on SKU keeps a re-run of the same sheet safe: colours are
-          // refreshed in place rather than duplicated.
           const { data: variant, error: vErr } = await supabase
             .from("product_variants")
             .upsert(
@@ -281,12 +283,22 @@ export default function ImportPage() {
                 product_id: productId,
                 sku: v.sku,
                 color: v.color,
-                color_hex: v.colorHex,
-                price: v.mrp,
+                color_hex: hexFor(v.color),
+                color_group: v.colorGroup,
+                price: v.price,
                 sale_price: v.salePrice,
+                discount_percent: v.discountPercent,
+                discount_amount: v.discountAmount,
                 stock_quantity: v.stock,
-                variant_info: v.variantInfo,
+                description: v.description,
                 bullet_points: v.bullets,
+                work_type: v.workType,
+                work_pattern: v.workPattern,
+                best_for: v.bestFor,
+                manufacturer: v.manufacturer,
+                included_components: v.includedComponents,
+                fabric_type: v.fabricType,
+                search_keywords: v.searchKeywords,
                 sort_order: priorVariant ? i : offset + i,
               },
               { onConflict: "sku" }
@@ -298,7 +310,6 @@ export default function ImportPage() {
           priorVariant ? updated++ : added++;
 
           if (v.images.length > 0) {
-            // Replace the image set so a corrected sheet fixes the gallery.
             await supabase.from("product_images").delete().eq("variant_id", variant.id);
             const { error: iErr } = await supabase.from("product_images").insert(
               v.images.map((url, idx) => ({
@@ -330,8 +341,8 @@ export default function ImportPage() {
     <div>
       <h1 className="font-serif text-2xl font-semibold text-stone-900">Import from Excel</h1>
       <p className="mt-1 text-sm text-stone-500">
-        Upload an Amazon flat-file listing sheet (.xlsx / .xlsm). Parent SKUs become products and child
-        SKUs become colour variants, with their images and bullet points.
+        Upload the AARAAH listing sheet (Uploader.xlsx format). Parent rows group colours together; child
+        rows become variants with their own images, price, description and bullet points.
       </p>
 
       <div className="mt-6 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6">
@@ -364,18 +375,20 @@ export default function ImportPage() {
             {parsed.map((p) => (
               <div key={p.parentSku} className="rounded-lg border border-stone-200 bg-white p-4">
                 <p className="text-sm font-semibold text-stone-900">{p.name}</p>
-                <p className="text-xs text-stone-400">Parent SKU: {p.parentSku}</p>
+                <p className="text-xs text-stone-400">
+                  Parent SKU: {p.parentSku} · Type: {p.productType || "—"}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {p.variants.map((v) => (
                     <div key={v.sku} className="w-24 rounded border border-stone-200 p-1">
                       {v.images[0] ? (
                         <img src={v.images[0]} alt={v.color} className="aspect-[3/4] w-full rounded object-cover" />
                       ) : (
-                        <div className="aspect-[3/4] w-full rounded" style={{ backgroundColor: v.colorHex }} />
+                        <div className="aspect-[3/4] w-full rounded" style={{ backgroundColor: hexFor(v.color) }} />
                       )}
                       <p className="mt-1 truncate text-[10px] text-stone-600">{v.color}</p>
                       <p className="text-[10px] font-semibold text-stone-900">
-                        ₹{v.salePrice ?? v.mrp} · {v.images.length} img
+                        ₹{v.salePrice ?? v.price} · {v.images.length} img
                       </p>
                     </div>
                   ))}

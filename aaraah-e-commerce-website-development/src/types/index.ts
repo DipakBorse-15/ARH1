@@ -82,6 +82,17 @@ export interface ProductVariant {
   active: boolean;
   variant_info: string | null;
   bullet_points: string[];
+  description: string | null;
+  work_type: string | null;
+  work_pattern: string | null;
+  best_for: string | null;
+  manufacturer: string | null;
+  included_components: string | null;
+  discount_percent: number | null;
+  discount_amount: number | null;
+  color_group: string | null;
+  fabric_type: string | null;
+  search_keywords: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
