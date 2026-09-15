@@ -129,17 +129,24 @@ export async function fetchProductBySlug(slug: string): Promise<ProductWithVaria
 }
 
 export async function fetchSimilarProducts(product: ProductWithVariants, limit = 8): Promise<ProductWithVariants[]> {
-  let query = supabase.from("products").select(PRODUCT_SELECT).eq("active", true).neq("id", product.id).limit(limit);
-
-  if (product.category_id) {
-    query = query.eq("category_id", product.category_id);
-  } else if (product.collection_id) {
-    query = query.eq("collection_id", product.collection_id);
-  }
-
-  const { data, error } = await query;
+  // Random picks from the whole catalog (any category), not just same-category
+  // "similar" items. Postgres/PostgREST has no simple random-order over the
+  // wire, so we pull a larger recent batch and shuffle client-side.
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("active", true)
+    .neq("id", product.id)
+    .order("created_at", { ascending: false })
+    .limit(60);
   if (error) throw error;
-  return ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+
+  const pool = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, limit);
 }
 
 export async function fetchVariantById(id: string): Promise<ProductVariant | null> {

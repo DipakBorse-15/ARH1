@@ -115,7 +115,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
           {loading && <LoadingState label="Loading products…" />}
           {error && <ErrorState message={error} onRetry={load} />}
-          {!loading && !error && <ProductGrid products={products} />}
+          {!loading && !error && <ProductGrid products={products} byVariant />}
 
           {!loading && !error && totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-2">

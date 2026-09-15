@@ -1,21 +1,24 @@
 import { Link } from "react-router-dom";
 import { PriceDisplay } from "./PriceDisplay";
-import { productColors, productMinPrice } from "@/services/products";
-import type { ProductWithVariants } from "@/types";
+import type { ProductVariant, ProductWithVariants } from "@/types";
 
-export function ProductCard({ product }: { product: ProductWithVariants }) {
+/**
+ * Renders one colour as its own tile. `variant` selects which colour of the
+ * (possibly multi-colour) product this card represents — pass it explicitly
+ * when flattening a product's variants into individual grid cards.
+ */
+export function ProductCard({ product, variant }: { product: ProductWithVariants; variant?: ProductVariant }) {
   const activeVariants = product.variants.filter((v) => v.active);
-  const primary = activeVariants[0];
-  if (!primary) return null;
+  const shown = variant ?? activeVariants[0];
+  if (!shown) return null;
 
-  const image = primary.images?.[0];
-  const colors = productColors(product);
-  const inStock = activeVariants.some((v) => v.is_available && v.stock_quantity > 0);
-  const minPrice = productMinPrice(product);
+  const image = shown.images?.[0];
+  const inStock = shown.is_available && shown.stock_quantity > 0;
+  const otherColourCount = activeVariants.length - 1;
 
   return (
     <Link
-      to={`/products/${product.slug}${primary.color ? `?variant=${encodeURIComponent(primary.color.toLowerCase())}` : ""}`}
+      to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(shown.color.toLowerCase())}` : ""}`}
       className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-lg hover:shadow-stone-200"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
@@ -45,21 +48,12 @@ export function ProductCard({ product }: { product: ProductWithVariants }) {
         <h3 className="truncate text-sm font-medium text-stone-800" title={product.name}>
           {product.name}
         </h3>
+        {shown.color && <p className="text-xs text-stone-500">{shown.color}</p>}
         <div className="text-sm">
-          <PriceDisplay variant={{ ...primary, price: minPrice, sale_price: null }} size="sm" />
+          <PriceDisplay variant={shown} size="sm" />
         </div>
-        {colors.length > 1 && (
-          <div className="flex items-center gap-1 pt-1">
-            {colors.slice(0, 5).map((c) => (
-              <span
-                key={c.color}
-                title={c.color}
-                className="h-3.5 w-3.5 rounded-full border border-stone-300"
-                style={{ backgroundColor: c.hex || "#ccc" }}
-              />
-            ))}
-            {colors.length > 5 && <span className="text-[11px] text-stone-400">+{colors.length - 5}</span>}
-          </div>
+        {otherColourCount > 0 && (
+          <p className="pt-0.5 text-[11px] text-stone-400">+{otherColourCount} more colour{otherColourCount > 1 ? "s" : ""}</p>
         )}
       </div>
     </Link>
