@@ -74,6 +74,13 @@ export default function ProductPage() {
     }, { replace: true });
   }
 
+  // Amazon-style: bullets follow the selected colour. A variant's own bullets win;
+  // the parent product's bullets are the fallback for variants that have none.
+  const activeBullets = useMemo(() => {
+    const variantBullets = selectedVariant?.bullet_points ?? [];
+    return variantBullets.length > 0 ? variantBullets : product?.bullet_points ?? [];
+  }, [selectedVariant, product]);
+
   const maxQty = useMemo(() => Math.min(10, selectedVariant?.stock_quantity ?? 0), [selectedVariant]);
   const inStock = !!selectedVariant && selectedVariant.is_available && selectedVariant.stock_quantity > 0;
 
@@ -182,12 +189,15 @@ export default function ProductPage() {
             </button>
           </div>
 
-          {product.bullet_points?.length > 0 && (
-            <ul className="mt-8 list-disc space-y-1.5 pl-5 text-sm text-stone-600">
-              {product.bullet_points.map((bp, idx) => (
-                <li key={idx}>{bp}</li>
-              ))}
-            </ul>
+          {activeBullets.length > 0 && (
+            <div className="mt-8 border-t border-stone-200 pt-6">
+              <h2 className="mb-2 text-sm font-semibold text-stone-900">About this item</h2>
+              <ul className="list-disc space-y-1.5 pl-5 text-sm text-stone-600">
+                {activeBullets.map((bp, idx) => (
+                  <li key={idx}>{bp}</li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {product.description && (

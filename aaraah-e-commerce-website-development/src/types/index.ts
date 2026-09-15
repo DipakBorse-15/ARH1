@@ -53,6 +53,7 @@ export interface VariantAttributes {
 export interface Product {
   id: string;
   brand: string;
+  parent_sku: string | null;
   name: string;
   slug: string;
   description: string | null;
@@ -80,6 +81,7 @@ export interface ProductVariant {
   is_available: boolean;
   active: boolean;
   variant_info: string | null;
+  bullet_points: string[];
   sort_order: number;
   created_at: string;
   updated_at: string;
