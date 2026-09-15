@@ -196,3 +196,16 @@ export interface DashboardStats {
   lowStockVariants: number;
   totalSales: number;
 }
+
+export interface HeroSlide {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  image: string;
+  cta_text: string | null;
+  cta_link: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}

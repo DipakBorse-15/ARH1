@@ -133,6 +133,34 @@ export interface SimilarItem {
   variant: ProductVariant;
 }
 
+export async function fetchBestsellers(limit = 8): Promise<SimilarItem[]> {
+  // No sales-count data yet, so "bestseller" = the biggest current discounts —
+  // a reasonable stand-in that also doubles as a "deals" section.
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("active", true)
+    .order("created_at", { ascending: false })
+    .limit(60);
+  if (error) throw error;
+
+  const products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+  const pool: SimilarItem[] = [];
+  products.forEach((product) => {
+    product.variants
+      .filter((v) => v.active && v.sale_price != null && v.sale_price < v.price)
+      .forEach((variant) => pool.push({ product, variant }));
+  });
+
+  pool.sort((a, b) => {
+    const discA = a.variant.price > 0 ? (a.variant.price - (a.variant.sale_price ?? a.variant.price)) / a.variant.price : 0;
+    const discB = b.variant.price > 0 ? (b.variant.price - (b.variant.sale_price ?? b.variant.price)) / b.variant.price : 0;
+    return discB - discA;
+  });
+
+  return pool.slice(0, limit);
+}
+
 export async function fetchSimilarVariants(currentVariantId: string, limit = 8): Promise<SimilarItem[]> {
   // "Similar" is per-SKU, not per-product: sibling colours of the SAME design
   // count too, since each SKU is its own listing. We only ever exclude the
