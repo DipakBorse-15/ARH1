@@ -39,6 +39,7 @@ function githubPagesFallback(base: string): Plugin {
   <body>Redirecting…</body>
 </html>
 `;
+      fs.mkdirSync("dist", { recursive: true });
       fs.writeFileSync("dist/404.html", html, "utf-8");
     },
   };
