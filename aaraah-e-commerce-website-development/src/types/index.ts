@@ -189,6 +189,8 @@ export interface Order {
 export interface DashboardStats {
   totalProducts: number;
   activeProducts: number;
+  totalVariants: number;
+  activeVariants: number;
   totalOrders: number;
   pendingOrders: number;
   deliveredOrders: number;

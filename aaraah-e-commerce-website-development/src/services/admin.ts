@@ -5,6 +5,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   const [
     { count: totalProducts },
     { count: activeProducts },
+    { count: totalVariants },
+    { count: activeVariants },
     { count: totalOrders },
     { count: pendingOrders },
     { count: deliveredOrders },
@@ -14,6 +16,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   ] = await Promise.all([
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase.from("products").select("id", { count: "exact", head: true }).eq("active", true),
+    supabase.from("product_variants").select("id", { count: "exact", head: true }),
+    supabase.from("product_variants").select("id", { count: "exact", head: true }).eq("active", true),
     supabase.from("orders").select("id", { count: "exact", head: true }),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "delivered"),
@@ -27,6 +31,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   return {
     totalProducts: totalProducts || 0,
     activeProducts: activeProducts || 0,
+    totalVariants: totalVariants || 0,
+    activeVariants: activeVariants || 0,
     totalOrders: totalOrders || 0,
     pendingOrders: pendingOrders || 0,
     deliveredOrders: deliveredOrders || 0,

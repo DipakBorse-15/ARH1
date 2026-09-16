@@ -32,13 +32,15 @@ export default function DashboardPage() {
   if (!stats) return null;
 
   const cards = [
-    { label: "Total Products", value: stats.totalProducts },
-    { label: "Active Products", value: stats.activeProducts },
+    { label: "Product Designs", value: stats.totalProducts },
+    { label: "Active Designs", value: stats.activeProducts },
+    { label: "Total SKUs (Colours)", value: stats.totalVariants },
+    { label: "Active SKUs (Colours)", value: stats.activeVariants },
     { label: "Total Orders", value: stats.totalOrders },
     { label: "Pending Orders", value: stats.pendingOrders },
     { label: "Delivered Orders", value: stats.deliveredOrders },
     { label: "Total Customers", value: stats.totalCustomers },
-    { label: "Low Stock Variants", value: stats.lowStockVariants, warn: stats.lowStockVariants > 0 },
+    { label: "Low Stock SKUs", value: stats.lowStockVariants, warn: stats.lowStockVariants > 0 },
     { label: "Total Sales (Paid)", value: formatINR(stats.totalSales) },
   ];
 

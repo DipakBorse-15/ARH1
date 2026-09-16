@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ToastProvider } from "@/contexts/ToastContext";
+import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { MainLayout } from "@/layouts/MainLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
@@ -32,6 +33,7 @@ const AdminCollectionsPage = lazy(() => import("@/pages/admin/CollectionsPage"))
 const AdminOrdersPage = lazy(() => import("@/pages/admin/OrdersPage"));
 const AdminImportPage = lazy(() => import("@/pages/admin/ImportPage"));
 const AdminHeroSlidesPage = lazy(() => import("@/pages/admin/HeroSlidesPage"));
+const AdminHomeEditorPage = lazy(() => import("@/pages/admin/HomeEditorPage"));
 const AdminOrderDetailPage = lazy(() => import("@/pages/admin/OrderDetailPage"));
 
 // Normalize basename: BrowserRouter expects no trailing slash (except root "/").
@@ -41,6 +43,7 @@ export default function App() {
   return (
     <BrowserRouter basename={basename}>
       <ToastProvider>
+        <SiteSettingsProvider>
         <AuthProvider>
           <CartProvider>
             <Suspense fallback={<LoadingState label="Loading AARAAH…" />}>
@@ -74,6 +77,7 @@ export default function App() {
                     <Route path="products/new" element={<AdminProductFormPage />} />
                     <Route path="products/:id" element={<AdminProductFormPage />} />
                     <Route path="import" element={<AdminImportPage />} />
+                    <Route path="home-editor" element={<AdminHomeEditorPage />} />
                     <Route path="hero-slides" element={<AdminHeroSlidesPage />} />
                     <Route path="categories" element={<AdminCategoriesPage />} />
                     <Route path="collections" element={<AdminCollectionsPage />} />
@@ -85,6 +89,7 @@ export default function App() {
             </Suspense>
           </CartProvider>
         </AuthProvider>
+        </SiteSettingsProvider>
       </ToastProvider>
     </BrowserRouter>
   );
