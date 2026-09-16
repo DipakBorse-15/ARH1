@@ -209,3 +209,15 @@ export interface HeroSlide {
   created_at: string;
   updated_at: string;
 }
+
+export interface SiteSettings {
+  id: true;
+  logo_url: string | null;
+  site_name: string;
+  tagline: string | null;
+  announcement_text: string | null;
+  announcement_link: string | null;
+  announcement_active: boolean;
+  font_family: string;
+  updated_at: string;
+}
