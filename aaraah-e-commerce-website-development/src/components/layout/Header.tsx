@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 
@@ -9,6 +10,7 @@ export function Header() {
   const [search, setSearch] = useState("");
   const { user } = useAuth();
   const { itemCount } = useCart();
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
 
   function submitSearch(e: React.FormEvent) {
@@ -32,8 +34,14 @@ export function Header() {
           </svg>
         </button>
 
-        <Link to="/" className="mr-2 shrink-0 font-serif text-2xl font-bold tracking-wide text-rose-900">
-          {siteConfig.name}
+        <Link to="/" className="mr-2 flex shrink-0 items-center gap-2">
+          {settings?.logo_url ? (
+            <img src={settings.logo_url} alt={settings.site_name || siteConfig.name} className="h-9 w-auto object-contain" />
+          ) : (
+            <span className="font-serif text-2xl font-bold tracking-wide text-rose-900">
+              {settings?.site_name || siteConfig.name}
+            </span>
+          )}
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium text-stone-700 md:flex">
