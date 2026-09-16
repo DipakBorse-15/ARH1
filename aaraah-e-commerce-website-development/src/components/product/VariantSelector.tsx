@@ -33,7 +33,7 @@ export function VariantSelector({
               onClick={() => onSelect(v)}
               aria-pressed={isSelected}
               title={`${v.color}${outOfStock ? " (out of stock)" : ""}`}
-              className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition ${
+              className={`relative h-20 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
                 isSelected ? "border-rose-900" : "border-stone-200 hover:border-rose-900/60"
               } ${outOfStock ? "opacity-50" : ""}`}
             >
