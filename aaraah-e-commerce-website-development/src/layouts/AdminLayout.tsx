@@ -5,7 +5,6 @@ const links = [
   { to: "/admin", label: "Dashboard", end: true },
   { to: "/admin/products", label: "Products" },
   { to: "/admin/home-editor", label: "Home Page" },
-  { to: "/admin/hero-slides", label: "Banners" },
   { to: "/admin/import", label: "Import" },
   { to: "/admin/categories", label: "Categories" },
   { to: "/admin/collections", label: "Collections" },

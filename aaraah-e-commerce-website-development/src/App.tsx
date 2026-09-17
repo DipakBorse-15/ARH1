@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ToastProvider } from "@/contexts/ToastContext";
@@ -32,7 +32,6 @@ const AdminCategoriesPage = lazy(() => import("@/pages/admin/CategoriesPage"));
 const AdminCollectionsPage = lazy(() => import("@/pages/admin/CollectionsPage"));
 const AdminOrdersPage = lazy(() => import("@/pages/admin/OrdersPage"));
 const AdminImportPage = lazy(() => import("@/pages/admin/ImportPage"));
-const AdminHeroSlidesPage = lazy(() => import("@/pages/admin/HeroSlidesPage"));
 const AdminHomeEditorPage = lazy(() => import("@/pages/admin/HomeEditorPage"));
 const AdminOrderDetailPage = lazy(() => import("@/pages/admin/OrderDetailPage"));
 
@@ -78,7 +77,7 @@ export default function App() {
                     <Route path="products/:id" element={<AdminProductFormPage />} />
                     <Route path="import" element={<AdminImportPage />} />
                     <Route path="home-editor" element={<AdminHomeEditorPage />} />
-                    <Route path="hero-slides" element={<AdminHeroSlidesPage />} />
+                    <Route path="hero-slides" element={<Navigate to="/admin/home-editor" replace />} />
                     <Route path="categories" element={<AdminCategoriesPage />} />
                     <Route path="collections" element={<AdminCollectionsPage />} />
                     <Route path="orders" element={<AdminOrdersPage />} />
