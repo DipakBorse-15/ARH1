@@ -170,7 +170,7 @@ export default function ProductPage() {
           <ProductGallery images={selectedVariant.images || []} alt={`${product.name} - ${selectedVariant.color}`} />
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-rose-900/70">{product.brand}</p>
           <h1 className="mt-1 text-2xl font-semibold text-stone-900 sm:text-3xl">{product.name}</h1>
           <p className="mt-1 text-xs text-stone-400">SKU: {selectedVariant.sku}</p>

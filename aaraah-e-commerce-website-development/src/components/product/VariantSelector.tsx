@@ -20,7 +20,7 @@ export function VariantSelector({
         Colour: <span className="font-semibold text-stone-900">{selected?.color}</span>
       </p>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="grid min-w-0 grid-cols-4 gap-2 sm:max-w-xs">
         {visible.map((v) => {
           const isSelected = v.id === selectedId;
           const outOfStock = !v.is_available || v.stock_quantity <= 0;
@@ -33,7 +33,7 @@ export function VariantSelector({
               onClick={() => onSelect(v)}
               aria-pressed={isSelected}
               title={`${v.color}${outOfStock ? " (out of stock)" : ""}`}
-              className={`relative h-20 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
+              className={`relative aspect-[3/4] w-full overflow-hidden rounded-lg border-2 transition ${
                 isSelected ? "border-rose-900" : "border-stone-200 hover:border-rose-900/60"
               } ${outOfStock ? "opacity-50" : ""}`}
             >

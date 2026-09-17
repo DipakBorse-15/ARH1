@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
@@ -22,6 +22,7 @@ export default function AdminHeroSlidesPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<HeroSlide>>(EMPTY);
   const [uploading, setUploading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     load();
@@ -69,9 +70,32 @@ export default function AdminHeroSlidesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, title: string) {
+    if (!window.confirm(`Delete the banner "${title}"? This can't be undone.`)) return;
     try {
       await deleteHeroSlide(id);
+      show("Banner deleted", "success");
+      load();
+    } catch (err) {
+      show(friendlyError(err), "error");
+    }
+  }
+
+  function editSlide(s: HeroSlide) {
+    setForm(s);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function moveSlide(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    const a = items[index];
+    const b = items[target];
+    try {
+      await Promise.all([
+        upsertHeroSlide({ id: a.id, sort_order: b.sort_order }),
+        upsertHeroSlide({ id: b.id, sort_order: a.sort_order }),
+      ]);
       load();
     } catch (err) {
       show(friendlyError(err), "error");
@@ -86,7 +110,10 @@ export default function AdminHeroSlidesPage() {
         These images and text power the rotating banner at the top of the homepage. Lower "Order" shows first.
       </p>
 
-      <form onSubmit={handleSave} className="mb-8 grid gap-3 rounded-2xl border border-stone-200 bg-white p-5 sm:grid-cols-2">
+      <form ref={formRef} onSubmit={handleSave} className="mb-8 grid gap-3 rounded-2xl border border-stone-200 bg-white p-5 sm:grid-cols-2">
+        <h2 className="sm:col-span-2 text-sm font-semibold text-stone-900">
+          {form.id ? "Edit Banner" : "Add a New Banner"}
+        </h2>
         {form.id && (
           <div className="sm:col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Editing "{form.title}" —{" "}
@@ -151,7 +178,7 @@ export default function AdminHeroSlidesPage() {
           type="submit"
           className="sm:col-span-2 mt-1 rounded-full bg-rose-900 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-800"
         >
-          {form.id ? "Update Slide" : "Add Slide"}
+          {form.id ? "Save Changes" : "Save Banner"}
         </button>
       </form>
 
@@ -159,25 +186,45 @@ export default function AdminHeroSlidesPage() {
         <LoadingState label="Loading slides…" />
       ) : (
         <div className="space-y-3">
-          {items.map((s) => (
-            <div key={s.id} className="flex items-center gap-4 rounded-xl border border-stone-200 bg-white p-3">
+          {items.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white p-3">
+              <div className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => moveSlide(i, -1)}
+                  disabled={i === 0}
+                  title="Move up (shows earlier)"
+                  className="rounded border border-stone-200 px-1.5 text-stone-500 hover:bg-stone-50 disabled:opacity-30"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSlide(i, 1)}
+                  disabled={i === items.length - 1}
+                  title="Move down (shows later)"
+                  className="rounded border border-stone-200 px-1.5 text-stone-500 hover:bg-stone-50 disabled:opacity-30"
+                >
+                  ▼
+                </button>
+              </div>
               <img src={s.image} alt={s.title} className="h-16 w-28 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-stone-900">{s.title}</p>
                 <p className="truncate text-xs text-stone-500">
-                  Order {s.sort_order} · {s.active ? "Active" : "Hidden"}
+                  Position {i + 1} of {items.length} · {s.active ? "Active" : "Hidden"}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setForm(s)}
+                onClick={() => editSlide(s)}
                 className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
               >
                 Edit
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(s.id)}
+                onClick={() => handleDelete(s.id, s.title)}
                 className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
               >
                 Delete
