@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { fetchSiteSettings, updateSiteSettings } from "@/services/siteSettings";
-import { fetchAllCategoriesAdmin, upsertCategory } from "@/services/categories";
 import { fetchAllHeroSlidesAdmin, upsertHeroSlide, deleteHeroSlide } from "@/services/heroSlides";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { FONT_OPTIONS, applySiteFont } from "@/config/fonts";
-import type { Category, HeroSlide, SiteSettings } from "@/types";
+import type { HeroSlide, SiteSettings } from "@/types";
 
-type Tab = "branding" | "offer" | "banners" | "categories";
+type Tab = "branding" | "offer" | "banners";
 
 /** Storage keys reject spaces/special characters — keep only safe ones. */
 function safeFileName(name: string): string {
@@ -22,7 +20,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "branding", label: "Logo & Font" },
   { id: "offer", label: "Offer Strip" },
   { id: "banners", label: "Hero Banners" },
-  { id: "categories", label: "Category Thumbnails" },
 ];
 
 export default function AdminHomeEditorPage() {
@@ -54,7 +51,6 @@ export default function AdminHomeEditorPage() {
       {tab === "branding" && <BrandingTab />}
       {tab === "offer" && <OfferStripTab />}
       {tab === "banners" && <BannersTab />}
-      {tab === "categories" && <CategoriesTab />}
     </div>
   );
 }
@@ -554,84 +550,5 @@ function BannersTab() {
         </div>
       )}
     </div>
-  );
-}
-
-/* ---------------------------------------------------------------------- */
-/* Category thumbnails tab                                                */
-/* ---------------------------------------------------------------------- */
-
-function CategoriesTab() {
-  const { show } = useToast();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
-    setLoading(true);
-    try {
-      setCategories(await fetchAllCategoriesAdmin());
-    } catch (err) {
-      show(friendlyError(err), "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleUpload(cat: Category, file: File) {
-    setUploadingId(cat.id);
-    try {
-      const path = `${Date.now()}-${safeFileName(file.name)}`;
-      const { error } = await supabase.storage.from("category-images").upload(path, file, { upsert: true });
-      if (error) throw error;
-      const { data } = supabase.storage.from("category-images").getPublicUrl(path);
-      await upsertCategory({ id: cat.id, image: data.publicUrl });
-      show(`${cat.name} thumbnail updated`, "success");
-      load();
-    } catch (err) {
-      show(friendlyError(err, "Thumbnail upload failed."), "error");
-    } finally {
-      setUploadingId(null);
-    }
-  }
-
-  if (loading) return <LoadingState label="Loading categories…" />;
-
-  return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h2 className="mb-1 text-sm font-semibold text-stone-900">Category Thumbnails</h2>
-      <p className="mb-4 text-xs text-stone-500">
-        These images power the round category shortcuts on the homepage. To add, rename, or remove a category
-        entirely, use <Link to="/admin/categories" className="text-rose-900 underline">Categories</Link>.
-      </p>
-      <div className="flex flex-wrap gap-4">
-        {categories.map((c) => (
-          <div key={c.id} className="w-24 text-center">
-            <div className="mx-auto mb-1 h-20 w-20 overflow-hidden rounded-full border border-stone-200 bg-stone-100">
-              {c.image ? (
-                <img src={c.image} alt={c.name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-2xl text-stone-300">🪷</div>
-              )}
-            </div>
-            <p className="mb-1 truncate text-xs text-stone-700">{c.name}</p>
-            <label className="cursor-pointer text-[10px] font-semibold text-rose-900 underline">
-              {uploadingId === c.id ? "Uploading…" : "Change"}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => e.target.files?.[0] && handleUpload(c, e.target.files[0])}
-              />
-            </label>
-          </div>
-        ))}
-        {categories.length === 0 && <p className="text-sm text-stone-500">No categories yet.</p>}
-      </div>
-    </section>
   );
 }
