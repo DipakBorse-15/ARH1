@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { siteConfig, isSupabaseConfigured } from "@/config/site";
-import { fetchCategories } from "@/services/categories";
+import { fetchCategoriesByRecentActivity } from "@/services/categories";
 import { fetchCollections } from "@/services/collections";
 import { fetchProducts, fetchBestsellers, type SimilarItem } from "@/services/products";
 import { fetchActiveHeroSlides } from "@/services/heroSlides";
@@ -33,7 +33,7 @@ export default function Home() {
     try {
       const [hs, cats, cols, best] = await Promise.all([
         fetchActiveHeroSlides(),
-        fetchCategories(),
+        fetchCategoriesByRecentActivity(),
         fetchCollections(),
         fetchBestsellers(8),
       ]);
@@ -222,7 +222,7 @@ function CategoryShortcuts({ categories }: { categories: Category[] }) {
   if (!categories.length) return null;
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="flex gap-5 overflow-x-auto pb-2" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
         {categories.map((c) => (
           <Link key={c.id} to={`/category/${c.slug}`} className="flex w-20 shrink-0 flex-col items-center gap-2 text-center">
             <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-stone-100 text-stone-300">
