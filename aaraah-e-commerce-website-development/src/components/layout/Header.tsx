@@ -7,34 +7,38 @@ import { useCart } from "@/contexts/CartContext";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { user } = useAuth();
   const { itemCount } = useCart();
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
 
+  const navLinks = [
+    ...siteConfig.categories.map((c) => ({ label: c.name.toUpperCase(), to: `/category/${c.slug}` })),
+    ...siteConfig.collections.map((c) => ({ label: c.name.toUpperCase(), to: `/collection/${c.slug}` })),
+  ];
+
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
     if (search.trim()) {
       navigate(`/search?q=${encodeURIComponent(search.trim())}`);
+      setSearch("");
+      setSearchOpen(false);
       setMobileOpen(false);
     }
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-        <button
-          className="md:hidden"
-          aria-label="Open menu"
-          onClick={() => setMobileOpen((o) => !o)}
-        >
+        <button className="md:hidden" aria-label="Open menu" onClick={() => setMobileOpen((o) => !o)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
           </svg>
         </button>
 
-        <Link to="/" className="mr-2 flex shrink-0 items-center gap-2">
+        <Link to="/" className="mr-1 flex shrink-0 items-center gap-2">
           {settings?.logo_url ? (
             <img src={settings.logo_url} alt={settings.site_name || siteConfig.name} className="h-9 w-auto object-contain" />
           ) : (
@@ -44,44 +48,27 @@ export function Header() {
           )}
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm font-medium text-stone-700 md:flex">
-          <Link to="/" className="transition hover:text-rose-900">
-            Home
-          </Link>
-          <div className="group relative">
-            <button className="flex items-center gap-1 py-4 transition hover:text-rose-900">Categories</button>
-            <div className="invisible absolute left-0 top-full w-56 rounded-xl border border-stone-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
-              {siteConfig.categories.map((c) => (
-                <Link key={c.slug} to={`/category/${c.slug}`} className="block rounded-lg px-3 py-2 hover:bg-stone-50">
-                  {c.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div className="group relative">
-            <button className="flex items-center gap-1 py-4 transition hover:text-rose-900">Collections</button>
-            <div className="invisible absolute left-0 top-full w-56 rounded-xl border border-stone-200 bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">
-              {siteConfig.collections.map((c) => (
-                <Link key={c.slug} to={`/collection/${c.slug}`} className="block rounded-lg px-3 py-2 hover:bg-stone-50">
-                  {c.name}
-                </Link>
-              ))}
-            </div>
-          </div>
+        {/* Centered flat nav — categories then collections, no dropdowns */}
+        <nav className="hidden flex-1 items-center justify-center gap-6 text-sm font-medium tracking-wide text-stone-700 md:flex">
+          {navLinks.map((link) => (
+            <Link key={link.to} to={link.to} className="whitespace-nowrap py-4 transition hover:text-rose-900">
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
-        <form onSubmit={submitSearch} className="ml-auto hidden max-w-xs flex-1 items-center md:flex">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search sarees, kurtis…"
-            aria-label="Search products"
-            className="w-full rounded-full border border-stone-300 bg-stone-50 px-4 py-2 text-sm focus:border-rose-900 focus:outline-none"
-          />
-        </form>
-
         <div className="ml-auto flex items-center gap-4 md:ml-0">
+          <button
+            type="button"
+            aria-label="Search"
+            onClick={() => setSearchOpen((o) => !o)}
+            className="hidden text-stone-700 hover:text-rose-900 md:block"
+          >
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.2-3.2" strokeLinecap="round" />
+            </svg>
+          </button>
           <Link to={user ? "/account" : "/login"} aria-label="Account" className="text-stone-700 hover:text-rose-900">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <circle cx="12" cy="8" r="4" />
@@ -104,6 +91,23 @@ export function Header() {
         </div>
       </div>
 
+      {/* Expanding search row (desktop) */}
+      {searchOpen && (
+        <div className="hidden border-t border-stone-200 bg-stone-50 px-4 py-3 md:block">
+          <form onSubmit={submitSearch} className="mx-auto max-w-7xl">
+            <input
+              autoFocus
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search sarees, kurtis…"
+              aria-label="Search products"
+              className="w-full max-w-md rounded-full border border-stone-300 bg-white px-4 py-2 text-sm focus:border-rose-900 focus:outline-none"
+            />
+          </form>
+        </div>
+      )}
+
       {mobileOpen && (
         <div className="border-t border-stone-200 bg-white px-4 py-4 md:hidden">
           <form onSubmit={submitSearch} className="mb-4 flex">
@@ -115,29 +119,15 @@ export function Header() {
               className="w-full rounded-full border border-stone-300 px-4 py-2 text-sm"
             />
           </form>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Categories</p>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            {siteConfig.categories.map((c) => (
-              <Link
-                key={c.slug}
-                to={`/category/${c.slug}`}
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700"
-              >
-                {c.name}
-              </Link>
-            ))}
-          </div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Collections</p>
           <div className="grid grid-cols-2 gap-2">
-            {siteConfig.collections.map((c) => (
+            {navLinks.map((link) => (
               <Link
-                key={c.slug}
-                to={`/collection/${c.slug}`}
+                key={link.to}
+                to={link.to}
                 onClick={() => setMobileOpen(false)}
                 className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700"
               >
-                {c.name}
+                {link.label}
               </Link>
             ))}
           </div>

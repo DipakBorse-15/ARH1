@@ -220,6 +220,9 @@ export interface SiteSettings {
   announcement_text: string | null;
   announcement_link: string | null;
   announcement_active: boolean;
+  announcement2_text: string | null;
+  announcement2_link: string | null;
+  announcement2_active: boolean;
   font_family: string;
   updated_at: string;
 }
