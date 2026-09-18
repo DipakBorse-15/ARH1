@@ -37,7 +37,7 @@ export default function AdminCollectionsPage() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
-      const path = `${Date.now()}-${file.name}`;
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("collection-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("collection-images").getPublicUrl(path);

@@ -13,6 +13,11 @@ import type { Category, HeroSlide, SiteSettings } from "@/types";
 
 type Tab = "branding" | "offer" | "banners" | "categories";
 
+/** Storage keys reject spaces/special characters — keep only safe ones. */
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "-");
+}
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "branding", label: "Logo & Font" },
   { id: "offer", label: "Offer Strip" },
@@ -137,7 +142,7 @@ function BrandingTab() {
   async function handleLogoUpload(file: File) {
     setUploadingLogo(true);
     try {
-      const path = `logo-${Date.now()}-${file.name}`;
+      const path = `logo-${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("site-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("site-images").getPublicUrl(path);
@@ -356,7 +361,7 @@ function BannersTab() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
-      const path = `${Date.now()}-${file.name}`;
+      const path = `${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("hero-images").getPublicUrl(path);
@@ -580,7 +585,7 @@ function CategoriesTab() {
   async function handleUpload(cat: Category, file: File) {
     setUploadingId(cat.id);
     try {
-      const path = `${Date.now()}-${file.name}`;
+      const path = `${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("category-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("category-images").getPublicUrl(path);
