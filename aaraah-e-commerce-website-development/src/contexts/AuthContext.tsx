@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { siteConfig } from "@/config/site";
 import type { Profile } from "@/types";
 
 interface AuthContextValue {
@@ -62,10 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string, fullName: string, mobile: string) {
+    // Explicit redirect: don't rely on Supabase's dashboard "Site URL" being
+    // correct — build it from where the app is actually running right now.
+    const base = siteConfig.basePath === "/" ? "" : siteConfig.basePath.replace(/\/$/, "");
+    const emailRedirectTo = `${window.location.origin}${base}/`;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName }, emailRedirectTo },
     });
     if (error) return { error: error.message };
     if (data.user) {

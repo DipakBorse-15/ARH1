@@ -5,6 +5,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { MainLayout } from "@/layouts/MainLayout";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
 import { LoadingState } from "@/components/ui/States";
@@ -45,6 +46,7 @@ export default function App() {
         <SiteSettingsProvider>
         <AuthProvider>
           <CartProvider>
+            <ScrollToTop />
             <Suspense fallback={<LoadingState label="Loading AARAAH…" />}>
               <Routes>
                 <Route element={<MainLayout />}>
