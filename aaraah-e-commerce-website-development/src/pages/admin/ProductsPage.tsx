@@ -105,19 +105,20 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function handleVariantPriceCommit(productId: string, variant: ProductVariant, rawValue: string) {
-    const nextPrice = Number(rawValue);
-    if (!Number.isFinite(nextPrice) || nextPrice < 0) {
-      show("Enter a valid price.", "error");
+  async function handleVariantSellingPriceCommit(productId: string, variant: ProductVariant, rawValue: string) {
+    const nextSalePrice = Number(rawValue);
+    if (!Number.isFinite(nextSalePrice) || nextSalePrice < 0) {
+      show("Enter a valid selling price.", "error");
       return;
     }
-    if (nextPrice === variant.price) return; // unchanged, nothing to save
+    const currentEffective = variant.sale_price ?? variant.price;
+    if (nextSalePrice === currentEffective) return; // unchanged, nothing to save
 
     setSavingKey(`variant:${variant.id}`);
     try {
-      await updateVariantQuick(variant.id, { price: nextPrice });
-      patchVariant(productId, variant.id, { price: nextPrice });
-      show("Price updated", "success");
+      await updateVariantQuick(variant.id, { sale_price: nextSalePrice });
+      patchVariant(productId, variant.id, { sale_price: nextSalePrice });
+      show("Selling price updated", "success");
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {
@@ -158,7 +159,7 @@ export default function AdminProductsPage() {
                 <th className="p-3">Design / Colour</th>
                 <th className="p-3">Category</th>
                 <th className="p-3">Collection</th>
-                <th className="p-3">Price</th>
+                <th className="p-3">Selling Price</th>
                 <th className="p-3">Stock</th>
                 <th className="p-3">Active</th>
                 <th className="p-3">Actions</th>
@@ -236,7 +237,7 @@ export default function AdminProductsPage() {
                           collections={collections}
                           saving={savingKey === `variant:${v.id}`}
                           onCollectionChange={(collectionId) => handleVariantCollectionChange(p.id, v.id, collectionId)}
-                          onPriceCommit={(raw) => handleVariantPriceCommit(p.id, v, raw)}
+                          onPriceCommit={(raw) => handleVariantSellingPriceCommit(p.id, v, raw)}
                           editHref={`/admin/products/${p.id}`}
                         />
                       ))}
@@ -268,11 +269,12 @@ function VariantRow({
   onPriceCommit: (rawValue: string) => void;
   editHref: string;
 }) {
-  const [priceDraft, setPriceDraft] = useState(String(variant.price));
+  const effectiveSellingPrice = variant.sale_price ?? variant.price;
+  const [priceDraft, setPriceDraft] = useState(String(effectiveSellingPrice));
 
   useEffect(() => {
-    setPriceDraft(String(variant.price));
-  }, [variant.price]);
+    setPriceDraft(String(effectiveSellingPrice));
+  }, [effectiveSellingPrice]);
 
   const inheritedCollection = collections.find((c) => c.id === product.collection_id);
 
@@ -313,9 +315,11 @@ function VariantRow({
             disabled={saving}
             onChange={(e) => setPriceDraft(e.target.value)}
             onBlur={(e) => onPriceCommit(e.target.value)}
+            title="Selling price (what the customer pays)"
             className="w-20 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-rose-900 focus:outline-none disabled:opacity-50"
           />
         </div>
+        <p className="mt-0.5 text-[10px] text-stone-400">MRP ₹{variant.price}</p>
       </td>
       <td className="p-3 text-stone-500">{variant.stock_quantity}</td>
       <td className="p-3">
