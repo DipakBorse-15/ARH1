@@ -93,6 +93,9 @@ export interface ProductVariant {
   color_group: string | null;
   fabric_type: string | null;
   search_keywords: string | null;
+  /** NULL = inherit the parent product's collection_id (see migration 0013). */
+  collection_id: string | null;
+  collection?: Collection | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
