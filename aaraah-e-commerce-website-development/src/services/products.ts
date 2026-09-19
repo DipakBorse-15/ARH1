@@ -7,7 +7,8 @@ const PRODUCT_SELECT = `
   collection:collections(*),
   variants:product_variants(
     *,
-    images:product_images(*)
+    images:product_images(*),
+    collection:collections(*)
   )
 `;
 
@@ -44,6 +45,18 @@ export function effectivePrice(variant: ProductVariant): number {
   return Number(variant.sale_price ?? variant.price);
 }
 
+/**
+ * A variant's actual collection: its own collection_id if set, otherwise it
+ * inherits the parent design's collection. Same override pattern already
+ * used for per-variant description/bullet_points (see migrations 0006/0008).
+ */
+export function variantCollectionId(
+  product: Pick<Product, "collection_id">,
+  variant: Pick<ProductVariant, "collection_id">
+): string | null {
+  return variant.collection_id ?? product.collection_id ?? null;
+}
+
 export function productMinPrice(product: ProductWithVariants): number {
   const active = product.variants.filter((v) => v.active);
   if (!active.length) return 0;
@@ -69,10 +82,14 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
     query = query.eq("category_id", cat.id);
   }
 
+  // Collection membership can be set per-variant now, so it can't be pushed
+  // down into the products-table query below — resolved and applied after
+  // fetching (see the `collectionId` block further down).
+  let collectionId: string | null = null;
   if (collectionSlug) {
     const { data: col } = await supabase.from("collections").select("id").eq("slug", collectionSlug).maybeSingle();
     if (!col) return { products: [], total: 0 };
-    query = query.eq("collection_id", col.id);
+    collectionId = col.id;
   }
 
   if (search) {
@@ -86,8 +103,17 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
 
   let products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
 
-  // Only keep products that still have at least one active/available variant.
+  // Only keep products that still have at least one active variant.
   products = products.filter((p) => p.variants.some((v) => v.active));
+
+  if (collectionId) {
+    products = products
+      .map((p) => ({
+        ...p,
+        variants: p.variants.filter((v) => variantCollectionId(p, v) === collectionId),
+      }))
+      .filter((p) => p.variants.some((v) => v.active));
+  }
 
   if (filters.color) {
     products = products.filter((p) => p.variants.some((v) => v.color === filters.color));
@@ -113,7 +139,10 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
       break; // newest / relevance already ordered by created_at
   }
 
-  const total = filters.color || filters.inStockOnly || filters.minPrice || filters.maxPrice ? products.length : count || products.length;
+  const total =
+    filters.color || filters.inStockOnly || filters.minPrice || filters.maxPrice || collectionId
+      ? products.length
+      : count || products.length;
 
   const start = (page - 1) * pageSize;
   const paged = products.slice(start, start + pageSize);
@@ -221,14 +250,42 @@ export async function upsertProduct(product: Partial<Product>) {
   return data as Product;
 }
 
+/**
+ * Partial update for an EXISTING product only (id required). Uses `.update()`
+ * instead of `.upsert()` — upsert plans an INSERT-on-conflict first, which
+ * fails NOT NULL checks (e.g. `slug`) when the payload only has a couple of
+ * fields. Use this for quick inline edits (collection, active toggle, etc.).
+ */
+export async function updateProductQuick(
+  id: string,
+  patch: Partial<Pick<Product, "collection_id" | "category_id" | "active">>
+) {
+  const { data, error } = await supabase.from("products").update(patch).eq("id", id).select().single();
+  if (error) throw error;
+  return data as Product;
+}
+
 export async function deleteProduct(id: string) {
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
 }
 
 export async function upsertVariant(variant: Partial<ProductVariant>) {
-  const { images: _images, ...payload } = variant;
+  const { images: _images, collection: _collection, ...payload } = variant;
   const { data, error } = await supabase.from("product_variants").upsert(payload).select().single();
+  if (error) throw error;
+  return data as ProductVariant;
+}
+
+/**
+ * Partial update for an EXISTING variant only (id required) — same reasoning
+ * as `updateProductQuick`. Use this for quick inline edits (price, collection).
+ */
+export async function updateVariantQuick(
+  id: string,
+  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">>
+) {
+  const { data, error } = await supabase.from("product_variants").update(patch).eq("id", id).select().single();
   if (error) throw error;
   return data as ProductVariant;
 }
