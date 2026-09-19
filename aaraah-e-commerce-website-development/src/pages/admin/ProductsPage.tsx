@@ -4,16 +4,20 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAllProductsAdmin, upsertProduct, deleteProduct } from "@/services/products";
+import { fetchAllCollectionsAdmin } from "@/services/collections";
 import { friendlyError } from "@/lib/supabase";
-import type { ProductWithVariants } from "@/types";
+import type { Collection, ProductWithVariants } from "@/types";
 
 export default function AdminProductsPage() {
   const { show } = useToast();
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingCollectionId, setSavingCollectionId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
+    fetchAllCollectionsAdmin().then(setCollections).catch(() => {});
   }, []);
 
   async function load() {
@@ -33,6 +37,29 @@ export default function AdminProductsPage() {
       load();
     } catch (err) {
       show(friendlyError(err), "error");
+    }
+  }
+
+  async function handleCollectionChange(productId: string, collectionId: string) {
+    setSavingCollectionId(productId);
+    try {
+      await upsertProduct({ id: productId, collection_id: collectionId || null });
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId
+            ? {
+                ...p,
+                collection_id: collectionId || null,
+                collection: collections.find((c) => c.id === collectionId) || null,
+              }
+            : p
+        )
+      );
+      show("Collection updated", "success");
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setSavingCollectionId(null);
     }
   }
 
@@ -68,6 +95,7 @@ export default function AdminProductsPage() {
               <tr>
                 <th className="p-3">Design</th>
                 <th className="p-3">Category</th>
+                <th className="p-3">Collection</th>
                 <th className="p-3">Variants</th>
                 <th className="p-3">Stock</th>
                 <th className="p-3">Active</th>
@@ -82,6 +110,21 @@ export default function AdminProductsPage() {
                     <p className="text-xs text-stone-400">{p.brand}</p>
                   </td>
                   <td className="p-3 text-stone-500">{p.category?.name || "—"}</td>
+                  <td className="p-3">
+                    <select
+                      value={p.collection_id || ""}
+                      disabled={savingCollectionId === p.id}
+                      onChange={(e) => handleCollectionChange(p.id, e.target.value)}
+                      className="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-rose-900 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="">No collection</option>
+                      {collections.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="p-3 text-stone-500">{p.variants.length}</td>
                   <td className="p-3 text-stone-500">{p.variants.reduce((s, v) => s + v.stock_quantity, 0)}</td>
                   <td className="p-3">
