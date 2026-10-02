@@ -27,7 +27,7 @@ interface FormState {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "razorpay";
+  payment_method: "cod" | "upi";
 }
 
 const EMPTY_FORM: FormState = {
@@ -90,7 +90,9 @@ export default function CheckoutPage() {
   }, [directItem, cartItems]);
 
   const subtotal = directItem ? effectivePrice(directItem.variant) * directItem.quantity : cartSubtotal;
-  const shipping = subtotal > 0 && subtotal < 999 ? 79 : 0;
+  // Must match SHIPPING_FEE in the create-order Edge Function exactly — this
+  // number is only ever a preview, the server computes the order's real total.
+  const shipping = 0;
   const total = subtotal + shipping;
 
   function applyAddress(a: Address) {
@@ -243,13 +245,13 @@ export default function CheckoutPage() {
                 />
                 Cash on Delivery
               </label>
-              <label className="mt-2 flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm opacity-60">
+              <label className="mt-2 flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm">
                 <input
                   type="radio"
-                  checked={form.payment_method === "razorpay"}
-                  onChange={() => setForm({ ...form, payment_method: "razorpay" })}
+                  checked={form.payment_method === "upi"}
+                  onChange={() => setForm({ ...form, payment_method: "upi" })}
                 />
-                Pay Online (UPI / Card / Netbanking) — gateway integration coming soon
+                Pay via UPI (scan QR after placing order)
               </label>
             </div>
           </div>

@@ -27,8 +27,10 @@ interface Payload {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "razorpay" | "cashfree" | "phonepe";
+  payment_method: "cod" | "upi";
 }
+
+const VALID_PAYMENT_METHODS = new Set(["cod", "upi"]);
 
 const SHIPPING_FEE = 0; // Flat free shipping for now — adjust as needed.
 const corsHeaders = {
@@ -66,6 +68,9 @@ Deno.serve(async (req) => {
     if (!payload.items?.length) return json({ error: "Cart is empty" }, 400);
     if (!payload.full_name || !payload.mobile || !payload.email || !payload.address_line1 || !payload.city || !payload.state || !payload.pincode) {
       return json({ error: "Missing required address fields" }, 400);
+    }
+    if (!VALID_PAYMENT_METHODS.has(payload.payment_method)) {
+      return json({ error: "Invalid payment method" }, 400);
     }
 
     const variantIds = payload.items.map((i) => i.variant_id);
@@ -131,7 +136,7 @@ Deno.serve(async (req) => {
         state: payload.state,
         pincode: payload.pincode,
         payment_method: payload.payment_method,
-        payment_status: payload.payment_method === "cod" ? "pending" : "pending",
+        payment_status: "pending",
         status: "pending",
         subtotal,
         shipping_fee: SHIPPING_FEE,
@@ -147,11 +152,30 @@ Deno.serve(async (req) => {
     if (itemsError) return json({ error: "Could not save order items" }, 500);
 
     // Decrement stock atomically per-variant (never touches other colors).
+    // decrement_variant_stock raises an exception (and the `.error` below is
+    // set) if a concurrent order already took the remaining stock.
+    const outOfStockSkus: string[] = [];
     for (const item of payload.items) {
-      await admin.rpc("decrement_variant_stock", {
+      const { error: stockError } = await admin.rpc("decrement_variant_stock", {
         p_variant_id: item.variant_id,
         p_quantity: item.quantity,
       });
+      if (stockError) {
+        const variant = variants?.find((v: { id: string }) => v.id === item.variant_id);
+        outOfStockSkus.push(variant?.sku ?? item.variant_id);
+      }
+    }
+
+    if (outOfStockSkus.length > 0) {
+      // Don't leave a "successful" order whose stock was never actually
+      // reserved — cancel it and tell the customer which items to revisit.
+      // (Any items that DID decrement above are intentionally left
+      // decremented; an admin can restock manually if needed.)
+      await admin.from("orders").update({ status: "cancelled" }).eq("id", order.id);
+      return json(
+        { error: `Sorry, these items just sold out: ${outOfStockSkus.join(", ")}. Please update your cart and try again.` },
+        409
+      );
     }
 
     // Clear purchased items from the cart.

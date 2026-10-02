@@ -14,6 +14,11 @@ export const siteConfig = {
   currencySymbol: "₹",
   supportEmail: "care@aaraah.in",
   supportPhone: "+91 90000 00000",
+  // Manual UPI collection: customer scans this on the confirmation page,
+  // admin marks the order "paid" by hand once the payment is seen. Set the
+  // real values via VITE_UPI_ID / VITE_UPI_PAYEE_NAME before going live.
+  upiId: import.meta.env.VITE_UPI_ID || "set-upi-id@bank",
+  upiPayeeName: import.meta.env.VITE_UPI_PAYEE_NAME || "AARAAH",
   categories: [
     { name: "Saree", slug: "saree" },
     { name: "Kurti", slug: "kurti" },

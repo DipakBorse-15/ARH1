@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
+import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
 import { fetchOrderById } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Order } from "@/types";
@@ -51,6 +52,8 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
       )}
+
+      {order && <UpiPaymentCard order={order} />}
 
       <div className="mt-8 flex justify-center gap-3">
         <Link to="/account/orders" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">

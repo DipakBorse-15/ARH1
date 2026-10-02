@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Order, OrderStatus } from "@/types";
+import type { Order, OrderStatus, PaymentStatus } from "@/types";
 
 export interface CheckoutPayload {
   items: { variant_id: string; quantity: number }[];
@@ -11,7 +11,7 @@ export interface CheckoutPayload {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "razorpay" | "cashfree" | "phonepe";
+  payment_method: "cod" | "upi";
 }
 
 export interface CreateOrderResponse {
@@ -59,5 +59,21 @@ export async function fetchAllOrdersAdmin(): Promise<Order[]> {
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+  if (error) throw error;
+}
+
+/**
+ * Manual UPI flow: admin checks their own UPI app/bank, then marks the
+ * payment here by hand. Marking a pending order "paid" also bumps its
+ * status to "confirmed" so it moves forward in the fulfilment flow.
+ */
+export async function updateOrderPaymentStatus(
+  orderId: string,
+  paymentStatus: PaymentStatus,
+  opts?: { alsoConfirm?: boolean }
+): Promise<void> {
+  const patch: { payment_status: PaymentStatus; status?: OrderStatus } = { payment_status: paymentStatus };
+  if (opts?.alsoConfirm) patch.status = "confirmed";
+  const { error } = await supabase.from("orders").update(patch).eq("id", orderId);
   if (error) throw error;
 }

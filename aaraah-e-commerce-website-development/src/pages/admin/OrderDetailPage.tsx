@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchOrderById, updateOrderStatus } from "@/services/orders";
+import { fetchOrderById, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
@@ -42,6 +42,22 @@ export default function AdminOrderDetailPage() {
       await updateOrderStatus(order.id, status);
       setOrder({ ...order, status });
       show("Order status updated", "success");
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleMarkPaid() {
+    if (!order) return;
+    if (!confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
+    setUpdating(true);
+    try {
+      const alsoConfirm = order.status === "pending";
+      await updateOrderPaymentStatus(order.id, "paid", { alsoConfirm });
+      setOrder({ ...order, payment_status: "paid", status: alsoConfirm ? "confirmed" : order.status });
+      show("Payment marked as received", "success");
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {
@@ -129,6 +145,15 @@ export default function AdminOrderDetailPage() {
           <h2 className="mb-2 text-sm font-semibold text-stone-900">Payment</h2>
           <p className="text-sm capitalize text-stone-600">Method: {order.payment_method}</p>
           <p className="text-sm capitalize text-stone-600">Status: {order.payment_status}</p>
+          {order.payment_method === "upi" && order.payment_status !== "paid" && (
+            <button
+              disabled={updating}
+              onClick={handleMarkPaid}
+              className="mt-2 rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              ✓ Mark Payment Received
+            </button>
+          )}
           <div className="mt-3 space-y-1 border-t border-stone-200 pt-3 text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>

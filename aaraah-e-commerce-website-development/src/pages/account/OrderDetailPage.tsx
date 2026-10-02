@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
+import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
 import { fetchOrderById } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Order } from "@/types";
@@ -91,6 +92,8 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <UpiPaymentCard order={order} />
     </div>
   );
 }

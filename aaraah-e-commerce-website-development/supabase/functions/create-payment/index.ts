@@ -29,10 +29,15 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(supabaseUrl, serviceKey, { global: { headers: { Authorization: authHeader } } });
 
-    const { data: userData } = await admin.auth.getUser();
+    const userClient = createClient(supabaseUrl, serviceKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData } = await userClient.auth.getUser();
     if (!userData?.user) return json({ error: "Not authenticated" }, 401);
+
+    // Separate admin client (no user Authorization header) for trusted reads
+    // — keeps the service-role privilege from being downgraded by PostgREST
+    // honoring the forwarded user JWT instead.
+    const admin = createClient(supabaseUrl, serviceKey);
 
     const { order_id } = await req.json();
     if (!order_id) return json({ error: "order_id is required" }, 400);

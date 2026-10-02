@@ -3,13 +3,7 @@ import { Link } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
-import {
-  fetchAllProductsAdmin,
-  deleteProduct,
-  updateProductQuick,
-  updateVariantQuick,
-  variantCollectionId,
-} from "@/services/products";
+import { fetchAllProductsAdmin, deleteProduct, updateProductQuick, updateVariantQuick } from "@/services/products";
 import { fetchAllCollectionsAdmin } from "@/services/collections";
 import { friendlyError } from "@/lib/supabase";
 import type { Collection, ProductVariant, ProductWithVariants } from "@/types";
