@@ -380,7 +380,7 @@ export default function AdminProductsPage() {
                           saving={savingKey === `variant:${v.id}`}
                           onCollectionChange={(collectionId) => handleVariantCollectionChange(p.id, v.id, collectionId)}
                           onPriceCommit={(raw) => handleVariantSellingPriceCommit(p.id, v, raw)}
-                          editHref={`/admin/products/${p.id}`}
+                          editHref={`/admin/products/${p.id}?variant=${v.id}`}
                         />
                       ))}
                   </Fragment>
@@ -489,7 +489,7 @@ function SearchResultsTable({
                   />
                 </td>
                 <td className="p-3">
-                  <Link to={`/admin/products/${product.id}`} className="text-rose-900 hover:underline">
+                  <Link to={`/admin/products/${product.id}?variant=${variant.id}`} className="text-rose-900 hover:underline">
                     Edit
                   </Link>
                 </td>

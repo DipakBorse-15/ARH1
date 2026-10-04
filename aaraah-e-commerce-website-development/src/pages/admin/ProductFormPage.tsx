@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
@@ -40,6 +40,10 @@ export default function ProductFormPage() {
   const isNew = !id || id === "new";
   const navigate = useNavigate();
   const { show } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Deep link from the admin SKU search: /admin/products/:id?variant=<variantId>
+  // opens straight to that one colour instead of the whole design.
+  const focusedVariantId = searchParams.get("variant");
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -167,6 +171,32 @@ export default function ProductFormPage() {
   }
 
   if (loading) return <LoadingState />;
+
+  const focusedVariant = focusedVariantId ? variants.find((v) => v.id === focusedVariantId) : null;
+
+  // Single-SKU view: came here from the admin SKU search "Edit" link. Show
+  // just that one colour's editor, not the whole design's form + every
+  // other colour — a "full design" link escapes back to the normal view.
+  if (!isNew && focusedVariant) {
+    return (
+      <div className="max-w-2xl">
+        <SEO title={`Edit ${focusedVariant.sku}`} canonicalPath="/admin/products" />
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-stone-400">{product.name}</p>
+            <h1 className="font-serif text-2xl font-semibold text-stone-900">{focusedVariant.sku}</h1>
+          </div>
+          <button
+            onClick={() => setSearchParams({})}
+            className="text-sm text-rose-900 hover:underline"
+          >
+            Edit full design ({variants.length} colours) →
+          </button>
+        </div>
+        <VariantCard variant={focusedVariant} onUpdate={handleUpdateVariant} onDelete={handleDeleteVariant} onUpload={handleUploadImages} onDeleteImage={handleDeleteImage} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl">
