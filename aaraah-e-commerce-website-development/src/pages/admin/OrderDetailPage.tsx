@@ -5,7 +5,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchOrderById, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
-import { friendlyError } from "@/lib/supabase";
+import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "confirmed", "processing", "shipped", "delivered"];
@@ -35,13 +35,29 @@ export default function AdminOrderDetailPage() {
     }
   }
 
+  // Clicking "Confirmed" is also how a manual-UPI payment gets marked
+  // received — there's no separate "Mark Payment Received" button anymore.
+  // For UPI orders still awaiting payment, confirming the order and
+  // confirming the payment are the same real-world action for this store,
+  // so they happen together and fire the payment-confirmed email.
   async function handleStatusChange(status: OrderStatus) {
     if (!order) return;
+
+    const alsoMarkPaid = status === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
+    if (alsoMarkPaid && !confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
+
     setUpdating(true);
     try {
-      await updateOrderStatus(order.id, status);
-      setOrder({ ...order, status });
-      show("Order status updated", "success");
+      if (alsoMarkPaid) {
+        await updateOrderPaymentStatus(order.id, "paid", { alsoConfirm: true });
+        setOrder({ ...order, status: "confirmed", payment_status: "paid" });
+        show("Order confirmed and payment marked received", "success");
+        sendPaymentConfirmedEmail(order.id);
+      } else {
+        await updateOrderStatus(order.id, status);
+        setOrder({ ...order, status });
+        show("Order status updated", "success");
+      }
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {
@@ -49,19 +65,14 @@ export default function AdminOrderDetailPage() {
     }
   }
 
-  async function handleMarkPaid() {
-    if (!order) return;
-    if (!confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
-    setUpdating(true);
+  // Fire-and-forget: a failed email shouldn't undo the payment confirmation
+  // that already succeeded, so this only ever shows a soft warning toast.
+  async function sendPaymentConfirmedEmail(id: string) {
     try {
-      const alsoConfirm = order.status === "pending";
-      await updateOrderPaymentStatus(order.id, "paid", { alsoConfirm });
-      setOrder({ ...order, payment_status: "paid", status: alsoConfirm ? "confirmed" : order.status });
-      show("Payment marked as received", "success");
-    } catch (err) {
-      show(friendlyError(err), "error");
-    } finally {
-      setUpdating(false);
+      const { error } = await supabase.functions.invoke("send-payment-confirmed-email", { body: { order_id: id } });
+      if (error) throw error;
+    } catch {
+      show("Payment confirmed, but the email couldn't be sent.", "error");
     }
   }
 
@@ -80,22 +91,26 @@ export default function AdminOrderDetailPage() {
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
         <h2 className="mb-3 text-sm font-semibold text-stone-900">Update status</h2>
         <div className="flex flex-wrap gap-2">
-          {STATUS_FLOW.map((s) => (
-            <button
-              key={s}
-              disabled={updating}
-              onClick={() => handleStatusChange(s)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize ${
-                order.status === s ? "bg-rose-900 text-white" : "border border-stone-300 text-stone-600"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+          {STATUS_FLOW.map((s) => {
+            const needsPaymentConfirm = s === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
+            return (
+              <button
+                key={s}
+                disabled={updating}
+                onClick={() => handleStatusChange(s)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize disabled:opacity-50 ${
+                  order.status === s ? "bg-rose-900 text-white" : "border border-stone-300 text-stone-600"
+                }`}
+              >
+                {s}
+                {needsPaymentConfirm && " · confirm UPI payment"}
+              </button>
+            );
+          })}
           <button
             disabled={updating}
             onClick={() => handleStatusChange("cancelled")}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+            className={`rounded-full px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
               order.status === "cancelled" ? "bg-rose-700 text-white" : "border border-rose-300 text-rose-600"
             }`}
           >
@@ -144,16 +159,14 @@ export default function AdminOrderDetailPage() {
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <h2 className="mb-2 text-sm font-semibold text-stone-900">Payment</h2>
           <p className="text-sm capitalize text-stone-600">Method: {order.payment_method}</p>
-          <p className="text-sm capitalize text-stone-600">Status: {order.payment_status}</p>
-          {order.payment_method === "upi" && order.payment_status !== "paid" && (
-            <button
-              disabled={updating}
-              onClick={handleMarkPaid}
-              className="mt-2 rounded-full bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              ✓ Mark Payment Received
-            </button>
-          )}
+          <p className="text-sm capitalize text-stone-600">
+            Status: {order.payment_status}
+            {order.payment_method === "upi" && order.payment_status !== "paid" && (
+              <span className="ml-2 text-xs normal-case text-stone-400">
+                (click "confirmed" above once you've checked your UPI app)
+              </span>
+            )}
+          </p>
           <div className="mt-3 space-y-1 border-t border-stone-200 pt-3 text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>

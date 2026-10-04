@@ -122,7 +122,11 @@ export default function ProductFormPage() {
 
   async function handleUpdateVariant(v: ProductVariant) {
     try {
-      await upsertVariant(v);
+      // Availability is derived from stock, not set by hand — in stock shows
+      // on the site automatically, out of stock shows "Out of stock"
+      // automatically. `active` stays true here; use "Delete variant" (or
+      // the design-level Published toggle) to actually remove a listing.
+      await upsertVariant({ ...v, is_available: v.stock_quantity > 0, active: true });
       show("Variant updated", "success");
       if (product.id) load(product.id);
     } catch (err) {
@@ -317,14 +321,13 @@ function VariantCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={local.is_available} onChange={(e) => setLocal({ ...local, is_available: e.target.checked })} />
-          Available
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={local.active} onChange={(e) => setLocal({ ...local, active: e.target.checked })} />
-          Active
-        </label>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+            local.stock_quantity > 0 ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-500"
+          }`}
+        >
+          {local.stock_quantity > 0 ? "In stock — shows on site" : "Out of stock — shows automatically"}
+        </span>
         <p className="text-stone-400">MRP preview: {formatINR(local.price)}</p>
       </div>
 

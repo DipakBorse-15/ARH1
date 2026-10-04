@@ -1,12 +1,24 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAllProductsAdmin, deleteProduct, updateProductQuick, updateVariantQuick } from "@/services/products";
+import {
+  fetchAllProductsAdmin,
+  deleteProduct,
+  updateProductQuick,
+  updateVariantQuick,
+  updateVariantsBulk,
+} from "@/services/products";
 import { fetchAllCollectionsAdmin } from "@/services/collections";
 import { friendlyError } from "@/lib/supabase";
 import type { Collection, ProductVariant, ProductWithVariants } from "@/types";
+
+interface Draft {
+  price: number;
+  stock_quantity: number;
+  collection_id: string | null;
+}
 
 export default function AdminProductsPage() {
   const { show } = useToast();
@@ -15,6 +27,11 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  // --- SKU search / bulk quick-edit state ---
+  const [skuQuery, setSkuQuery] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
     load();
@@ -130,14 +147,141 @@ export default function AdminProductsPage() {
     }
   }
 
+  // --- SKU search: flatten every variant across every design whose SKU
+  // contains the query, regardless of which design it belongs to. ---
+  const searchMatches = useMemo(() => {
+    const q = skuQuery.trim().toLowerCase();
+    if (!q) return [];
+    const out: { product: ProductWithVariants; variant: ProductVariant }[] = [];
+    for (const p of products) {
+      for (const v of p.variants) {
+        if (v.sku.toLowerCase().includes(q)) out.push({ product: p, variant: v });
+      }
+    }
+    return out;
+  }, [products, skuQuery]);
+
+  // Seed a draft (once) for every newly-matched variant, without touching
+  // drafts the admin is already mid-edit on.
+  useEffect(() => {
+    if (searchMatches.length === 0) return;
+    setDrafts((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const { variant } of searchMatches) {
+        if (!next[variant.id]) {
+          next[variant.id] = {
+            price: variant.sale_price ?? variant.price,
+            stock_quantity: variant.stock_quantity,
+            collection_id: variant.collection_id,
+          };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [searchMatches]);
+
+  function updateDraft(variantId: string, patch: Partial<Draft>) {
+    setDrafts((prev) => ({ ...prev, [variantId]: { ...prev[variantId], ...patch } }));
+  }
+
+  function clearSearch() {
+    setSkuQuery("");
+    setDrafts({});
+  }
+
+  async function handleSaveAll() {
+    type Edit = { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">> };
+    const edits: Edit[] = [];
+    for (const { variant } of searchMatches) {
+      const d = drafts[variant.id];
+      if (!d) continue;
+      const changedPrice = d.price !== (variant.sale_price ?? variant.price);
+      const changedStock = d.stock_quantity !== variant.stock_quantity;
+      const changedCollection = d.collection_id !== variant.collection_id;
+      if (!changedPrice && !changedStock && !changedCollection) continue;
+
+      const patch: Edit["patch"] = {};
+      if (changedPrice) patch.sale_price = d.price;
+      if (changedStock) patch.stock_quantity = d.stock_quantity;
+      if (changedCollection) patch.collection_id = d.collection_id;
+      edits.push({ id: variant.id, patch });
+    }
+
+    if (edits.length === 0) {
+      show("No changes to save.", "error");
+      return;
+    }
+
+    setSavingAll(true);
+    try {
+      const { succeeded, failed } = await updateVariantsBulk(edits);
+      if (succeeded.length > 0) show(`${succeeded.length} variant${succeeded.length > 1 ? "s" : ""} updated`, "success");
+      if (failed.length > 0) show(`${failed.length} failed to save — check SKUs for conflicts`, "error");
+      await load();
+      setDrafts({});
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setSavingAll(false);
+    }
+  }
+
+  const isSearching = skuQuery.trim() !== "";
+  const dirtyCount = searchMatches.filter(({ variant }) => {
+    const d = drafts[variant.id];
+    if (!d) return false;
+    return (
+      d.price !== (variant.sale_price ?? variant.price) ||
+      d.stock_quantity !== variant.stock_quantity ||
+      d.collection_id !== variant.collection_id
+    );
+  }).length;
+
   return (
     <div>
       <SEO title="Manage Products" canonicalPath="/admin/products" />
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-2xl font-semibold text-stone-900">Products</h1>
         <Link to="/admin/products/new" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">
           + New Product Design
         </Link>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[240px] max-w-sm flex-1">
+          <input
+            value={skuQuery}
+            onChange={(e) => setSkuQuery(e.target.value)}
+            placeholder="Search by SKU, e.g. 105S or 105S101…"
+            className="w-full rounded-full border border-stone-300 py-2 pl-4 pr-9 text-sm focus:border-rose-900 focus:outline-none"
+          />
+          {isSearching && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {isSearching && (
+          <>
+            <span className="text-xs text-stone-500">
+              {searchMatches.length} SKU{searchMatches.length !== 1 ? "s" : ""} matched
+            </span>
+            <button
+              onClick={handleSaveAll}
+              disabled={savingAll || dirtyCount === 0}
+              className="ml-auto rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {savingAll ? "Saving…" : dirtyCount > 0 ? `Save All (${dirtyCount})` : "Save All"}
+            </button>
+          </>
+        )}
       </div>
 
       {loading && <LoadingState />}
@@ -145,7 +289,11 @@ export default function AdminProductsPage() {
         <EmptyState title="No products yet" message="Create your first product design with color variants." />
       )}
 
-      {!loading && products.length > 0 && (
+      {!loading && products.length > 0 && isSearching && (
+        <SearchResultsTable matches={searchMatches} drafts={drafts} collections={collections} onDraftChange={updateDraft} />
+      )}
+
+      {!loading && products.length > 0 && !isSearching && (
         <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-50 text-xs uppercase text-stone-500">
@@ -242,6 +390,114 @@ export default function AdminProductsPage() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SKU search results: a flat, editable table across every design — type a
+// SKU prefix like "105S" to pull up every colour of that design (105S101,
+// 105S102, …) no matter which parent it's under, edit Price/Stock/Collection
+// inline, then hit "Save All" once.
+// ---------------------------------------------------------------------------
+function SearchResultsTable({
+  matches,
+  drafts,
+  collections,
+  onDraftChange,
+}: {
+  matches: { product: ProductWithVariants; variant: ProductVariant }[];
+  drafts: Record<string, Draft>;
+  collections: Collection[];
+  onDraftChange: (variantId: string, patch: Partial<Draft>) => void;
+}) {
+  if (matches.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500">
+        No SKUs match that search — try a shorter prefix, like just the design number.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-stone-50 text-xs uppercase text-stone-500">
+          <tr>
+            <th className="p-3">SKU / Colour</th>
+            <th className="p-3">Design</th>
+            <th className="p-3">Collection</th>
+            <th className="p-3">Selling Price</th>
+            <th className="p-3">Stock</th>
+            <th className="p-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {matches.map(({ product, variant }) => {
+            const draft = drafts[variant.id];
+            if (!draft) return null;
+            const inheritedCollection = collections.find((c) => c.id === product.collection_id);
+            return (
+              <tr key={variant.id} className="border-t border-stone-100">
+                <td className="p-3">
+                  <span className="inline-flex items-center gap-2">
+                    {variant.color_hex && (
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full border border-stone-300"
+                        style={{ backgroundColor: variant.color_hex }}
+                      />
+                    )}
+                    <span className="font-medium text-stone-800">{variant.sku}</span>
+                  </span>
+                  <p className="pl-5 text-xs text-stone-400">{variant.color}</p>
+                </td>
+                <td className="p-3 text-stone-500">{product.name}</td>
+                <td className="p-3">
+                  <select
+                    value={draft.collection_id || ""}
+                    onChange={(e) => onDraftChange(variant.id, { collection_id: e.target.value || null })}
+                    className="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-rose-900 focus:outline-none"
+                  >
+                    <option value="">{inheritedCollection ? `Inherit (${inheritedCollection.name})` : "Inherit (No collection)"}</option>
+                    {collections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-stone-400">₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.price}
+                      onChange={(e) => onDraftChange(variant.id, { price: Number(e.target.value) })}
+                      className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-rose-900 focus:outline-none"
+                    />
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-stone-400">MRP ₹{variant.price}</p>
+                </td>
+                <td className="p-3">
+                  <input
+                    type="number"
+                    min={0}
+                    value={draft.stock_quantity}
+                    onChange={(e) => onDraftChange(variant.id, { stock_quantity: Number(e.target.value) })}
+                    className="w-16 rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-rose-900 focus:outline-none"
+                  />
+                </td>
+                <td className="p-3">
+                  <Link to={`/admin/products/${product.id}`} className="text-rose-900 hover:underline">
+                    Edit
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

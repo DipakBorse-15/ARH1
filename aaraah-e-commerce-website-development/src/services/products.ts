@@ -285,9 +285,32 @@ export async function updateVariantQuick(
   id: string,
   patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">>
 ) {
-  const { data, error } = await supabase.from("product_variants").update(patch).eq("id", id).select().single();
+  // Availability always follows stock — any path that changes stock_quantity
+  // (quick-edit here, or the full product form) must keep is_available in
+  // sync, since the storefront's "Out of stock" badge reads is_available.
+  const fullPatch: Partial<ProductVariant> = { ...patch };
+  if (patch.stock_quantity !== undefined) {
+    fullPatch.is_available = patch.stock_quantity > 0;
+  }
+  const { data, error } = await supabase.from("product_variants").update(fullPatch).eq("id", id).select().single();
   if (error) throw error;
   return data as ProductVariant;
+}
+
+/** Bulk "Save All" for the admin SKU-search quick-edit table. Each row is
+ * saved independently so one bad row (e.g. a duplicate SKU conflict) doesn't
+ * block the rest — failures are returned, not thrown. */
+export async function updateVariantsBulk(
+  edits: { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">> }[]
+): Promise<{ succeeded: string[]; failed: { id: string; error: string }[] }> {
+  const results = await Promise.allSettled(edits.map((e) => updateVariantQuick(e.id, e.patch)));
+  const succeeded: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") succeeded.push(edits[i].id);
+    else failed.push({ id: edits[i].id, error: r.reason instanceof Error ? r.reason.message : String(r.reason) });
+  });
+  return { succeeded, failed };
 }
 
 export async function deleteVariant(id: string) {
