@@ -19,3 +19,58 @@ body {
   background-color: #7a1730;
   color: #fff;
 }
+
+/* Product grid: one quiet reveal when cards first mount — not a repeating
+   scroll effect. Product gallery: a soft crossfade when the photo changes
+   (new colour, new thumbnail), instead of a hard cut. */
+@keyframes fade-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-rise-in {
+  animation: fade-rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s ease-out both;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0ede7 25%, #f8f6f2 50%, #f0ede7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-rise-in,
+  .animate-fade-in,
+  .animate-shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
+}

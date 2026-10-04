@@ -165,7 +165,9 @@ export default function ProductPage() {
         }}
       />
 
-      <div className="grid items-start gap-10 md:grid-cols-2">
+      {/* key={product.id}: one quiet entrance per product visited — switching
+          colour on the SAME product should not replay it. */}
+      <div key={product.id} className="grid animate-fade-rise-in items-start gap-10 md:grid-cols-2">
         <div className="md:sticky md:top-20 md:self-start">
           <ProductGallery images={selectedVariant.images || []} alt={`${product.name} - ${selectedVariant.color}`} />
         </div>

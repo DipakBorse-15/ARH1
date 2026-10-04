@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PriceDisplay } from "./PriceDisplay";
 import type { ProductVariant, ProductWithVariants } from "@/types";
@@ -8,6 +9,7 @@ import type { ProductVariant, ProductWithVariants } from "@/types";
  * when flattening a product's variants into individual grid cards.
  */
 export function ProductCard({ product, variant }: { product: ProductWithVariants; variant?: ProductVariant }) {
+  const [loaded, setLoaded] = useState(false);
   const activeVariants = product.variants.filter((v) => v.active);
   const shown = variant ?? activeVariants[0];
   if (!shown) return null;
@@ -19,16 +21,22 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
   return (
     <Link
       to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(shown.color.toLowerCase())}` : ""}`}
-      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition hover:shadow-lg hover:shadow-stone-200"
+      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-xl hover:shadow-rose-900/10"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
         {image ? (
-          <img
-            src={image.url}
-            alt={image.alt_text || product.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          />
+          <>
+            {!loaded && <div className="absolute inset-0 animate-shimmer" />}
+            <img
+              src={image.url}
+              alt={image.alt_text || product.name}
+              loading="lazy"
+              onLoad={() => setLoaded(true)}
+              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${
+                loaded ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-stone-300">No Image</div>
         )}

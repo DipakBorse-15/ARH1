@@ -29,7 +29,14 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
         ))}
       </div>
       <div className="flex-1 overflow-hidden rounded-2xl bg-stone-100">
-        <img src={current.url} alt={current.alt_text || alt} className="aspect-[3/4] w-full object-cover" />
+        {/* key={current.id} remounts the img on every change, re-triggering
+            the crossfade — a soft swap instead of a hard cut. */}
+        <img
+          key={current.id}
+          src={current.url}
+          alt={current.alt_text || alt}
+          className="aspect-[3/4] w-full animate-fade-in object-cover"
+        />
       </div>
     </div>
   );
