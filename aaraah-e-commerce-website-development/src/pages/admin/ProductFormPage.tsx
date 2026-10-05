@@ -176,16 +176,9 @@ export default function ProductFormPage() {
     }
   }
 
-  async function handleMoveImage(variantId: string, imageId: string, direction: "left" | "right") {
-    const variant = variants.find((v) => v.id === variantId);
-    if (!variant) return;
-    const images = [...(variant.images || [])]; // already sorted by sort_order
-    const idx = images.findIndex((i) => i.id === imageId);
-    const swapWith = direction === "left" ? idx - 1 : idx + 1;
-    if (idx === -1 || swapWith < 0 || swapWith >= images.length) return;
-    [images[idx], images[swapWith]] = [images[swapWith], images[idx]];
+  async function handleReorderImages(_variantId: string, orderedImageIds: string[]) {
     try {
-      await reorderVariantImages(images.map((i) => i.id));
+      await reorderVariantImages(orderedImageIds);
       if (product.id) load(product.id);
     } catch (err) {
       show(friendlyError(err), "error");
@@ -221,7 +214,7 @@ export default function ProductFormPage() {
           onDelete={handleDeleteVariant}
           onUpload={handleUploadImages}
           onDeleteImage={handleDeleteImage}
-          onMoveImage={handleMoveImage}
+          onReorderImages={handleReorderImages}
         />
       </div>
     );
@@ -309,7 +302,7 @@ export default function ProductFormPage() {
                 onDelete={handleDeleteVariant}
                 onUpload={handleUploadImages}
                 onDeleteImage={handleDeleteImage}
-                onMoveImage={handleMoveImage}
+                onReorderImages={handleReorderImages}
               />
             ))}
           </div>
@@ -338,16 +331,33 @@ function VariantCard({
   onDelete,
   onUpload,
   onDeleteImage,
-  onMoveImage,
+  onReorderImages,
 }: {
   variant: ProductVariant;
   onUpdate: (v: ProductVariant) => void;
   onDelete: (id: string) => void;
   onUpload: (variantId: string, files: FileList) => void;
   onDeleteImage: (imageId: string) => void;
-  onMoveImage: (variantId: string, imageId: string, direction: "left" | "right") => void;
+  onReorderImages: (variantId: string, orderedImageIds: string[]) => void;
 }) {
   const [local, setLocal] = useState(variant);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      setOverId(null);
+      return;
+    }
+    const ids = (variant.images || []).map((i) => i.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    onReorderImages(variant.id, ids);
+    setDragId(null);
+    setOverId(null);
+  }
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -416,48 +426,43 @@ function VariantCard({
 
       <div className="mt-4 border-t border-stone-100 pt-4">
         <p className="mb-2 text-xs font-medium text-stone-500">
-          Images <span className="font-normal text-stone-400">— first photo is what shows on the site</span>
+          Images <span className="font-normal text-stone-400">— drag to reorder; first photo shows on the site</span>
         </p>
         <div className="flex flex-wrap gap-2">
-          {(variant.images || []).map((img, i) => {
-            const isFirst = i === 0;
-            const isLast = i === (variant.images || []).length - 1;
-            return (
-              <div key={img.id} className="group relative h-24 w-16 overflow-hidden rounded-lg border border-stone-200">
-                <img src={img.url} alt={img.alt_text || ""} className="h-20 w-full object-cover" />
-                {isFirst && (
-                  <span className="absolute left-0.5 top-0.5 rounded bg-emerald-700 px-1 py-0.5 text-[9px] font-semibold text-white">
-                    Cover
-                  </span>
-                )}
-                <button
-                  onClick={() => onDeleteImage(img.id)}
-                  className="absolute right-0.5 top-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white group-hover:flex"
-                  aria-label="Remove image"
-                >
-                  ×
-                </button>
-                <div className="absolute bottom-0 flex h-4 w-full divide-x divide-white/30 bg-black/50">
-                  <button
-                    onClick={() => onMoveImage(variant.id, img.id, "left")}
-                    disabled={isFirst}
-                    className="flex-1 text-[10px] leading-4 text-white disabled:opacity-30"
-                    aria-label="Move earlier"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() => onMoveImage(variant.id, img.id, "right")}
-                    disabled={isLast}
-                    className="flex-1 text-[10px] leading-4 text-white disabled:opacity-30"
-                    aria-label="Move later"
-                  >
-                    ›
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          {(variant.images || []).map((img, i) => (
+            <div
+              key={img.id}
+              draggable
+              onDragStart={() => setDragId(img.id)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOverId(img.id);
+              }}
+              onDragLeave={() => setOverId((cur) => (cur === img.id ? null : cur))}
+              onDrop={() => handleDrop(img.id)}
+              onDragEnd={() => {
+                setDragId(null);
+                setOverId(null);
+              }}
+              className={`group relative h-24 w-16 cursor-grab overflow-hidden rounded-lg border-2 active:cursor-grabbing ${
+                overId === img.id && dragId !== img.id ? "border-rose-900" : "border-stone-200"
+              } ${dragId === img.id ? "opacity-40" : ""}`}
+            >
+              <img src={img.url} alt={img.alt_text || ""} className="h-full w-full object-cover" draggable={false} />
+              {i === 0 && (
+                <span className="absolute left-0.5 top-0.5 rounded bg-emerald-700 px-1 py-0.5 text-[9px] font-semibold text-white">
+                  Cover
+                </span>
+              )}
+              <button
+                onClick={() => onDeleteImage(img.id)}
+                className="absolute right-0.5 top-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white group-hover:flex"
+                aria-label="Remove image"
+              >
+                ×
+              </button>
+            </div>
+          ))}
           <label className="flex h-24 w-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 text-xs text-stone-400">
             + Add
             <input
