@@ -329,6 +329,17 @@ export async function deleteVariantImage(id: string) {
   if (error) throw error;
 }
 
+/** Persist a new left-to-right order for a variant's photos. The first id in
+ * the array becomes sort_order 0 — that's the one the storefront (gallery
+ * default, product card thumbnail) shows first. */
+export async function reorderVariantImages(orderedImageIds: string[]): Promise<void> {
+  const results = await Promise.allSettled(
+    orderedImageIds.map((id, index) => supabase.from("product_images").update({ sort_order: index }).eq("id", id))
+  );
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed) throw new Error("Could not save the new image order");
+}
+
 export async function uploadProductImage(file: File, variantId: string): Promise<{ path: string; url: string }> {
   const ext = file.name.split(".").pop();
   const path = `${variantId}/${crypto.randomUUID()}.${ext}`;

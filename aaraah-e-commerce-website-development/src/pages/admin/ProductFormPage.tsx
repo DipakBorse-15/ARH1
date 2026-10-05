@@ -12,6 +12,7 @@ import {
   deleteVariant,
   addVariantImage,
   deleteVariantImage,
+  reorderVariantImages,
   uploadProductImage,
 } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
@@ -150,9 +151,14 @@ export default function ProductFormPage() {
 
   async function handleUploadImages(variantId: string, files: FileList) {
     try {
+      const variant = variants.find((v) => v.id === variantId);
+      // New photos go to the end of the order, not sort_order 0 — otherwise
+      // every upload competes for "first" and the order becomes arbitrary.
+      let nextOrder = (variant?.images || []).length;
       for (const file of Array.from(files)) {
         const { path, url } = await uploadProductImage(file, variantId);
-        await addVariantImage({ variant_id: variantId, storage_path: path, url, alt_text: product.name, sort_order: 0 });
+        await addVariantImage({ variant_id: variantId, storage_path: path, url, alt_text: product.name, sort_order: nextOrder });
+        nextOrder += 1;
       }
       show("Image(s) uploaded", "success");
       if (product.id) load(product.id);
@@ -164,6 +170,22 @@ export default function ProductFormPage() {
   async function handleDeleteImage(imageId: string) {
     try {
       await deleteVariantImage(imageId);
+      if (product.id) load(product.id);
+    } catch (err) {
+      show(friendlyError(err), "error");
+    }
+  }
+
+  async function handleMoveImage(variantId: string, imageId: string, direction: "left" | "right") {
+    const variant = variants.find((v) => v.id === variantId);
+    if (!variant) return;
+    const images = [...(variant.images || [])]; // already sorted by sort_order
+    const idx = images.findIndex((i) => i.id === imageId);
+    const swapWith = direction === "left" ? idx - 1 : idx + 1;
+    if (idx === -1 || swapWith < 0 || swapWith >= images.length) return;
+    [images[idx], images[swapWith]] = [images[swapWith], images[idx]];
+    try {
+      await reorderVariantImages(images.map((i) => i.id));
       if (product.id) load(product.id);
     } catch (err) {
       show(friendlyError(err), "error");
@@ -193,7 +215,14 @@ export default function ProductFormPage() {
             Edit full design ({variants.length} colours) →
           </button>
         </div>
-        <VariantCard variant={focusedVariant} onUpdate={handleUpdateVariant} onDelete={handleDeleteVariant} onUpload={handleUploadImages} onDeleteImage={handleDeleteImage} />
+        <VariantCard
+          variant={focusedVariant}
+          onUpdate={handleUpdateVariant}
+          onDelete={handleDeleteVariant}
+          onUpload={handleUploadImages}
+          onDeleteImage={handleDeleteImage}
+          onMoveImage={handleMoveImage}
+        />
       </div>
     );
   }
@@ -273,7 +302,15 @@ export default function ProductFormPage() {
 
           <div className="mb-6 space-y-4">
             {variants.map((v) => (
-              <VariantCard key={v.id} variant={v} onUpdate={handleUpdateVariant} onDelete={handleDeleteVariant} onUpload={handleUploadImages} onDeleteImage={handleDeleteImage} />
+              <VariantCard
+                key={v.id}
+                variant={v}
+                onUpdate={handleUpdateVariant}
+                onDelete={handleDeleteVariant}
+                onUpload={handleUploadImages}
+                onDeleteImage={handleDeleteImage}
+                onMoveImage={handleMoveImage}
+              />
             ))}
           </div>
 
@@ -301,12 +338,14 @@ function VariantCard({
   onDelete,
   onUpload,
   onDeleteImage,
+  onMoveImage,
 }: {
   variant: ProductVariant;
   onUpdate: (v: ProductVariant) => void;
   onDelete: (id: string) => void;
   onUpload: (variantId: string, files: FileList) => void;
   onDeleteImage: (imageId: string) => void;
+  onMoveImage: (variantId: string, imageId: string, direction: "left" | "right") => void;
 }) {
   const [local, setLocal] = useState(variant);
 
@@ -376,21 +415,50 @@ function VariantCard({
       </div>
 
       <div className="mt-4 border-t border-stone-100 pt-4">
-        <p className="mb-2 text-xs font-medium text-stone-500">Images</p>
+        <p className="mb-2 text-xs font-medium text-stone-500">
+          Images <span className="font-normal text-stone-400">— first photo is what shows on the site</span>
+        </p>
         <div className="flex flex-wrap gap-2">
-          {(variant.images || []).map((img) => (
-            <div key={img.id} className="group relative h-20 w-16 overflow-hidden rounded-lg border border-stone-200">
-              <img src={img.url} alt={img.alt_text || ""} className="h-full w-full object-cover" />
-              <button
-                onClick={() => onDeleteImage(img.id)}
-                className="absolute right-0.5 top-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white group-hover:flex"
-                aria-label="Remove image"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <label className="flex h-20 w-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 text-xs text-stone-400">
+          {(variant.images || []).map((img, i) => {
+            const isFirst = i === 0;
+            const isLast = i === (variant.images || []).length - 1;
+            return (
+              <div key={img.id} className="group relative h-24 w-16 overflow-hidden rounded-lg border border-stone-200">
+                <img src={img.url} alt={img.alt_text || ""} className="h-20 w-full object-cover" />
+                {isFirst && (
+                  <span className="absolute left-0.5 top-0.5 rounded bg-emerald-700 px-1 py-0.5 text-[9px] font-semibold text-white">
+                    Cover
+                  </span>
+                )}
+                <button
+                  onClick={() => onDeleteImage(img.id)}
+                  className="absolute right-0.5 top-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white group-hover:flex"
+                  aria-label="Remove image"
+                >
+                  ×
+                </button>
+                <div className="absolute bottom-0 flex h-4 w-full divide-x divide-white/30 bg-black/50">
+                  <button
+                    onClick={() => onMoveImage(variant.id, img.id, "left")}
+                    disabled={isFirst}
+                    className="flex-1 text-[10px] leading-4 text-white disabled:opacity-30"
+                    aria-label="Move earlier"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => onMoveImage(variant.id, img.id, "right")}
+                    disabled={isLast}
+                    className="flex-1 text-[10px] leading-4 text-white disabled:opacity-30"
+                    aria-label="Move later"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <label className="flex h-24 w-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 text-xs text-stone-400">
             + Add
             <input
               type="file"
