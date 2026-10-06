@@ -94,7 +94,7 @@ export default function Home() {
           {bestsellers.length > 0 && (
             <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
               <div className="mb-6 flex items-center justify-between">
-                <h2 className="font-serif text-2xl font-semibold text-stone-900">In High Demand</h2>
+                <h2 className="font-serif text-2xl font-semibold text-stone-900">Bestsellers on Sale</h2>
               </div>
               <ProductGrid items={bestsellers} />
             </section>
@@ -268,9 +268,6 @@ function CornerLeaf({ className = "" }: { className?: string }) {
   );
 }
 
-/** Bento-style collage: the first collection gets a tall hero tile, the rest
- *  tile in around it — same card visual language, denser/more editorial
- *  layout than a plain uniform grid. */
 function SpotlightCollections({ collections }: { collections: Collection[] }) {
   if (!collections.length) return null;
   return (
@@ -280,8 +277,8 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mb-10 text-center">
-          <p className="text-xs font-semibold tracking-[0.3em] text-amber-800/80">SHOP BY</p>
-          <h2 className="mt-1 font-serif text-4xl font-bold text-stone-900 sm:text-5xl">Occasion</h2>
+          <p className="text-xs font-semibold tracking-[0.3em] text-amber-800/80">EXPLORE OUR</p>
+          <h2 className="mt-1 font-serif text-4xl font-bold text-stone-900 sm:text-5xl">Top Collections</h2>
           <div className="mt-3 flex items-center justify-center gap-3 text-amber-800/70">
             <span className="h-px w-10 bg-amber-800/40" />
             <LotusDivider className="h-5 w-5" />
@@ -290,33 +287,29 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
           <p className="mt-3 text-sm text-stone-600">Timeless Styles &nbsp;|&nbsp; Premium Fabrics &nbsp;|&nbsp; For Every You</p>
         </div>
 
-        <div className="grid grid-flow-dense grid-cols-2 gap-4 md:grid-cols-4 md:auto-rows-[170px]">
-          {collections.map((c, i) => (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {collections.map((c) => (
             <Link
               key={c.id}
               to={`/collection/${c.slug}`}
-              className={`group relative overflow-hidden rounded-2xl shadow-lg shadow-stone-900/10 transition duration-300 hover:-translate-y-1 ${
-                i === 0
-                  ? "col-span-2 row-span-2 aspect-[3/4] md:aspect-auto"
-                  : "col-span-1 row-span-1 aspect-square md:aspect-auto"
-              }`}
+              className="group relative overflow-hidden rounded-2xl shadow-lg shadow-stone-900/10 transition duration-300 hover:-translate-y-1"
             >
-              {c.image ? (
-                <img
-                  src={c.image}
-                  alt={c.name}
-                  className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-rose-900 to-amber-700" />
-              )}
+              <div className="aspect-[3/4] w-full bg-stone-800">
+                {c.image ? (
+                  <img
+                    src={c.image}
+                    alt={c.name}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-900 to-amber-700" />
+                )}
+              </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 p-3 pb-4 text-center sm:gap-2 sm:p-4 sm:pb-5">
-                <span className={`font-serif font-semibold text-white ${i === 0 ? "text-xl sm:text-2xl" : "text-sm sm:text-base"}`}>
-                  {c.name}
-                </span>
-                {i === 0 && <LotusDivider className="h-3.5 w-3.5 text-white/70" />}
-                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full border border-white/70 px-3 py-1 text-[11px] font-medium text-white transition group-hover:bg-white group-hover:text-stone-900 sm:px-4 sm:py-1.5 sm:text-xs">
+              <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-4 pb-5 text-center">
+                <span className="font-serif text-xl font-semibold text-white sm:text-2xl">{c.name}</span>
+                <LotusDivider className="h-3.5 w-3.5 text-white/70" />
+                <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/70 px-4 py-1.5 text-xs font-medium text-white transition group-hover:bg-white group-hover:text-stone-900">
                   Shop Now <span aria-hidden="true">→</span>
                 </span>
               </div>
