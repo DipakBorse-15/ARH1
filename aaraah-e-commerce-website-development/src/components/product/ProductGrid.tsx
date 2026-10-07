@@ -30,7 +30,7 @@ export function ProductGrid({
       {cards.map((c, i) => (
         // Capped stagger: a long grid still settles in quickly instead of a
         // slow cascading tail down the page.
-        <div key={c.key} className="animate-fade-rise-in" style={{ animationDelay: `${Math.min(i, 11) * 40}ms` }}>
+        <div key={c.key} className="animate-fade-rise-in" style={{ animationDelay: `${Math.min(i, 7) * 100}ms` }}>
           <ProductCard product={c.product} variant={c.variant} />
         </div>
       ))}

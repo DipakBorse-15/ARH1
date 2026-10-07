@@ -21,7 +21,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
   return (
     <Link
       to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(shown.color.toLowerCase())}` : ""}`}
-      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-xl hover:shadow-rose-900/10"
+      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-3 hover:scale-[1.03] hover:border-rose-900 hover:shadow-2xl hover:shadow-rose-900/40"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
         {image ? (
@@ -32,7 +32,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
               alt={image.alt_text || product.name}
               loading="lazy"
               onLoad={() => setLoaded(true)}
-              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${
+              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-110 ${
                 loaded ? "opacity-100" : "opacity-0"
               }`}
             />
