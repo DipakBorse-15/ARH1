@@ -212,9 +212,9 @@ function CategoryShortcuts({ categories }: { categories: Category[] }) {
           <div key={c.id} className="w-1/4 flex-none snap-start sm:w-auto sm:flex-initial animate-pop-in" style={{ animationDelay: `${Math.min(i, 9) * 90}ms` }}>
             <Link
               to={`/category/${c.slug}`}
-              className="group mx-auto flex w-full flex-col items-center gap-2 text-center sm:w-[202px] sm:gap-4"
+              className="group mx-auto flex w-full flex-col items-center gap-2 text-center sm:w-[170px] sm:gap-4"
             >
-              <div className="relative flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-[202px] sm:w-[202px]">
+              <div className="relative flex h-[57px] w-[57px] items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-[170px] sm:w-[170px]">
                 {c.image ? (
                   <img
                     src={c.image}
@@ -222,7 +222,7 @@ function CategoryShortcuts({ categories }: { categories: Category[] }) {
                     className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
                   />
                 ) : (
-                  <span className="text-[2rem] transition-transform duration-500 group-hover:scale-125 sm:text-[5rem]">🪷</span>
+                  <span className="text-[1.7rem] transition-transform duration-500 group-hover:scale-125 sm:text-[4.2rem]">🪷</span>
                 )}
                 <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-t from-rose-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
               </div>
@@ -281,7 +281,7 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
           <h2 className="mt-1 font-serif text-4xl font-bold text-stone-900 sm:text-5xl">Top Collections</h2>
           <div className="mt-3 flex items-center justify-center gap-3 text-amber-800/70">
             <span className="h-px w-10 bg-amber-800/40" />
-            <LotusDivider className="h-[60px] w-[60px]" />
+            <LotusDivider className="h-5 w-5" />
             <span className="h-px w-10 bg-amber-800/40" />
           </div>
           <p className="mt-3 text-sm text-stone-600">Timeless Styles &nbsp;|&nbsp; Premium Fabrics &nbsp;|&nbsp; For Every You</p>
