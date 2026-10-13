@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { Product, ProductVariant, ProductWithVariants } from "@/types";
+import type { Collection, Product, ProductVariant, ProductWithVariants } from "@/types";
 
 const PRODUCT_SELECT = `
   *,
@@ -160,6 +160,63 @@ export async function fetchProductBySlug(slug: string): Promise<ProductWithVaria
 export interface SimilarItem {
   product: ProductWithVariants;
   variant: ProductVariant;
+}
+
+export interface HomeCollectionRow {
+  collection: Collection;
+  /** First `perCollection` colours, newest first. */
+  items: SimilarItem[];
+  /** Everything in the collection — drives the "More products" button. */
+  total: number;
+}
+
+export interface HomeFeed {
+  latest: SimilarItem[];
+  collectionRows: HomeCollectionRow[];
+}
+
+/**
+ * Everything the homepage product sections need, from ONE query: the newest
+ * `latestCount` colours across the store, plus the newest `perCollection`
+ * colours of every collection. Each colour is its own tile (same as the rest
+ * of the storefront), and a colour belongs to a collection by its own
+ * collection_id, falling back to its design's (see variantCollectionId).
+ *
+ * Fetches all active designs rather than a capped page, so a colour freshly
+ * added to an old design still lands in "latest". Fine at today's catalogue
+ * size; if it grows into the thousands, move this to a server-side view.
+ */
+export async function fetchHomeFeed(
+  collections: Collection[],
+  opts: { latestCount?: number; perCollection?: number } = {}
+): Promise<HomeFeed> {
+  const { latestCount = 12, perCollection = 8 } = opts;
+
+  const { data, error } = await supabase.from("products").select(PRODUCT_SELECT).eq("active", true);
+  if (error) throw error;
+
+  const pool: SimilarItem[] = [];
+  ((data || []) as ProductWithVariants[]).map(sortVariantImages).forEach((product) => {
+    product.variants.filter((v) => v.active).forEach((variant) => pool.push({ product, variant }));
+  });
+  pool.sort((a, b) => new Date(b.variant.created_at).getTime() - new Date(a.variant.created_at).getTime());
+
+  const byCollection = new Map<string, SimilarItem[]>();
+  pool.forEach((item) => {
+    const cid = variantCollectionId(item.product, item.variant);
+    if (!cid) return;
+    const list = byCollection.get(cid);
+    if (list) list.push(item);
+    else byCollection.set(cid, [item]);
+  });
+
+  const collectionRows: HomeCollectionRow[] = [];
+  collections.forEach((collection) => {
+    const all = byCollection.get(collection.id) || [];
+    if (all.length) collectionRows.push({ collection, items: all.slice(0, perCollection), total: all.length });
+  });
+
+  return { latest: pool.slice(0, latestCount), collectionRows };
 }
 
 export async function fetchBestsellers(limit = 8): Promise<SimilarItem[]> {

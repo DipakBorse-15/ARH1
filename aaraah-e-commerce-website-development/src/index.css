@@ -62,6 +62,27 @@ body {
   animation: fade-in 0.45s ease-out both;
 }
 
+/* Homepage category circles: a springy pop-in (slight overshoot) — the
+   cubic-bezier's >1 control point is what makes it bounce past 1.0 and settle. */
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) translateY(40px) rotate(-6deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.07) translateY(-6px) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.85s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
 .animate-shimmer {
   background: linear-gradient(90deg, #f0ede7 25%, #f8f6f2 50%, #f0ede7 75%);
   background-size: 200% 100%;
@@ -71,6 +92,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-rise-in,
   .animate-fade-in,
+  .animate-pop-in,
   .animate-shimmer {
     animation: none !important;
     transition: none !important;

@@ -21,7 +21,7 @@ export async function fetchCategoriesByRecentActivity(): Promise<Category[]> {
     supabase.from("categories").select("*").eq("active", true),
     supabase
       .from("product_variants")
-      .select("created_at, product:products(category_id)")
+      .select("created_at, product:products(category_id, created_at)")
       .eq("active", true)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -29,19 +29,27 @@ export async function fetchCategoriesByRecentActivity(): Promise<Category[]> {
   if (catErr) throw catErr;
   if (varErr) throw varErr;
 
-  const latestByCategory = new Map<string, string>();
-  (variants || []).forEach((v: { created_at: string; product: { category_id: string | null }[] | null }) => {
-    const categoryId = v.product?.[0]?.category_id;
-    if (categoryId && !latestByCategory.has(categoryId)) {
-      latestByCategory.set(categoryId, v.created_at);
-    }
+  type Parent = { category_id: string | null; created_at: string };
+  type Row = { created_at: string; product: Parent | Parent[] | null };
+
+  // A variant -> product link is many-to-one, so PostgREST returns `product`
+  // as a single object, not an array. The old code indexed it as `[0]`, which
+  // is undefined on an object — every category looked "never used" and the
+  // list silently fell back to alphabetical order. Accept both shapes.
+  const latestByCategory = new Map<string, number>();
+  ((variants || []) as unknown as Row[]).forEach((v) => {
+    const parent = Array.isArray(v.product) ? v.product[0] : v.product;
+    const categoryId = parent?.category_id;
+    if (!categoryId) return;
+    const stamp = Math.max(new Date(v.created_at).getTime(), parent?.created_at ? new Date(parent.created_at).getTime() : 0);
+    if (stamp > (latestByCategory.get(categoryId) ?? 0)) latestByCategory.set(categoryId, stamp);
   });
 
   const categories = (cats || []) as Category[];
   return [...categories].sort((a, b) => {
     const ta = latestByCategory.get(a.id);
     const tb = latestByCategory.get(b.id);
-    if (ta && tb) return new Date(tb).getTime() - new Date(ta).getTime();
+    if (ta && tb) return tb - ta;
     if (ta) return -1;
     if (tb) return 1;
     return a.name.localeCompare(b.name);

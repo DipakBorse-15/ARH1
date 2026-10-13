@@ -6,20 +6,19 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { siteConfig, isSupabaseConfigured } from "@/config/site";
 import { fetchCategoriesByRecentActivity } from "@/services/categories";
 import { fetchCollections } from "@/services/collections";
-import { fetchProducts, fetchBestsellers, type SimilarItem } from "@/services/products";
+import { fetchHomeFeed, type HomeCollectionRow, type HomeFeed, type SimilarItem } from "@/services/products";
 import { fetchActiveHeroSlides } from "@/services/heroSlides";
 import { friendlyError } from "@/lib/supabase";
-import type { Category, Collection, HeroSlide, ProductWithVariants } from "@/types";
+import type { Category, Collection, HeroSlide } from "@/types";
+
+const LATEST_COUNT = 12; // 3 rows of 4
+const PER_COLLECTION = 8; // 2 rows of 4
 
 export default function Home() {
   const [slides, setSlides] = useState<HeroSlide[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [bestsellers, setBestsellers] = useState<SimilarItem[]>([]);
-  const [newArrivals, setNewArrivals] = useState<ProductWithVariants[]>([]);
-  const [festive, setFestive] = useState<ProductWithVariants[]>([]);
-  const [daily, setDaily] = useState<ProductWithVariants[]>([]);
-  const [occasional, setOccasional] = useState<ProductWithVariants[]>([]);
+  const [feed, setFeed] = useState<HomeFeed>({ latest: [], collectionRows: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,27 +30,15 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const [hs, cats, cols, best] = await Promise.all([
+      const [hs, cats, cols] = await Promise.all([
         fetchActiveHeroSlides(),
         fetchCategoriesByRecentActivity(),
         fetchCollections(),
-        fetchBestsellers(8),
       ]);
       setSlides(hs);
       setCategories(cats);
       setCollections(cols);
-      setBestsellers(best);
-
-      const [na, fe, dw, oc] = await Promise.all([
-        fetchProducts({ collectionSlug: "new-arrival", pageSize: 8 }),
-        fetchProducts({ collectionSlug: "festive", pageSize: 8 }),
-        fetchProducts({ collectionSlug: "daily-wear", pageSize: 8 }),
-        fetchProducts({ collectionSlug: "occasional", pageSize: 8 }),
-      ]);
-      setNewArrivals(na.products);
-      setFestive(fe.products);
-      setDaily(dw.products);
-      setOccasional(oc.products);
+      setFeed(await fetchHomeFeed(cols, { latestCount: LATEST_COUNT, perCollection: PER_COLLECTION }));
     } catch (err) {
       setError(friendlyError(err, "Could not load the homepage right now."));
     } finally {
@@ -91,23 +78,13 @@ export default function Home() {
         <>
           <CategoryShortcuts categories={categories} />
 
-          {bestsellers.length > 0 && (
-            <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h2 className="font-serif text-2xl font-semibold text-stone-900">Bestsellers on Sale</h2>
-              </div>
-              <ProductGrid items={bestsellers} />
-            </section>
-          )}
+          <LatestLaunches items={feed.latest} />
 
           <SpotlightCollections collections={collections} />
 
-          <ProductSection title="New Arrivals" viewAllHref="/collection/new-arrival" products={newArrivals} />
-          <ProductSection title="Festive Collection" viewAllHref="/collection/festive" products={festive} />
-          <ProductSection title="Daily Wear" viewAllHref="/collection/daily-wear" products={daily} />
-          <ProductSection title="Occasional Wear" viewAllHref="/collection/occasional" products={occasional} />
-
-          <TrustSection />
+          {feed.collectionRows.map((row) => (
+            <CollectionProducts key={row.collection.id} row={row} perCollection={PER_COLLECTION} />
+          ))}
         </>
       )}
     </div>
@@ -217,23 +194,44 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   );
 }
 
-/** Horizontally-scrolling circular category shortcuts. */
+/** Big circular category shortcuts. Order comes from fetchCategoriesByRecentActivity,
+ *  so the category that just got a new product/colour is first.
+ *
+ *  The entrance animation lives on a wrapper and the hover effects on the inner
+ *  link on purpose: a finished CSS animation (fill-mode "both") keeps owning its
+ *  element's `transform`, which would silently swallow any hover transform
+ *  placed on that same element. */
 function CategoryShortcuts({ categories }: { categories: Category[] }) {
   if (!categories.length) return null;
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-        {categories.map((c) => (
-          <Link key={c.id} to={`/category/${c.slug}`} className="flex w-20 shrink-0 flex-col items-center gap-2 text-center">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-stone-200 bg-stone-100 text-stone-300">
-              {c.image ? (
-                <img src={c.image} alt={c.name} className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-2xl">🪷</span>
-              )}
-            </div>
-            <p className="line-clamp-2 text-xs font-medium text-stone-700">{c.name}</p>
-          </Link>
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-10 sm:gap-x-10 sm:gap-y-14">
+        {categories.map((c, i) => (
+          <div key={c.id} className="animate-pop-in" style={{ animationDelay: `${Math.min(i, 9) * 90}ms` }}>
+            <Link
+              to={`/category/${c.slug}`}
+              className="group flex w-36 flex-col items-center gap-4 text-center sm:w-60"
+            >
+              <div className="relative flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-60 sm:w-60">
+                {c.image ? (
+                  <img
+                    src={c.image}
+                    alt={c.name}
+                    className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
+                  />
+                ) : (
+                  <span className="text-6xl transition-transform duration-500 group-hover:scale-125 sm:text-8xl">🪷</span>
+                )}
+                <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-t from-rose-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <p className="line-clamp-2 font-serif text-base font-semibold text-stone-800 transition-colors duration-300 group-hover:text-rose-900 sm:text-xl">
+                  {c.name}
+                </p>
+                <span className="h-0.5 w-0 rounded-full bg-rose-900 transition-all duration-500 group-hover:w-12" />
+              </div>
+            </Link>
+          </div>
         ))}
       </div>
     </section>
@@ -321,39 +319,41 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
   );
 }
 
-function ProductSection({ title, viewAllHref, products }: { title: string; viewAllHref: string; products: ProductWithVariants[] }) {
-  if (!products.length) return null;
+/** The newest colours across the whole store, 4 per row. */
+function LatestLaunches({ items }: { items: SimilarItem[] }) {
+  if (!items.length) return null;
   return (
-    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-serif text-2xl font-semibold text-stone-900">{title}</h2>
-        <Link to={viewAllHref} className="text-sm font-medium text-rose-900 hover:underline">
-          View all →
-        </Link>
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div className="mb-6 text-center">
+        <h2 className="font-serif text-3xl font-semibold text-stone-900">Latest Launches</h2>
+        <p className="mt-1 text-sm text-stone-500">Fresh off the loom — our newest arrivals</p>
       </div>
-      <ProductGrid products={products} byVariant />
+      <ProductGrid items={items} columnsClass="grid-cols-2 md:grid-cols-4" />
     </section>
   );
 }
 
-function TrustSection() {
-  const items = [
-    { icon: "🚚", title: "Pan-India Delivery", desc: "Fast, reliable shipping to every state." },
-    { icon: "🔒", title: "Secure Payments", desc: "Your transactions are safe & encrypted." },
-    { icon: "↩️", title: "Easy Returns", desc: "Hassle-free returns on eligible items." },
-    { icon: "🧵", title: "Quality Fabrics", desc: "Curated craftsmanship you can trust." },
-  ];
+/** One collection: its newest colours (4 per row), plus a "More Products"
+ *  button only when the collection has more than what is shown. */
+function CollectionProducts({ row, perCollection }: { row: HomeCollectionRow; perCollection: number }) {
+  const extra = row.total - perCollection;
   return (
-    <section className="border-t border-stone-200 bg-stone-50 py-12">
-      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-4 sm:px-6 md:grid-cols-4">
-        {items.map((it) => (
-          <div key={it.title} className="text-center">
-            <div className="mb-2 text-3xl">{it.icon}</div>
-            <h3 className="text-sm font-semibold text-stone-900">{it.title}</h3>
-            <p className="mt-1 text-xs text-stone-500">{it.desc}</p>
-          </div>
-        ))}
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <div className="mb-6 text-center">
+        <h2 className="font-serif text-3xl font-semibold text-stone-900">{row.collection.name}</h2>
       </div>
+      <ProductGrid items={row.items} columnsClass="grid-cols-2 md:grid-cols-4" />
+      {extra > 0 && (
+        <div className="mt-8 text-center">
+          <Link
+            to={`/collection/${row.collection.slug}`}
+            className="inline-flex items-center gap-2 rounded-full border-2 border-rose-900 px-8 py-3 text-sm font-semibold text-rose-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-rose-900 hover:text-white hover:shadow-lg hover:shadow-rose-900/30"
+          >
+            More Products <span aria-hidden="true">→</span>
+            <span className="text-xs font-normal opacity-70">(+{extra})</span>
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

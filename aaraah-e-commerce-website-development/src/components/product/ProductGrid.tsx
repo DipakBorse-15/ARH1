@@ -7,6 +7,7 @@ export function ProductGrid({
   items,
   emptyMessage,
   byVariant = false,
+  columnsClass = "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
 }: {
   products?: ProductWithVariants[];
   /** Pre-flattened (product, variant) pairs — e.g. cross-product recommendations. Takes priority over `products`. */
@@ -14,6 +15,8 @@ export function ProductGrid({
   emptyMessage?: string;
   /** When true, every active colour of `products` gets its own tile instead of one tile per product. */
   byVariant?: boolean;
+  /** Tailwind grid-cols classes; the homepage passes a strict 4-per-row layout. */
+  columnsClass?: string;
 }) {
   const cards = items
     ? items.map((it) => ({ key: it.variant.id, product: it.product, variant: it.variant }))
@@ -26,7 +29,7 @@ export function ProductGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+    <div className={`grid gap-3 sm:gap-4 ${columnsClass}`}>
       {cards.map((c, i) => (
         // Capped stagger: a long grid still settles in quickly instead of a
         // slow cascading tail down the page.
