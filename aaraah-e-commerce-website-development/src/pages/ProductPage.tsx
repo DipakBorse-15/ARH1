@@ -143,7 +143,7 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-8 sm:px-6">
       <SEO
         title={`${product.name} — ${selectedVariant.color || ""}`}
         description={product.description || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
@@ -167,14 +167,14 @@ export default function ProductPage() {
 
       {/* key={product.id}: one quiet entrance per product visited — switching
           colour on the SAME product should not replay it. */}
-      <div key={product.id} className="grid animate-fade-rise-in items-start gap-10 md:grid-cols-2">
-        <div className="md:sticky md:top-20 md:self-start">
+      <div key={product.id} className="grid animate-fade-rise-in grid-cols-1 items-start gap-8 md:grid-cols-2 md:gap-10">
+        <div className="min-w-0 md:sticky md:top-20 md:self-start">
           <ProductGallery images={selectedVariant.images || []} alt={`${product.name} - ${selectedVariant.color}`} />
         </div>
 
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-rose-900/70">{product.brand}</p>
-          <h1 className="mt-1 text-2xl font-semibold text-stone-900 sm:text-3xl">{product.name}</h1>
+          <h1 className="mt-1 break-words text-2xl font-semibold text-stone-900 sm:text-3xl">{product.name}</h1>
           <p className="mt-1 text-xs text-stone-400">SKU: {selectedVariant.sku}</p>
 
           <div className="mt-4">

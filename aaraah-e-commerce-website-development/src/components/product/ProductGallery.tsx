@@ -13,8 +13,8 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
   const current = images[Math.min(active, images.length - 1)];
 
   return (
-    <div className="flex flex-col-reverse gap-3 md:flex-row">
-      <div className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+    <div className="flex min-w-0 max-w-full flex-col-reverse gap-3 md:flex-row">
+      <div className="flex max-w-full gap-2 overflow-x-auto md:flex-col md:overflow-visible">
         {images.map((img, idx) => (
           <button
             key={img.id}
@@ -28,7 +28,7 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-hidden rounded-2xl bg-stone-100">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-2xl bg-stone-100">
         {/* key={current.id} remounts the img on every change, re-triggering
             the crossfade — a soft swap instead of a hard cut. */}
         <img
