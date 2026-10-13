@@ -210,9 +210,9 @@ function CategoryShortcuts({ categories }: { categories: Category[] }) {
           <div key={c.id} className="animate-pop-in" style={{ animationDelay: `${Math.min(i, 9) * 90}ms` }}>
             <Link
               to={`/category/${c.slug}`}
-              className="group flex w-36 flex-col items-center gap-4 text-center sm:w-60"
+              className="group flex w-[121px] flex-col items-center gap-4 text-center sm:w-[202px]"
             >
-              <div className="relative flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-60 sm:w-60">
+              <div className="relative flex h-[121px] w-[121px] items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-[202px] sm:w-[202px]">
                 {c.image ? (
                   <img
                     src={c.image}
@@ -220,7 +220,7 @@ function CategoryShortcuts({ categories }: { categories: Category[] }) {
                     className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
                   />
                 ) : (
-                  <span className="text-6xl transition-transform duration-500 group-hover:scale-125 sm:text-8xl">🪷</span>
+                  <span className="text-[3.15rem] transition-transform duration-500 group-hover:scale-125 sm:text-[5rem]">🪷</span>
                 )}
                 <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-t from-rose-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
               </div>
