@@ -281,7 +281,7 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
           <h2 className="mt-1 font-serif text-4xl font-bold text-stone-900 sm:text-5xl">Top Collections</h2>
           <div className="mt-3 flex items-center justify-center gap-3 text-amber-800/70">
             <span className="h-px w-10 bg-amber-800/40" />
-            <LotusDivider className="h-5 w-5" />
+            <LotusDivider className="h-[60px] w-[60px]" />
             <span className="h-px w-10 bg-amber-800/40" />
           </div>
           <p className="mt-3 text-sm text-stone-600">Timeless Styles &nbsp;|&nbsp; Premium Fabrics &nbsp;|&nbsp; For Every You</p>
@@ -308,7 +308,7 @@ function SpotlightCollections({ collections }: { collections: Collection[] }) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-4 pb-5 text-center">
                 <span className="font-serif text-xl font-semibold text-white sm:text-2xl">{c.name}</span>
-                <LotusDivider className="h-3.5 w-3.5 text-white/70" />
+                <LotusDivider className="h-[42px] w-[42px] text-white/70" />
                 <span className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/70 px-4 py-1.5 text-xs font-medium text-white transition group-hover:bg-white group-hover:text-stone-900">
                   Shop Now <span aria-hidden="true">→</span>
                 </span>

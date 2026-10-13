@@ -62,8 +62,10 @@ export default function ProductFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function load(productId: string) {
-    setLoading(true);
+  // silent=true: refresh data after an edit WITHOUT swapping the page for the
+  // loading spinner — that remount is what threw the admin back to the top.
+  async function load(productId: string, silent = false) {
+    if (!silent) setLoading(true);
     try {
       const data = await fetchProductByIdAdmin(productId);
       if (data) {
@@ -74,7 +76,7 @@ export default function ProductFormPage() {
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -119,7 +121,7 @@ export default function ProductFormPage() {
       });
       setNewVariant(EMPTY_VARIANT);
       show("Variant added", "success");
-      load(product.id);
+      load(product.id, true);
     } catch (err) {
       show(friendlyError(err, "Could not add variant. SKU must be unique."), "error");
     }
@@ -133,7 +135,7 @@ export default function ProductFormPage() {
       // the design-level Published toggle) to actually remove a listing.
       await upsertVariant({ ...v, is_available: v.stock_quantity > 0, active: true });
       show("Variant updated", "success");
-      if (product.id) load(product.id);
+      if (product.id) load(product.id, true);
     } catch (err) {
       show(friendlyError(err), "error");
     }
@@ -143,7 +145,7 @@ export default function ProductFormPage() {
     if (!confirm("Delete this variant?")) return;
     try {
       await deleteVariant(vid);
-      if (product.id) load(product.id);
+      if (product.id) load(product.id, true);
     } catch (err) {
       show(friendlyError(err), "error");
     }
@@ -161,7 +163,7 @@ export default function ProductFormPage() {
         nextOrder += 1;
       }
       show("Image(s) uploaded", "success");
-      if (product.id) load(product.id);
+      if (product.id) load(product.id, true);
     } catch (err) {
       show(friendlyError(err, "Image upload failed."), "error");
     }
@@ -170,7 +172,7 @@ export default function ProductFormPage() {
   async function handleDeleteImage(imageId: string) {
     try {
       await deleteVariantImage(imageId);
-      if (product.id) load(product.id);
+      if (product.id) load(product.id, true);
     } catch (err) {
       show(friendlyError(err), "error");
     }
@@ -179,7 +181,7 @@ export default function ProductFormPage() {
   async function handleReorderImages(_variantId: string, orderedImageIds: string[]) {
     try {
       await reorderVariantImages(orderedImageIds);
-      if (product.id) load(product.id);
+      if (product.id) load(product.id, true);
     } catch (err) {
       show(friendlyError(err), "error");
     }
