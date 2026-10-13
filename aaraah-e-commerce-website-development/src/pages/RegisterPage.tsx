@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function RegisterPage() {
@@ -74,13 +75,7 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-stone-600">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none"
-            />
+            <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
           </div>
           <button
             type="submit"

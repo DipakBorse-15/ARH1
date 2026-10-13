@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { AccountNav } from "@/components/account/AccountNav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +12,8 @@ export default function AccountPage() {
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [mobile, setMobile] = useState(profile?.mobile || "");
   const [saving, setSaving] = useState(false);
+  const [searchParams] = useSearchParams();
+  const justVerified = searchParams.get("verified") === "1";
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +35,11 @@ export default function AccountPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <SEO title="My Account" canonicalPath="/account" />
       <h1 className="mb-4 font-serif text-3xl font-semibold text-stone-900">My Account</h1>
+      {justVerified && (
+        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Your email is verified — welcome to AARAAH! You are signed in.
+        </p>
+      )}
       <AccountNav />
 
       <form onSubmit={handleSave} className="max-w-md space-y-4 rounded-2xl border border-stone-200 p-6">

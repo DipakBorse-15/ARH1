@@ -54,9 +54,12 @@ export default function AdminOrderDetailPage() {
         show("Order confirmed and payment marked received", "success");
         sendPaymentConfirmedEmail(order.id);
       } else {
+        const firstConfirm = status === "confirmed" && order.status !== "confirmed";
         await updateOrderStatus(order.id, status);
         setOrder({ ...order, status });
         show("Order status updated", "success");
+        // COD has no payment step, so "Confirmed" is the customer's order-confirmation mail.
+        if (firstConfirm && order.payment_method === "cod") sendPaymentConfirmedEmail(order.id);
       }
     } catch (err) {
       show(friendlyError(err), "error");
@@ -72,7 +75,7 @@ export default function AdminOrderDetailPage() {
       const { error } = await supabase.functions.invoke("send-payment-confirmed-email", { body: { order_id: id } });
       if (error) throw error;
     } catch {
-      show("Payment confirmed, but the email couldn't be sent.", "error");
+      show("Order updated, but the confirmation email couldn't be sent.", "error");
     }
   }
 

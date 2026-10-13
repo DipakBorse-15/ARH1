@@ -6,7 +6,7 @@ import { effectivePrice } from "@/services/products";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAddresses, upsertAddress } from "@/services/addresses";
+import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
 import { placeOrder } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
@@ -57,9 +57,20 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (profile) setForm((f) => ({ ...f, full_name: profile.full_name || "", email: profile.email || "", mobile: profile.mobile || "" }));
-    if (user) fetchAddresses(user.id).then(setSavedAddresses).catch(() => {});
+    // Only fill fields the customer hasn't typed yet — a profile refresh
+    // (token renewal, tab focus) must never wipe what they are typing.
+    const metaMobile = typeof user?.user_metadata?.mobile === "string" ? user.user_metadata.mobile : "";
+    setForm((f) => ({
+      ...f,
+      full_name: f.full_name || profile?.full_name || "",
+      email: f.email || profile?.email || user?.email || "",
+      mobile: f.mobile || profile?.mobile || metaMobile,
+    }));
   }, [user, profile]);
+
+  useEffect(() => {
+    if (user) fetchAddresses(user.id).then(setSavedAddresses).catch(() => {});
+  }, [user]);
 
   const lines = useMemo(() => {
     if (directItem) {
@@ -135,7 +146,8 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
-      await upsertAddress({
+      // Best-effort and de-duplicated: never blocks the order, never saves the same address twice.
+      await saveAddressIfNew({
         user_id: user.id,
         full_name: form.full_name,
         mobile: form.mobile,
@@ -144,8 +156,7 @@ export default function CheckoutPage() {
         city: form.city,
         state: form.state,
         pincode: form.pincode,
-        is_default: savedAddresses.length === 0,
-      });
+      }).catch(() => {});
 
       const result = await placeOrder({
         items: lines.map((l) => ({ variant_id: l.variant_id, quantity: l.quantity })),

@@ -24,9 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function loadProfile(userId: string) {
+  async function loadProfile(userId: string, metaMobile?: string) {
     const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
-    setProfile(data as Profile | null);
+    let row = data as Profile | null;
+    // The mobile number is typed at sign-up, but the profile can't be written
+    // until the email is confirmed (no session yet). It rides along in the
+    // sign-up metadata; the first time the customer is signed in, copy it over.
+    if (row && !row.mobile && metaMobile) {
+      const { error } = await supabase.from("profiles").update({ mobile: metaMobile }).eq("user_id", userId);
+      if (!error) row = { ...row, mobile: metaMobile };
+    }
+    setProfile(row);
+  }
+
+  function metaMobileOf(u: User | null | undefined): string | undefined {
+    const m = u?.user_metadata?.mobile;
+    return typeof m === "string" && m ? m : undefined;
   }
 
   useEffect(() => {
@@ -39,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       if (data.session?.user) {
-        await loadProfile(data.session.user.id);
+        await loadProfile(data.session.user.id, metaMobileOf(data.session.user));
       }
       setLoading(false);
     });
@@ -48,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
-        loadProfile(newSession.user.id);
+        loadProfile(newSession.user.id, metaMobileOf(newSession.user));
       } else {
         setProfile(null);
       }
@@ -66,15 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Explicit redirect: don't rely on Supabase's dashboard "Site URL" being
     // correct — build it from where the app is actually running right now.
     const base = siteConfig.basePath === "/" ? "" : siteConfig.basePath.replace(/\/$/, "");
-    const emailRedirectTo = `${window.location.origin}${base}/`;
+    // After confirming, land on My Account (already signed in) with a welcome note.
+    const emailRedirectTo = `${window.location.origin}${base}/account?verified=1`;
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName }, emailRedirectTo },
+      options: { data: { full_name: fullName, mobile }, emailRedirectTo },
     });
     if (error) return { error: error.message };
     if (data.user) {
+      // Works only when a session exists (email confirmation off); otherwise the
+      // metadata above + loadProfile() fill the mobile number after first sign-in.
       await supabase.from("profiles").update({ full_name: fullName, mobile }).eq("user_id", data.user.id);
     }
     return {};
@@ -86,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshProfile() {
-    if (user) await loadProfile(user.id);
+    if (user) await loadProfile(user.id, metaMobileOf(user));
   }
 
   const isAdmin = profile?.role === "admin";

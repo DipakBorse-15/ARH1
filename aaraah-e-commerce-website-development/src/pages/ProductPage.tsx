@@ -127,7 +127,12 @@ export default function ProductPage() {
     }
     if (!user) {
       show("Please sign in to continue.", "error");
-      navigate("/login", { state: { from: window.location.pathname + window.location.search } });
+      navigate("/login", {
+        state: {
+          from: "/checkout",
+          directItem: { variant_id: selectedVariant.id, quantity, product, variant: selectedVariant },
+        },
+      });
       return;
     }
     navigate("/checkout", {

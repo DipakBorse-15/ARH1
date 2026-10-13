@@ -4,7 +4,7 @@ import { AccountNav } from "@/components/account/AccountNav";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAddresses, upsertAddress, deleteAddress } from "@/services/addresses";
+import { fetchAddresses, saveAddressIfNew, deleteAddress } from "@/services/addresses";
 import { friendlyError } from "@/lib/supabase";
 import type { Address } from "@/types";
 
@@ -39,7 +39,16 @@ export default function AddressesPage() {
     e.preventDefault();
     if (!user) return;
     try {
-      await upsertAddress({ ...form, user_id: user.id });
+      await saveAddressIfNew({
+        full_name: form.full_name || "",
+        mobile: form.mobile || "",
+        line1: form.line1 || "",
+        line2: form.line2 || null,
+        city: form.city || "",
+        state: form.state || "",
+        pincode: form.pincode || "",
+        user_id: user.id,
+      });
       setForm(EMPTY);
       setShowForm(false);
       show("Address saved", "success");

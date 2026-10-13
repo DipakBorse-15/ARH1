@@ -1,28 +1,15 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
-import { fetchOrderById } from "@/services/orders";
-import { friendlyError } from "@/lib/supabase";
-import type { Order } from "@/types";
+import { useLiveOrder } from "@/hooks/useLiveOrder";
 
 export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
   const orderNumber = (location.state as { orderNumber?: string } | null)?.orderNumber;
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!orderId) return;
-    fetchOrderById(orderId)
-      .then(setOrder)
-      .catch((err) => setError(friendlyError(err)))
-      .finally(() => setLoading(false));
-  }, [orderId]);
+  const { order, loading, error } = useLiveOrder(orderId);
 
   if (loading) return <LoadingState label="Confirming your order…" />;
   if (error) return <ErrorState message={error} />;
