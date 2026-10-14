@@ -1,18 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { FilterPanel, SortDropdown } from "@/components/product/FilterSort";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchCollectionBySlug } from "@/services/collections";
-import { fetchProducts, type ProductFilters } from "@/services/products";
+import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import type { Category, Collection, ProductWithVariants } from "@/types";
 
 type Mode = "category" | "collection" | "search";
 
 const PAGE_SIZE = 12;
+
+// Old category URLs (before the 6-category restructure) keep working.
+const LEGACY_CATEGORY_SLUGS: Record<string, string> = {
+  saree: "sarees",
+  kurti: "kurties-kurta-sets",
+  "kurta-set-with-dupatta": "kurties-kurta-sets",
+};
 
 export function ProductListingPage({ mode }: { mode: Mode }) {
   const { slug } = useParams();
@@ -79,8 +86,14 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
     return Array.from(set);
   }, [products]);
 
+  const availableSizes = useMemo(() => collectSizes(products), [products]);
+
   const heading = mode === "search" ? `Search results for "${query}"` : taxonomy?.name || "Products";
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  if (mode === "category" && slug && LEGACY_CATEGORY_SLUGS[slug]) {
+    return <Navigate to={`/category/${LEGACY_CATEGORY_SLUGS[slug]}`} replace />;
+  }
 
   if ((mode === "category" || mode === "collection") && !loading && !taxonomy && !error) {
     return <ErrorState message="This page could not be found." />;
@@ -95,7 +108,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
       <div className="grid gap-8 md:grid-cols-[220px_1fr]">
         <aside className="hidden md:block">
-          <FilterPanel filters={filters} availableColors={availableColors} onChange={setFilters} />
+          <FilterPanel filters={filters} availableColors={availableColors} availableSizes={availableSizes} onChange={setFilters} />
         </aside>
 
         <div>
@@ -108,7 +121,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
             <details className="rounded-lg border border-stone-200 p-3">
               <summary className="cursor-pointer text-sm font-medium">Filters</summary>
               <div className="mt-3">
-                <FilterPanel filters={filters} availableColors={availableColors} onChange={setFilters} />
+                <FilterPanel filters={filters} availableColors={availableColors} availableSizes={availableSizes} onChange={setFilters} />
               </div>
             </details>
           </div>

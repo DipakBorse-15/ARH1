@@ -4,6 +4,7 @@ import { siteConfig } from "@/config/site";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useNavCategories } from "@/hooks/useNavCategories";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -13,11 +14,12 @@ export function Header() {
   const { itemCount } = useCart();
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
+  const categories = useNavCategories();
 
-  const navLinks = [
-    ...siteConfig.categories.map((c) => ({ label: c.name.toUpperCase(), to: `/category/${c.slug}` })),
-    ...siteConfig.collections.map((c) => ({ label: c.name.toUpperCase(), to: `/collection/${c.slug}` })),
-  ];
+  const categoryLinks = categories.map((c) => ({ label: c.name.toUpperCase(), to: `/category/${c.slug}` }));
+  const collectionLinks = siteConfig.collections.map((c) => ({ label: c.name.toUpperCase(), to: `/collection/${c.slug}` }));
+  // Mobile menu shows everything in one grid.
+  const navLinks = [...categoryLinks, ...collectionLinks];
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -48,13 +50,26 @@ export function Header() {
           )}
         </Link>
 
-        {/* Centered flat nav — categories then collections, no dropdowns */}
-        <nav className="hidden flex-1 items-center justify-center gap-6 text-sm font-medium tracking-wide text-stone-700 md:flex">
-          {navLinks.map((link) => (
+        {/* Centered nav — categories (newest launch first), collections tucked into a dropdown
+            so six long category names still fit on one line. */}
+        <nav className="hidden flex-1 items-center justify-center gap-5 text-sm font-medium tracking-wide text-stone-700 md:flex">
+          {categoryLinks.map((link) => (
             <Link key={link.to} to={link.to} className="whitespace-nowrap py-4 transition hover:text-rose-900">
               {link.label}
             </Link>
           ))}
+          <div className="group relative">
+            <button type="button" className="whitespace-nowrap py-4 transition hover:text-rose-900" aria-haspopup="true">
+              COLLECTIONS ▾
+            </button>
+            <div className="invisible absolute left-1/2 top-full z-50 w-48 -translate-x-1/2 rounded-lg border border-stone-200 bg-white py-2 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+              {collectionLinks.map((link) => (
+                <Link key={link.to} to={link.to} className="block px-4 py-2 text-stone-700 hover:bg-stone-50 hover:text-rose-900">
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
         </nav>
 
         <div className="ml-auto flex items-center gap-4 md:ml-0">
@@ -100,7 +115,7 @@ export function Header() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search sarees, kurtis…"
+              placeholder="Search sarees, kurties, lehengas…"
               aria-label="Search products"
               className="w-full max-w-md rounded-full border border-stone-300 bg-white px-4 py-2 text-sm focus:border-rose-900 focus:outline-none"
             />

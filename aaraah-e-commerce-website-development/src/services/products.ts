@@ -27,6 +27,7 @@ export interface ProductFilters {
   collectionSlug?: string;
   search?: string;
   color?: string;
+  size?: string;
   minPrice?: number;
   maxPrice?: number;
   inStockOnly?: boolean;
@@ -55,6 +56,33 @@ export function variantCollectionId(
   variant: Pick<ProductVariant, "collection_id">
 ): string | null {
   return variant.collection_id ?? product.collection_id ?? null;
+}
+
+/**
+ * Sizes a variant is available in. Stored as free text in attributes.size,
+ * either one size ("M") or a list ("S, M, L, XL"). Empty for products that
+ * have no sizes at all (most sarees, dupattas).
+ */
+export function variantSizes(variant: Pick<ProductVariant, "attributes">): string[] {
+  const raw = variant.attributes?.size;
+  if (!raw) return [];
+  return raw
+    .split(/[,/|]/)
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "3XL", "4XL", "5XL", "FREE SIZE", "FREE"];
+
+/** Distinct sizes across the active variants, in S→XL order (unknown labels last, A→Z). */
+export function collectSizes(products: ProductWithVariants[]): string[] {
+  const set = new Set<string>();
+  products.forEach((p) => p.variants.forEach((v) => v.active && variantSizes(v).forEach((x) => set.add(x))));
+  const rank = (x: string) => {
+    const i = SIZE_ORDER.indexOf(x);
+    return i === -1 ? SIZE_ORDER.length : i;
+  };
+  return Array.from(set).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, undefined, { numeric: true }));
 }
 
 export function productMinPrice(product: ProductWithVariants): number {
@@ -118,6 +146,10 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
   if (filters.color) {
     products = products.filter((p) => p.variants.some((v) => v.color === filters.color));
   }
+  if (filters.size) {
+    const wanted = filters.size.toUpperCase();
+    products = products.filter((p) => p.variants.some((v) => v.active && variantSizes(v).includes(wanted)));
+  }
   if (filters.inStockOnly) {
     products = products.filter((p) => p.variants.some((v) => v.active && v.is_available && v.stock_quantity > 0));
   }
@@ -140,7 +172,7 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
   }
 
   const total =
-    filters.color || filters.inStockOnly || filters.minPrice || filters.maxPrice || collectionId
+    filters.color || filters.size || filters.inStockOnly || filters.minPrice || filters.maxPrice || collectionId
       ? products.length
       : count || products.length;
 

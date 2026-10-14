@@ -11,10 +11,13 @@ const PRICE_RANGES: { label: string; min?: number; max?: number }[] = [
 export function FilterPanel({
   filters,
   availableColors,
+  availableSizes = [],
   onChange,
 }: {
   filters: ProductFilters;
   availableColors: string[];
+  /** Size section only renders when the products on this page actually have sizes. */
+  availableSizes?: string[];
   onChange: (next: ProductFilters) => void;
 }) {
   return (
@@ -60,6 +63,33 @@ export function FilterPanel({
                 }`}
               >
                 {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {availableSizes.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-stone-900">Size</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => onChange({ ...filters, size: undefined, page: 1 })}
+              className={`rounded-full border px-3 py-1 text-xs ${
+                !filters.size ? "border-rose-900 bg-rose-900 text-white" : "border-stone-300 text-stone-600"
+              }`}
+            >
+              All
+            </button>
+            {availableSizes.map((sz) => (
+              <button
+                key={sz}
+                onClick={() => onChange({ ...filters, size: sz, page: 1 })}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  filters.size === sz ? "border-rose-900 bg-rose-900 text-white" : "border-stone-300 text-stone-600"
+                }`}
+              >
+                {sz}
               </button>
             ))}
           </div>

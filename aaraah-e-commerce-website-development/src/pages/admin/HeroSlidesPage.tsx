@@ -141,7 +141,7 @@ export default function AdminHeroSlidesPage() {
           className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
         />
         <input
-          placeholder="Button link (e.g. /category/saree) — optional"
+          placeholder="Button link (e.g. /category/sarees) — optional"
           value={form.cta_link || ""}
           onChange={(e) => setForm((f) => ({ ...f, cta_link: e.target.value }))}
           className="rounded-lg border border-stone-300 px-3 py-2 text-sm"

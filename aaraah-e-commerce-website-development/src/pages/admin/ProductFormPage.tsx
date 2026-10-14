@@ -34,7 +34,7 @@ const EMPTY_PRODUCT: Partial<Product> = {
   active: true,
 };
 
-const EMPTY_VARIANT = { color: "", color_hex: "#7a1730", sku: "", price: 0, sale_price: "", stock_quantity: 0 };
+const EMPTY_VARIANT = { color: "", color_hex: "#7a1730", size: "", sku: "", price: 0, sale_price: "", stock_quantity: 0 };
 
 export default function ProductFormPage() {
   const { id } = useParams();
@@ -111,6 +111,7 @@ export default function ProductFormPage() {
         product_id: product.id,
         color: newVariant.color,
         color_hex: newVariant.color_hex,
+        attributes: newVariant.size.trim() ? { size: newVariant.size.trim() } : {},
         sku: newVariant.sku,
         price: Number(newVariant.price),
         sale_price: newVariant.sale_price ? Number(newVariant.sale_price) : null,
@@ -313,6 +314,7 @@ export default function ProductFormPage() {
             <p className="text-sm font-medium text-stone-700 sm:col-span-3">+ Add new colour variant</p>
             <input placeholder="Colour (e.g. Red)" required value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} className={inputClass} />
             <input type="color" value={newVariant.color_hex} onChange={(e) => setNewVariant({ ...newVariant, color_hex: e.target.value })} className="h-10 w-full rounded-lg border border-stone-300" />
+            <input placeholder="Sizes (optional, e.g. S, M, L, XL)" value={newVariant.size} onChange={(e) => setNewVariant({ ...newVariant, size: e.target.value })} className={inputClass} />
             <input placeholder="SKU (unique)" required value={newVariant.sku} onChange={(e) => setNewVariant({ ...newVariant, sku: e.target.value })} className={inputClass} />
             <input type="number" placeholder="Price" required value={newVariant.price} onChange={(e) => setNewVariant({ ...newVariant, price: Number(e.target.value) })} className={inputClass} />
             <input type="number" placeholder="Sale price (optional)" value={newVariant.sale_price} onChange={(e) => setNewVariant({ ...newVariant, sale_price: e.target.value })} className={inputClass} />
@@ -381,6 +383,14 @@ function VariantCard({
         </Labeled>
         <Labeled label="Colour hex">
           <input type="color" value={local.color_hex ?? "#7a1730"} onChange={(e) => setLocal({ ...local, color_hex: e.target.value })} className="h-10 w-full rounded-lg border border-stone-300" />
+        </Labeled>
+        <Labeled label="Sizes (comma separated, optional)">
+          <input
+            placeholder="S, M, L, XL"
+            value={local.attributes?.size ?? ""}
+            onChange={(e) => setLocal({ ...local, attributes: { ...(local.attributes || {}), size: e.target.value } })}
+            className={inputClass}
+          />
         </Labeled>
         <Labeled label="SKU">
           <input value={local.sku} onChange={(e) => setLocal({ ...local, sku: e.target.value })} className={inputClass} />

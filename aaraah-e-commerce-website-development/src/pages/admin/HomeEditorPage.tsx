@@ -461,7 +461,7 @@ function BannersTab() {
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
           />
           <input
-            placeholder="Button link (optional, e.g. /category/saree)"
+            placeholder="Button link (optional, e.g. /category/sarees)"
             value={form.cta_link || ""}
             onChange={(e) => setForm((f) => ({ ...f, cta_link: e.target.value }))}
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm"

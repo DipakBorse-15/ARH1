@@ -50,7 +50,7 @@ export default function Home() {
     <div>
       <SEO
         title={`${siteConfig.name} — Premium Indian Ethnic Wear`}
-        description="Shop premium sarees, kurtis, dress materials and kurta sets. Elegant, modern Indian ethnic fashion delivered across India."
+        description="Shop premium sarees, kurties, kurta sets, lehengas, dupattas and more. Elegant, modern Indian ethnic fashion delivered across India."
         jsonLd={{
           "@context": "https://schema.org",
           "@type": "Organization",
@@ -117,10 +117,10 @@ function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               Drape yourself in timeless Indian elegance
             </h1>
             <p className="max-w-md text-rose-50/90">
-              Discover sarees, kurtis, dress materials and kurta sets crafted for celebrations and everyday grace.
+              Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link to="/category/saree" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-900 shadow-lg">
+              <Link to="/category/sarees" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-900 shadow-lg">
                 Shop Sarees
               </Link>
               <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold">

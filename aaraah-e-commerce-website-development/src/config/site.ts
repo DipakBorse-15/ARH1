@@ -20,10 +20,12 @@ export const siteConfig = {
   upiId: import.meta.env.VITE_UPI_ID || "set-upi-id@bank",
   upiPayeeName: import.meta.env.VITE_UPI_PAYEE_NAME || "AARAAH",
   categories: [
-    { name: "Saree", slug: "saree" },
-    { name: "Kurti", slug: "kurti" },
-    { name: "Dress Material", slug: "dress-material" },
-    { name: "Kurta Set with Dupatta", slug: "kurta-set-with-dupatta" },
+    { name: "Sarees", slug: "sarees" },
+    { name: "Kurties & Kurta Sets", slug: "kurties-kurta-sets" },
+    { name: "Lehengas", slug: "lehengas" },
+    { name: "Dupattas & Stoles", slug: "dupattas-stoles" },
+    { name: "Bottomwear", slug: "bottomwear" },
+    { name: "Blouses", slug: "blouses" },
   ],
   collections: [
     { name: "New Arrival", slug: "new-arrival" },

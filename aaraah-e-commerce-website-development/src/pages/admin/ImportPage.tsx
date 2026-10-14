@@ -174,12 +174,53 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
   return products;
 }
 
+/**
+ * Sheet "Product Type" values (Amazon-style: SAREE, KURTA, ...) -> our 6 category slugs.
+ * Without this, importing "SAREE" would auto-create a duplicate "Saree" category next
+ * to "Sarees". Anything not listed here still falls back to find-or-create below.
+ */
+const PRODUCT_TYPE_TO_CATEGORY_SLUG: Record<string, string> = {
+  saree: "sarees",
+  sarees: "sarees",
+  kurti: "kurties-kurta-sets",
+  kurtis: "kurties-kurta-sets",
+  kurty: "kurties-kurta-sets",
+  kurta: "kurties-kurta-sets",
+  kurtas: "kurties-kurta-sets",
+  "kurta set": "kurties-kurta-sets",
+  "kurta sets": "kurties-kurta-sets",
+  "kurta set with dupatta": "kurties-kurta-sets",
+  "salwar suit": "kurties-kurta-sets",
+  "salwar suits": "kurties-kurta-sets",
+  lehenga: "lehengas",
+  lehengas: "lehengas",
+  "lehenga choli": "lehengas",
+  dupatta: "dupattas-stoles",
+  dupattas: "dupattas-stoles",
+  stole: "dupattas-stoles",
+  stoles: "dupattas-stoles",
+  bottomwear: "bottomwear",
+  "bottom wear": "bottomwear",
+  palazzo: "bottomwear",
+  palazzos: "bottomwear",
+  legging: "bottomwear",
+  leggings: "bottomwear",
+  churidar: "bottomwear",
+  salwar: "bottomwear",
+  pant: "bottomwear",
+  pants: "bottomwear",
+  skirt: "bottomwear",
+  blouse: "blouses",
+  blouses: "blouses",
+};
+
 /** Find or create a category matching the sheet's "Product Type" (e.g. "SAREE"). */
 async function resolveCategoryId(productType: string): Promise<string | null> {
   const label = productType.trim();
   if (!label) return null;
   const niceName = label.charAt(0) + label.slice(1).toLowerCase(); // "SAREE" -> "Saree"
-  const slug = slugify(niceName);
+  const mappedSlug = PRODUCT_TYPE_TO_CATEGORY_SLUG[label.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ")];
+  const slug = mappedSlug || slugify(niceName);
 
   const { data: existing } = await supabase.from("categories").select("id").eq("slug", slug).maybeSingle();
   if (existing) return existing.id;
