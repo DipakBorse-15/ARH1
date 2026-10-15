@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
     // decrement_variant_stock raises an exception (and the `.error` below is
     // set) if a concurrent order already took the remaining stock.
     const outOfStockSkus: string[] = [];
+    const failedVariantIds: string[] = [];
     for (const item of payload.items) {
       const { error: stockError } = await admin.rpc("decrement_variant_stock", {
         p_variant_id: item.variant_id,
@@ -163,14 +164,18 @@ Deno.serve(async (req) => {
       if (stockError) {
         const variant = variants?.find((v: { id: string }) => v.id === item.variant_id);
         outOfStockSkus.push(variant?.sku ?? item.variant_id);
+        failedVariantIds.push(item.variant_id);
       }
     }
 
     if (outOfStockSkus.length > 0) {
       // Don't leave a "successful" order whose stock was never actually
       // reserved — cancel it and tell the customer which items to revisit.
-      // (Any items that DID decrement above are intentionally left
-      // decremented; an admin can restock manually if needed.)
+      // Cancelling an order makes a database trigger put back the stock of
+      // EVERY item still on it, so first drop the items that never got their
+      // stock reserved; the items that did decrement are then restored
+      // automatically and nothing is left over.
+      await admin.from("order_items").delete().eq("order_id", order.id).in("variant_id", failedVariantIds);
       await admin.from("orders").update({ status: "cancelled" }).eq("id", order.id);
       return json(
         { error: `Sorry, these items just sold out: ${outOfStockSkus.join(", ")}. Please update your cart and try again.` },

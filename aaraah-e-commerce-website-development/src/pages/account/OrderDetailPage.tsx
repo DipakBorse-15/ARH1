@@ -1,13 +1,41 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
 import { useLiveOrder } from "@/hooks/useLiveOrder";
+import { useToast } from "@/contexts/ToastContext";
+import { CancelOrderError, cancelOrder } from "@/services/orders";
+import { friendlyError } from "@/lib/supabase";
+
+// Customers can cancel only until the order ships.
+const CUSTOMER_CANCELLABLE = ["pending", "confirmed", "processing"];
 
 export default function OrderDetailPage() {
   const { orderId } = useParams();
-  const { order, loading, error } = useLiveOrder(orderId);
+  const { order, loading, error, refetch } = useLiveOrder(orderId);
+  const { show } = useToast();
+  const [cancelling, setCancelling] = useState(false);
+
+  async function handleCancel() {
+    if (!order) return;
+    if (!confirm("Are you sure you want to cancel this order? This cannot be undone.")) return;
+    setCancelling(true);
+    try {
+      const res = await cancelOrder(order.id);
+      show(
+        res.emailed ? "Your order has been cancelled. We've emailed you the details." : "Your order has been cancelled.",
+        "success"
+      );
+    } catch (err) {
+      show(err instanceof CancelOrderError ? err.message : friendlyError(err, "Could not cancel the order. Please try again."), "error");
+    } finally {
+      // Always re-read: shows the new status, or the real one if it changed meanwhile.
+      await refetch();
+      setCancelling(false);
+    }
+  }
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} />;
@@ -79,6 +107,29 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {order.status === "cancelled" && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+          <p className="font-semibold">This order has been cancelled.</p>
+          {order.payment_status === "paid" && (
+            <p className="mt-1">We had received your payment. We'll contact you shortly about your refund.</p>
+          )}
+        </div>
+      )}
+
+      {CUSTOMER_CANCELLABLE.includes(order.status) && (
+        <div className="mb-6 rounded-2xl border border-stone-200 p-5">
+          <h2 className="mb-1 text-sm font-semibold text-stone-900">Need to cancel?</h2>
+          <p className="mb-3 text-xs text-stone-500">You can cancel this order any time before it is shipped.</p>
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="rounded-full border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling…" : "Cancel order"}
+          </button>
+        </div>
+      )}
 
       <UpiPaymentCard order={order} />
     </div>

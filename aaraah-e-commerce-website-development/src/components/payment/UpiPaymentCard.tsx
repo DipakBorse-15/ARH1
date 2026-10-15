@@ -28,7 +28,7 @@ export function UpiPaymentCard({ order }: { order: Order }) {
     };
   }, [upiLink]);
 
-  if (order.payment_method !== "upi" || order.payment_status === "paid") return null;
+  if (order.payment_method !== "upi" || order.payment_status === "paid" || order.status === "cancelled") return null;
 
   return (
     <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center">

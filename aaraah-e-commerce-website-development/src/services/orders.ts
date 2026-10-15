@@ -57,6 +57,39 @@ export async function fetchAllOrdersAdmin(): Promise<Order[]> {
   return data as Order[];
 }
 
+/** Thrown when the cancel-order function refused with a message meant for the user. */
+export class CancelOrderError extends Error {}
+
+export interface CancelOrderResult {
+  cancelled: boolean;
+  /** false if the customer email could not be sent (the order is still cancelled). */
+  emailed: boolean;
+  already?: boolean;
+}
+
+/**
+ * Cancels an order through the `cancel-order` Edge Function: sets it to
+ * "cancelled" (a DB trigger restores the stock) and emails the customer.
+ * Customers can only cancel their own order before it ships; admins any time.
+ */
+export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
+  const { data, error } = await supabase.functions.invoke("cancel-order", { body: { order_id: orderId } });
+  if (error) {
+    // For non-2xx replies the real message is in the response body.
+    let message = "";
+    try {
+      const res = (error as { context?: Response }).context;
+      if (res) message = (await res.json())?.error ?? "";
+    } catch {
+      /* ignore */
+    }
+    if (message) throw new CancelOrderError(message);
+    throw error;
+  }
+  if (data?.error) throw new CancelOrderError(data.error);
+  return data as CancelOrderResult;
+}
+
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
   const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
   if (error) throw error;

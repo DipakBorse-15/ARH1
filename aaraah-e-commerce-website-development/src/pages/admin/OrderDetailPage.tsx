@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchOrderById, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
+import { CancelOrderError, cancelOrder, fetchOrderById, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
@@ -43,6 +43,25 @@ export default function AdminOrderDetailPage() {
   async function handleStatusChange(status: OrderStatus) {
     if (!order) return;
 
+    // Cancelling goes through the cancel-order function: it puts the stock back
+    // and emails the customer.
+    if (status === "cancelled") {
+      if (order.status === "cancelled") return;
+      if (!confirm("Cancel this order? The customer will be emailed and the stock will be added back.")) return;
+      setUpdating(true);
+      try {
+        const res = await cancelOrder(order.id);
+        setOrder({ ...order, status: "cancelled" });
+        if (res.emailed) show("Order cancelled, stock restored and customer emailed", "success");
+        else show("Order cancelled and stock restored, but the cancellation email couldn't be sent.", "error");
+      } catch (err) {
+        show(err instanceof CancelOrderError ? err.message : friendlyError(err), "error");
+      } finally {
+        setUpdating(false);
+      }
+      return;
+    }
+
     const alsoMarkPaid = status === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
     if (alsoMarkPaid && !confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
 
@@ -62,7 +81,8 @@ export default function AdminOrderDetailPage() {
         if (firstConfirm && order.payment_method === "cod") sendPaymentConfirmedEmail(order.id);
       }
     } catch (err) {
-      show(friendlyError(err), "error");
+      const msg = (err as { message?: string })?.message ?? "";
+      show(/not enough stock/i.test(msg) ? "Not enough stock to reopen this cancelled order." : friendlyError(err), "error");
     } finally {
       setUpdating(false);
     }

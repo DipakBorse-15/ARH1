@@ -48,5 +48,5 @@ export function useLiveOrder(orderId: string | undefined) {
     };
   }, [waiting, refetch]);
 
-  return { order, loading, error };
+  return { order, loading, error, refetch };
 }
