@@ -220,15 +220,16 @@ export interface HomeFeed {
  */
 export async function fetchHomeFeed(
   collections: Collection[],
-  opts: { latestCount?: number; perCollection?: number } = {}
+  opts: { latestCount?: number; perCollection?: number; categoryId?: string } = {}
 ): Promise<HomeFeed> {
-  const { latestCount = 12, perCollection = 8 } = opts;
+  const { latestCount = 12, perCollection = 8, categoryId } = opts;
 
   const { data, error } = await supabase.from("products").select(PRODUCT_SELECT).eq("active", true);
   if (error) throw error;
 
   const pool: SimilarItem[] = [];
   ((data || []) as ProductWithVariants[]).map(sortVariantImages).forEach((product) => {
+    if (categoryId && product.category_id !== categoryId) return; // category page: only this category
     product.variants.filter((v) => v.active).forEach((variant) => pool.push({ product, variant }));
   });
   pool.sort((a, b) => new Date(b.variant.created_at).getTime() - new Date(a.variant.created_at).getTime());
