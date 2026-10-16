@@ -63,7 +63,7 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
 
   return (
     <>
-      <CollectionCircles collections={shownCollections} categorySlug={category?.slug} />
+      <CollectionTiles collections={shownCollections} categorySlug={category?.slug} />
       <LatestLaunches items={feed.latest} />
       {feed.collectionRows.map((row) => (
         <CollectionProducts key={row.collection.id} row={row} perCollection={PER_COLLECTION} categorySlug={category?.slug} />
@@ -88,48 +88,111 @@ function ComingSoon({ name }: { name: string }) {
   );
 }
 
-/** Big circular collection shortcuts (same look the category circles had).
+/**
+ * Collections, in groups of 4.
  *
- *  The entrance animation lives on a wrapper and the hover effects on the inner
- *  link on purpose: a finished CSS animation (fill-mode "both") keeps owning its
- *  element's `transform`, which would silently swallow any hover transform
- *  placed on that same element. */
-function CollectionCircles({ collections, categorySlug }: { collections: Collection[]; categorySlug?: string }) {
+ *  Desktop/tablet (sm+) - "bento":      Phone - normal 2 x 2 grid:
+ *    ┌──────┬──────┬──────┐               ┌──────┬──────┐
+ *    │      │  B   │      │               │  A   │  B   │
+ *    │  A   ├──────┤  D   │               ├──────┼──────┤
+ *    │      │  C   │      │               │  C   │  D   │
+ *    └──────┴──────┴──────┘               └──────┴──────┘
+ *
+ * On the phone each group of 4 is two rows of rounded cards, about 4.5 inch
+ * tall in total (2 x 212px). A last group with fewer than 4 collections adapts
+ * (an odd last card spans the full width on the phone). Hover: tile lifts,
+ * photo zooms, shade deepens, name rises and an underline draws in.
+ *
+ * The entrance animation sits on a wrapper and the hover effects on the inner
+ * link on purpose: a finished CSS animation (fill-mode "both") keeps owning its
+ * element's `transform`, which would silently swallow any hover transform
+ * placed on that same element.
+ */
+function CollectionTiles({ collections, categorySlug }: { collections: Collection[]; categorySlug?: string }) {
   if (!collections.length) return null;
+
+  const groups: Collection[][] = [];
+  for (let i = 0; i < collections.length; i += 4) groups.push(collections.slice(i, i + 4));
+
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-14">
-      {/* Mobile: ONE row, exactly 4 per screen, swipe for more (scroll-snap).
-          sm+: wrapped, centred grid. */}
-      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory flex-nowrap overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:justify-center sm:gap-x-10 sm:gap-y-14 sm:overflow-visible sm:px-0 sm:pb-0">
-        {collections.map((c, i) => (
-          <div key={c.id} className="w-1/4 flex-none snap-start sm:w-auto sm:flex-initial animate-pop-in" style={{ animationDelay: `${Math.min(i, 9) * 90}ms` }}>
-            <Link
-              to={collectionHref(c.slug, categorySlug)}
-              className="group mx-auto flex w-full flex-col items-center gap-2 text-center sm:w-[170px] sm:gap-4"
-            >
-              <div className="relative flex h-[57px] w-[57px] items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-stone-100 text-stone-300 shadow-md ring-4 ring-transparent transition-all duration-500 ease-out group-hover:-translate-y-3 group-hover:scale-110 group-hover:border-rose-900 group-hover:shadow-2xl group-hover:shadow-rose-900/40 group-hover:ring-rose-900/20 sm:h-[170px] sm:w-[170px]">
-                {c.image ? (
-                  <img
-                    src={c.image}
-                    alt={c.name}
-                    className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-125"
-                  />
-                ) : (
-                  <span className="text-[1.7rem] transition-transform duration-500 group-hover:scale-125 sm:text-[4.2rem]">🪷</span>
-                )}
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-t from-rose-950/40 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-              </div>
-              <div className="flex flex-col items-center gap-1.5">
-                <p className="line-clamp-2 px-0.5 font-serif text-xs font-semibold text-stone-800 transition-colors duration-300 group-hover:text-rose-900 sm:text-xl">
-                  {c.name}
-                </p>
-                <span className="h-0.5 w-0 rounded-full bg-rose-900 transition-all duration-500 group-hover:w-12" />
-              </div>
-            </Link>
+    <section className="mx-auto max-w-7xl space-y-3 px-3 py-6 sm:space-y-4 sm:px-6 sm:py-10">
+      {groups.map((group, gi) => {
+        const layout = BENTO[group.length];
+        return (
+          <div
+            key={gi}
+            className={`grid auto-rows-[212px] grid-cols-2 gap-3 sm:auto-rows-[210px] sm:gap-4 lg:auto-rows-[300px] ${layout.grid}`}
+          >
+            {group.map((c, i) => (
+              <CollectionTile
+                key={c.id}
+                collection={c}
+                href={collectionHref(c.slug, categorySlug)}
+                cell={`${layout.cells[i]} ${group.length % 2 === 1 && i === group.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
+                delay={Math.min(gi * 4 + i, 9) * 90}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </section>
+  );
+}
+
+// Layout from sm (tablet/desktop) upward; the phone is a plain 2-column grid.
+// Static class strings (not built dynamically) so Tailwind keeps every one of them.
+const BENTO: Record<number, { grid: string; cells: string[] }> = {
+  4: {
+    grid: "sm:grid-cols-3 sm:grid-rows-2",
+    cells: [
+      "sm:col-start-1 sm:row-start-1 sm:row-span-2",
+      "sm:col-start-2 sm:row-start-1",
+      "sm:col-start-2 sm:row-start-2",
+      "sm:col-start-3 sm:row-start-1 sm:row-span-2",
+    ],
+  },
+  3: {
+    grid: "sm:grid-cols-2 sm:grid-rows-2",
+    cells: ["sm:col-start-1 sm:row-start-1 sm:row-span-2", "sm:col-start-2 sm:row-start-1", "sm:col-start-2 sm:row-start-2"],
+  },
+  2: {
+    grid: "sm:grid-cols-2 sm:grid-rows-2",
+    cells: ["sm:col-start-1 sm:row-start-1 sm:row-span-2", "sm:col-start-2 sm:row-start-1 sm:row-span-2"],
+  },
+  1: {
+    grid: "sm:mx-auto sm:max-w-md sm:grid-cols-1 sm:grid-rows-2",
+    cells: ["sm:row-span-2"],
+  },
+};
+
+function CollectionTile({ collection: c, href, cell, delay }: { collection: Collection; href: string; cell: string; delay: number }) {
+  return (
+    <div className={`${cell} animate-fade-rise-in min-h-0`} style={{ animationDelay: `${delay}ms` }}>
+      <Link
+        to={href}
+        className="group relative block h-full w-full overflow-hidden rounded-2xl bg-stone-800 shadow-md shadow-stone-900/10 ring-0 ring-rose-900/0 transition-all duration-500 ease-out hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-rose-900/30 hover:ring-4 hover:ring-rose-900/30 active:scale-[0.98] sm:rounded-3xl"
+      >
+        {c.image ? (
+          <img
+            src={c.image}
+            alt={c.name}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-900 to-amber-700 text-5xl transition-transform duration-700 group-hover:scale-110 sm:text-6xl">
+            🪷
+          </div>
+        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent transition-opacity duration-500 group-hover:from-rose-950/80" />
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-1.5 pb-2.5 text-center transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:gap-1.5 sm:px-3 sm:pb-5">
+          <span className="line-clamp-2 font-serif text-sm font-semibold leading-tight text-white drop-shadow-md sm:text-xl lg:text-2xl">
+            {c.name}
+          </span>
+          <span className="h-0.5 w-0 rounded-full bg-white/90 transition-all duration-500 group-hover:w-10 sm:group-hover:w-16" />
+        </div>
+      </Link>
+    </div>
   );
 }
 
