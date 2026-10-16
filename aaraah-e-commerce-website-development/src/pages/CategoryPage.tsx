@@ -63,17 +63,8 @@ export default function CategoryPage() {
         canonicalPath={`/category/${category.slug}`}
       />
 
-      <HeroCarousel
-        slides={slides}
-        fallback={
-          <section className="bg-gradient-to-br from-rose-950 via-rose-900 to-amber-800 text-white">
-            <div className="mx-auto max-w-7xl px-4 py-14 text-center sm:px-6 sm:py-20">
-              <h1 className="font-serif text-4xl font-bold sm:text-5xl">{category.name}</h1>
-              {category.description && <p className="mx-auto mt-3 max-w-xl text-rose-50/90">{category.description}</p>}
-            </div>
-          </section>
-        }
-      />
+      {/* Same banner as the Home page unless this category has banners of its own. */}
+      <HeroCarousel slides={slides} />
 
       <StorefrontSections category={{ id: category.id, slug: category.slug, name: category.name }} />
 
