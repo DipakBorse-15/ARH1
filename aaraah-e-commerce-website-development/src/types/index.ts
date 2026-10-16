@@ -209,6 +209,8 @@ export interface HeroSlide {
   image: string;
   cta_text: string | null;
   cta_link: string | null;
+  /** null = Home page banner; otherwise shown only on that category's page. */
+  category_id?: string | null;
   active: boolean;
   sort_order: number;
   created_at: string;

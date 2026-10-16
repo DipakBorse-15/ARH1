@@ -25,6 +25,8 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  // "More Products" from a category page opens the collection narrowed to that category.
+  const categoryParam = searchParams.get("category") || undefined;
 
   const [taxonomy, setTaxonomy] = useState<Category | Collection | null>(null);
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
@@ -35,12 +37,12 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     setFilters({ sort: "newest", page: 1, pageSize: PAGE_SIZE });
-  }, [mode, slug, query]);
+  }, [mode, slug, query, categoryParam]);
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, slug, query, filters]);
+  }, [mode, slug, query, categoryParam, filters]);
 
   async function load() {
     setLoading(true);
@@ -65,7 +67,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
           setTotal(0);
           return;
         }
-        const res = await fetchProducts({ ...filters, collectionSlug: slug });
+        const res = await fetchProducts({ ...filters, collectionSlug: slug, categorySlug: categoryParam });
         setProducts(res.products);
         setTotal(res.total);
       } else {
@@ -101,7 +103,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <SEO title={heading} description={taxonomy?.description || `Shop ${heading} at AARAAH.`} canonicalPath={`/${mode}/${slug || ""}`} />
+      <SEO title={heading} description={taxonomy?.description || `Shop ${heading} at AARAAH.`} canonicalPath={`/${mode}/${slug || ""}${mode === "category" ? "/all" : ""}`} />
       <h1 className="mb-1 font-serif text-3xl font-semibold text-stone-900">{heading}</h1>
       {taxonomy?.description && <p className="mb-6 max-w-2xl text-sm text-stone-500">{taxonomy.description}</p>}
       {mode === "search" && !query && <p className="mb-6 text-sm text-stone-500">Type a search term to find products.</p>}

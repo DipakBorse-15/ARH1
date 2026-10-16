@@ -5,7 +5,9 @@ import { useToast } from "@/contexts/ToastContext";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { fetchSiteSettings, updateSiteSettings } from "@/services/siteSettings";
 import { fetchAllHeroSlidesAdmin, upsertHeroSlide, deleteHeroSlide } from "@/services/heroSlides";
+import { fetchCategories } from "@/services/categories";
 import { supabase, friendlyError } from "@/lib/supabase";
+import type { Category } from "@/types";
 import { FONT_OPTIONS, applySiteFont } from "@/config/fonts";
 import type { HeroSlide, SiteSettings } from "@/types";
 
@@ -326,6 +328,7 @@ const EMPTY_SLIDE: Partial<HeroSlide> = {
   image: "",
   cta_text: "",
   cta_link: "",
+  category_id: null,
   active: true,
   sort_order: 0,
 };
@@ -333,6 +336,7 @@ const EMPTY_SLIDE: Partial<HeroSlide> = {
 function BannersTab() {
   const { show } = useToast();
   const [items, setItems] = useState<HeroSlide[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<HeroSlide>>(EMPTY_SLIDE);
   const [uploading, setUploading] = useState(false);
@@ -341,6 +345,7 @@ function BannersTab() {
 
   useEffect(() => {
     load();
+    fetchCategories().then(setCategories).catch(() => {});
   }, []);
 
   async function load() {
@@ -409,9 +414,11 @@ function BannersTab() {
   }
 
   async function moveSlide(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= items.length) return;
+    // Only swap with the neighbouring banner of the SAME page (Home / same category).
     const a = items[index];
+    let target = index + direction;
+    while (target >= 0 && target < items.length && (items[target].category_id ?? null) !== (a.category_id ?? null)) target += direction;
+    if (target < 0 || target >= items.length) return;
     const b = items[target];
     try {
       await Promise.all([
@@ -427,7 +434,7 @@ function BannersTab() {
   return (
     <div>
       <p className="mb-4 text-xs text-stone-500">
-        The rotating banner carousel at the top of the homepage. Add 2 or more to enable auto-rotation with
+        The rotating banner carousel at the top of the Home page and of each category page. Add 2 or more to enable auto-rotation with
         arrows; with one, it's a single static banner.
       </p>
 
@@ -466,13 +473,31 @@ function BannersTab() {
             onChange={(e) => setForm((f) => ({ ...f, cta_link: e.target.value }))}
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm"
           />
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-stone-600">Show this banner on</label>
+            <select
+              value={form.category_id ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value || null }))}
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+            >
+              <option value="">Home page</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} page
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-stone-400">
+              A category with no banner of its own shows the Home banners.
+            </p>
+          </div>
           <label className="flex items-center gap-2 text-sm text-stone-700 sm:col-span-2">
             <input
               type="checkbox"
               checked={form.active ?? true}
               onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
             />
-            Active (shown on homepage)
+            Active (visible to customers)
           </label>
 
           <div className="sm:col-span-2">
@@ -527,7 +552,7 @@ function BannersTab() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-stone-900">{s.title}</p>
                 <p className="truncate text-xs text-stone-500">
-                  Position {i + 1} of {items.length} · {s.active ? "Active" : "Hidden"}
+                  {s.category_id ? `${categories.find((c) => c.id === s.category_id)?.name ?? "Category"} page` : "Home page"} · {s.active ? "Active" : "Hidden"}
                 </p>
               </div>
               <button

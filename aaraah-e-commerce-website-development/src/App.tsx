@@ -11,6 +11,7 @@ import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
 import { LoadingState } from "@/components/ui/States";
 import { siteConfig } from "@/config/site";
 import { ProductListingPage } from "@/pages/ProductListingPage";
+import CategoryPage from "@/pages/CategoryPage";
 
 import Home from "@/pages/Home";
 import LoginPage from "@/pages/LoginPage";
@@ -51,7 +52,8 @@ export default function App() {
               <Routes>
                 <Route element={<MainLayout />}>
                   <Route index element={<Home />} />
-                  <Route path="category/:slug" element={<ProductListingPage mode="category" />} />
+                  <Route path="category/:slug" element={<CategoryPage />} />
+                  <Route path="category/:slug/all" element={<ProductListingPage mode="category" />} />
                   <Route path="collection/:slug" element={<ProductListingPage mode="collection" />} />
                   <Route path="search" element={<ProductListingPage mode="search" />} />
                   <Route path="products/:slug" element={<ProductPage />} />
