@@ -53,7 +53,7 @@ export default function ProductPage() {
       setProduct(data);
       const activeVariants = data.variants.filter((v) => v.active);
       const requested = searchParams.get("variant");
-      const match = requested ? activeVariants.find((v) => colorSlug(v.color) === requested) : null;
+      const match = requested ? activeVariants.find((v) => colorSlug(v.color) === colorSlug(requested)) : null;
       const initialVariant = match || activeVariants[0] || null;
       setSelectedVariant(initialVariant);
       setQuantity(1);
@@ -66,6 +66,21 @@ export default function ProductPage() {
       setLoading(false);
     }
   }
+
+  // Same product, different ?variant= (e.g. a "similar" colour tile, or the
+  // browser back button): load() only runs when the slug changes, so follow
+  // the URL here.
+  const variantParam = searchParams.get("variant");
+  useEffect(() => {
+    if (!product || !variantParam) return;
+    const match = product.variants.find((v) => v.active && colorSlug(v.color) === colorSlug(variantParam));
+    if (match && match.id !== selectedVariant?.id) {
+      setSelectedVariant(match);
+      setQuantity(1);
+      fetchSimilarVariants(match.id).then(setSimilar).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantParam, product]);
 
   function selectVariant(v: ProductVariant) {
     setSelectedVariant(v);

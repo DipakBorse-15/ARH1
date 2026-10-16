@@ -3,6 +3,12 @@ import { Link } from "react-router-dom";
 import { PriceDisplay } from "./PriceDisplay";
 import type { ProductVariant, ProductWithVariants } from "@/types";
 
+// Must match colorSlug() on the product page, otherwise multi-word colours
+// ("Royal Blue") never match and the page falls back to the first colour.
+function colorSlug(color: string | null) {
+  return (color || "").toLowerCase().trim().replace(/\s+/g, "-");
+}
+
 /**
  * Renders one colour as its own tile. `variant` selects which colour of the
  * (possibly multi-colour) product this card represents — pass it explicitly
@@ -20,7 +26,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
 
   return (
     <Link
-      to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(shown.color.toLowerCase())}` : ""}`}
+      to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(colorSlug(shown.color))}` : ""}`}
       className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-3 hover:scale-[1.03] hover:border-rose-900 hover:shadow-2xl hover:shadow-rose-900/40"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
