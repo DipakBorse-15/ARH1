@@ -233,5 +233,7 @@ export interface SiteSettings {
   announcement2_link: string | null;
   announcement2_active: boolean;
   font_family: string;
+  /** Seconds each uploaded hero banner stays before the next one (default banner is fixed 5 s). */
+  hero_slide_seconds?: number;
   updated_at: string;
 }

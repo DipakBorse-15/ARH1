@@ -434,6 +434,7 @@ function BannersTab() {
 
   return (
     <div>
+      <SlideSecondsCard />
       <p className="mb-4 text-xs text-stone-500">
         The rotating banner carousel at the top of the Home page and of each category page. Add 2 or more to enable auto-rotation with
         arrows; with one, it's a single static banner.
@@ -596,6 +597,66 @@ function BannersTab() {
           {items.length === 0 && <p className="text-sm text-stone-500">No banners yet — add your first one above.</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+/* One setting for all uploaded banners: how many seconds each stays on screen. */
+function SlideSecondsCard() {
+  const { show } = useToast();
+  const { settings, refresh } = useSiteSettings();
+  const [value, setValue] = useState("5");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings?.hero_slide_seconds) setValue(String(settings.hero_slide_seconds));
+  }, [settings?.hero_slide_seconds]);
+
+  async function save() {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n) || n < 2 || n > 60) {
+      show("Enter seconds between 2 and 60", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateSiteSettings({ hero_slide_seconds: n });
+      setValue(String(n));
+      show("Saved", "success");
+      refresh();
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
+      <h2 className="mb-1 text-sm font-semibold text-stone-900">Auto-change time</h2>
+      <p className="mb-3 text-xs text-stone-500">
+        Each banner you upload stays this many seconds, then the next one appears. Applies to all uploaded banners. The built-in
+        default banner (first slide) is fixed at 5 seconds.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="number"
+          min={2}
+          max={60}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-24 rounded-lg border border-stone-300 px-3 py-2 text-sm"
+        />
+        <span className="text-sm text-stone-600">seconds</span>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-full bg-rose-900 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

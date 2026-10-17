@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { HeroSlide } from "@/types";
@@ -9,19 +9,19 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const { settings } = useSiteSettings();
   const logo = settings?.logo_url;
   const [index, setIndex] = useState(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const total = slides.length + 1; // +1 = the built-in default banner (always first)
   const active = index % total;
   const hasMobileImages = slides.some((x) => !!x.mobile_image);
 
+  // Default banner: fixed 5 s. Uploaded banners: the seconds set in Admin → Home Editor → Banners.
+  const adminSeconds = Math.min(60, Math.max(2, Number(settings?.hero_slide_seconds) || 5));
+  const delay = active === 0 ? 5000 : adminSeconds * 1000;
+
   useEffect(() => {
     if (total <= 1) return;
-    timer.current = setInterval(() => setIndex((i) => (i + 1) % total), 5000);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [total]);
+    const t = setTimeout(() => setIndex((active + 1) % total), delay);
+    return () => clearTimeout(t);
+  }, [active, total, delay]);
 
   return (
     <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-amber-50">
