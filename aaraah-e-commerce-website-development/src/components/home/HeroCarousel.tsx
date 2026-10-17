@@ -24,7 +24,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   }, [total]);
 
   return (
-    <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-transparent">
+    <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-amber-50">
       {/* All slides share one grid cell so the banner never changes height while rotating.
           Web: centred frame, 74.8% of the screen wide (max 1418px, so zooming out does not stretch it). Phones: full width. */}
       <div className="relative grid w-full sm:mx-auto sm:w-[74.8%] sm:max-w-[1418px] sm:aspect-[1.988] sm:overflow-hidden">
