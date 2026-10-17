@@ -99,8 +99,8 @@ function ComingSoon({ name }: { name: string }) {
  *    └──────┴────────┴──────┘               └───────┴───────┘
  *
  * Size: on a phone one group of 4 is 5.5 inch tall (MOBILE_BLOCK_HEIGHT),
- * i.e. two rows of rounded cards. On web it is 2 rows of 210px (tablet) /
- * 300px (desktop), the middle column a bit wider (1 : 1.2 : 1). A last group
+ * i.e. two rows of rounded cards. On web it is 2 rows of 188px (tablet) /
+ * 269px (desktop) - the block is 95% as wide and 10% lower than before - the middle column a bit wider (1 : 1.2 : 1). A last group
  * with fewer than 4 collections adapts. Phones use the collection's
  * mobile_image when one is uploaded.
  *
@@ -125,7 +125,7 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
         return (
           <div
             key={gi}
-            className={`grid grid-rows-2 gap-3 ${MOBILE_BLOCK_HEIGHT} sm:h-auto sm:grid-rows-[repeat(2,210px)] sm:gap-4 lg:grid-rows-[repeat(2,300px)] ${layout.grid}`}
+            className={`grid grid-rows-2 gap-3 ${MOBILE_BLOCK_HEIGHT} sm:mx-auto sm:h-auto sm:w-[95%] sm:grid-rows-[repeat(2,188px)] sm:gap-4 lg:grid-rows-[repeat(2,269px)] ${layout.grid}`}
           >
             {group.map((c, i) => (
               <CollectionTile
@@ -168,7 +168,7 @@ const BENTO: Record<number, { grid: string; cells: string[] }> = {
     cells: ["row-span-2 sm:col-start-1 sm:row-start-1", "row-span-2 sm:col-start-2 sm:row-start-1"],
   },
   1: {
-    grid: "grid-cols-2 sm:grid-cols-1 sm:mx-auto sm:max-w-md",
+    grid: "grid-cols-2 sm:grid-cols-1 sm:max-w-md",
     cells: ["col-span-2 row-span-2 sm:col-span-1"],
   },
 };
