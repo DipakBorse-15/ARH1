@@ -119,7 +119,22 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
   for (let i = 0; i < collections.length; i += 4) groups.push(collections.slice(i, i + 4));
 
   return (
-    <section className="mx-auto max-w-7xl space-y-2 px-3 py-6 sm:space-y-4 sm:px-6 sm:py-10">
+    <section className="relative overflow-hidden bg-gradient-to-b from-amber-50 via-orange-50/60 to-amber-50 py-10 sm:py-16">
+      <CornerLeaf className="pointer-events-none absolute -left-6 -top-6 h-40 w-40 text-amber-800 sm:h-56 sm:w-56" />
+      <CornerLeaf className="pointer-events-none absolute -right-6 -top-6 h-40 w-40 rotate-90 text-amber-800 sm:h-56 sm:w-56" />
+
+      <div className="relative mx-auto max-w-7xl space-y-3 px-3 sm:space-y-4 sm:px-6">
+        <div className="mb-6 text-center sm:mb-10">
+          <p className="text-xs font-semibold tracking-[0.3em] text-amber-800/80">EXPLORE OUR</p>
+          <h2 className="mt-1 font-serif text-4xl font-bold text-stone-900 sm:text-5xl">Top Collections</h2>
+          <div className="mt-3 flex items-center justify-center gap-3 text-amber-800/70">
+            <span className="h-px w-10 bg-amber-800/40" />
+            <LotusDivider className="h-5 w-5" />
+            <span className="h-px w-10 bg-amber-800/40" />
+          </div>
+          <p className="mt-3 text-sm text-stone-600">Timeless Styles &nbsp;|&nbsp; Premium Fabrics &nbsp;|&nbsp; For Every You</p>
+        </div>
+
       {groups.map((group, gi) => {
         const layout = BENTO[group.length];
         return (
@@ -139,7 +154,35 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
           </div>
         );
       })}
+      </div>
     </section>
+  );
+}
+
+function LotusDivider({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 3c1.2 2.5 1.2 5-0 7-1.2-2-1.2-4.5 0-7Z M12 3c-3 1.5-4.5 4-4.5 6.5C9.5 10.5 11 9.5 12 8c1 1.5 2.5 2.5 4.5 1.5C16.5 7 15 4.5 12 3Z M4 12c2.7-1 5.3-.5 7 1-2.6.8-5-.2-7-1Z M20 12c-2.7-1-5.3-.5-7 1 2.6.8 5-.2 7-1Z M12 10c2.2 1.6 3 3.8 2.4 6.2-2-.6-3.4-2.2-3.7-4.3 M12 10c-2.2 1.6-3 3.8-2.4 6.2 2-.6 3.4-2.2 3.7-4.3"
+        stroke="currentColor"
+        strokeWidth="0.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CornerLeaf({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 200 200" fill="none" className={className} aria-hidden="true">
+      <g stroke="currentColor" strokeWidth="1" opacity="0.35">
+        <path d="M10 190C60 160 90 110 80 40" />
+        <path d="M80 40C60 60 45 85 42 110" />
+        <path d="M80 40C95 65 100 95 92 125" />
+        <path d="M30 170C55 155 68 130 65 100" />
+      </g>
+    </svg>
   );
 }
 
