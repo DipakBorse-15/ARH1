@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
@@ -6,12 +6,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useNavCategories } from "@/hooks/useNavCategories";
 
-// Web menu look: spaced serif capitals, a gold line that draws in from the centre
-// and a soft maroon colour change on hover.
+// Web menu look: Cinzel capitals; on hover the item fills with deep maroon, the text turns
+// white and a gold line draws in under it (with a clear gap between the text and the line).
 const NAV_LINK =
-  "group/nav relative whitespace-nowrap px-0.5 py-4 font-serif text-[12px] font-medium uppercase tracking-[0.06em] text-stone-700 transition-all duration-300 hover:-translate-y-px hover:text-rose-900 lg:tracking-[0.12em] xl:text-[13px] xl:tracking-[0.16em]";
+  "group/nav relative whitespace-nowrap px-2 pb-3.5 pt-2 text-[10.5px] font-medium uppercase tracking-[0.02em] text-stone-700 transition-colors duration-300 hover:bg-[#7a1730] hover:text-white focus-visible:bg-[#7a1730] focus-visible:text-white lg:px-3 lg:text-[11.5px] lg:tracking-[0.04em] xl:px-3.5 xl:text-[13px] xl:tracking-[0.06em]";
 const NAV_LINE =
-  "pointer-events-none absolute inset-x-0 bottom-2.5 mx-auto h-px w-0 bg-gradient-to-r from-transparent via-amber-600 to-transparent transition-all duration-500 ease-out group-hover/nav:w-full group-focus-visible/nav:w-full";
+  "pointer-events-none absolute inset-x-0 bottom-1.5 mx-auto h-px w-0 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-500 ease-out group-hover/nav:w-[75%] group-focus-visible/nav:w-[75%] group-hover:w-[75%] group-focus-within:w-[75%]";
+
+// Web menu font: Cinzel Medium (500), loaded once from Google Fonts.
+function ensureMenuFont() {
+  if (document.getElementById("menu-font-cinzel")) return;
+  const link = document.createElement("link");
+  link.id = "menu-font-cinzel";
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Cinzel:wght@500&display=swap";
+  document.head.appendChild(link);
+}
+const MENU_FONT = { fontFamily: '"Cinzel", Georgia, serif' };
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,6 +33,10 @@ export function Header() {
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
   const categories = useNavCategories();
+
+  useEffect(() => {
+    ensureMenuFont();
+  }, []);
 
   const categoryLinks = categories.map((c) => ({ label: c.name.toUpperCase(), to: `/category/${c.slug}` }));
   const collectionLinks = siteConfig.collections.map((c) => ({ label: c.name.toUpperCase(), to: `/collection/${c.slug}` }));
@@ -59,7 +74,7 @@ export function Header() {
 
         {/* Centered nav — categories (newest launch first), collections tucked into a dropdown
             so six long category names still fit on one line. */}
-        <nav className="hidden flex-1 items-center justify-center gap-5 text-sm font-medium tracking-wide text-stone-700 md:flex">
+        <nav style={MENU_FONT} className="hidden flex-1 items-center justify-center gap-2 text-sm font-medium text-stone-700 md:flex lg:gap-4 xl:gap-5">
           {categoryLinks.map((link) => (
             <Link key={link.to} to={link.to} className={NAV_LINK}>
               {link.label}
@@ -67,9 +82,9 @@ export function Header() {
             </Link>
           ))}
           <div className="group relative">
-            <button type="button" className={NAV_LINK} aria-haspopup="true">
+            <button type="button" className={`${NAV_LINK} group-hover:bg-[#7a1730] group-hover:text-white group-focus-within:bg-[#7a1730] group-focus-within:text-white`} aria-haspopup="true">
               COLLECTIONS
-              <span aria-hidden="true" className="ml-1.5 inline-block text-[9px] text-amber-700 transition-transform duration-300 group-hover:rotate-180">
+              <span aria-hidden="true" className="ml-1.5 inline-block text-[9px] transition-transform duration-300 group-hover:rotate-180">
                 ▼
               </span>
               <span className={NAV_LINE} />
@@ -79,7 +94,7 @@ export function Header() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="relative block px-6 py-2.5 font-serif text-[13px] tracking-[0.12em] text-stone-700 transition-all duration-300 before:absolute before:left-3 before:top-1/2 before:h-px before:w-0 before:bg-amber-600 before:transition-all before:duration-300 hover:bg-rose-50/70 hover:pl-8 hover:text-rose-900 hover:before:w-3.5"
+                  className="relative block px-6 py-2.5 text-[12.5px] tracking-[0.08em] text-stone-700 transition-all duration-300 before:absolute before:left-3 before:top-1/2 before:h-px before:w-0 before:bg-white before:transition-all before:duration-300 hover:bg-[#7a1730] hover:pl-8 hover:text-white hover:before:w-3.5"
                 >
                   {link.label}
                 </Link>
