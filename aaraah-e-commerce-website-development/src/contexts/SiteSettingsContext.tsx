@@ -9,6 +9,20 @@ interface SiteSettingsContextValue {
   refresh: () => void;
 }
 
+const FAVICON_KEY = "aaraah_favicon";
+
+/** Browser-tab icon: use the uploaded site logo instead of the default lotus emoji. */
+function applyFavicon(url: string) {
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.removeAttribute("type"); // the default one is declared as svg
+  link.href = url;
+}
+
 const SiteSettingsContext = createContext<SiteSettingsContextValue | undefined>(undefined);
 
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
@@ -21,12 +35,27 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
       .then((s) => {
         setSettings(s);
         if (s?.font_family) applySiteFont(s.font_family);
+        if (s?.logo_url) {
+          applyFavicon(s.logo_url);
+          try {
+            localStorage.setItem(FAVICON_KEY, s.logo_url);
+          } catch {
+            /* private mode etc. — the icon just appears a moment later */
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
+    // Show the remembered logo as the tab icon straight away, before settings arrive.
+    try {
+      const saved = localStorage.getItem(FAVICON_KEY);
+      if (saved) applyFavicon(saved);
+    } catch {
+      /* ignore */
+    }
     load();
   }, [load]);
 

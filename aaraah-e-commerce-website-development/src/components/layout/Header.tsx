@@ -42,7 +42,7 @@ export function Header() {
 
         <Link to="/" className="mr-1 flex shrink-0 items-center gap-2">
           {settings?.logo_url ? (
-            <img src={settings.logo_url} alt={settings.site_name || siteConfig.name} className="h-9 w-auto object-contain" />
+            <img src={settings.logo_url} alt={settings.site_name || siteConfig.name} className="h-[54px] w-auto object-contain md:h-[72px]" />
           ) : (
             <span className="font-serif text-2xl font-bold tracking-wide text-rose-900">
               {settings?.site_name || siteConfig.name}
