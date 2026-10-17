@@ -209,6 +209,8 @@ export interface HeroSlide {
   title: string;
   subtitle: string | null;
   image: string;
+  /** Optional banner used on phones (< 640px) instead of `image`. */
+  mobile_image?: string | null;
   cta_text: string | null;
   cta_link: string | null;
   /** null = Home page banner; otherwise shown only on that category's page. */

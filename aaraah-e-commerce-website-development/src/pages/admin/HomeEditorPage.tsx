@@ -329,6 +329,7 @@ const EMPTY_SLIDE: Partial<HeroSlide> = {
   cta_text: "",
   cta_link: "",
   category_id: null,
+  mobile_image: null,
   active: true,
   sort_order: 0,
 };
@@ -339,7 +340,7 @@ function BannersTab() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<HeroSlide>>(EMPTY_SLIDE);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<"image" | "mobile_image" | null>(null);
   const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -359,18 +360,18 @@ function BannersTab() {
     }
   }
 
-  async function handleUpload(file: File) {
-    setUploading(true);
+  async function handleUpload(file: File, field: "image" | "mobile_image") {
+    setUploading(field);
     try {
       const path = `${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("hero-images").getPublicUrl(path);
-      setForm((f) => ({ ...f, image: data.publicUrl }));
+      setForm((f) => ({ ...f, [field]: data.publicUrl }));
     } catch (err) {
       show(friendlyError(err, "Image upload failed."), "error");
     } finally {
-      setUploading(false);
+      setUploading(null);
     }
   }
 
@@ -386,7 +387,7 @@ function BannersTab() {
     }
     setSaving(true);
     try {
-      await upsertHeroSlide(form);
+      await upsertHeroSlide({ ...form, mobile_image: form.mobile_image || null });
       setForm(EMPTY_SLIDE);
       show(form.id ? "Banner updated" : "Banner added", "success");
       load();
@@ -501,20 +502,41 @@ function BannersTab() {
           </label>
 
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Banner image (wide, e.g. 1600×700)</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Banner image — web (wide, e.g. 1600×700)</label>
             <input
               type="file"
               accept="image/*"
-              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "image")}
               className="block w-full text-sm text-stone-600 file:mr-4 file:rounded-full file:border-0 file:bg-rose-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-rose-800"
             />
-            {uploading && <p className="mt-1 text-xs text-stone-500">Uploading…</p>}
+            {uploading === "image" && <p className="mt-1 text-xs text-stone-500">Uploading…</p>}
             {form.image && <img src={form.image} alt="" className="mt-2 h-28 w-full rounded-lg object-cover" />}
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-stone-600">
+              Banner image — mobile (optional, tall 4:5, e.g. 1080×1350). Phones show this instead of the web banner.
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "mobile_image")}
+              className="block w-full text-sm text-stone-600 file:mr-4 file:rounded-full file:border-0 file:bg-rose-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-rose-800"
+            />
+            {uploading === "mobile_image" && <p className="mt-1 text-xs text-stone-500">Uploading…</p>}
+            {form.mobile_image && (
+              <div className="mt-2 flex items-center gap-3">
+                <img src={form.mobile_image} alt="" className="h-28 w-[90px] rounded-lg object-cover" />
+                <button type="button" onClick={() => setForm((f) => ({ ...f, mobile_image: null }))} className="text-xs text-stone-500 underline">
+                  Remove mobile image
+                </button>
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={saving || uploading}
+            disabled={saving || !!uploading}
             className="rounded-full bg-rose-900 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50 sm:col-span-2"
           >
             {saving ? "Saving…" : form.id ? "Save Changes" : "Save Banner"}

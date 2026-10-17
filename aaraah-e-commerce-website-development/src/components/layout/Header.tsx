@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +32,7 @@ export function Header() {
   const { itemCount } = useCart();
   const { settings } = useSiteSettings();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const categories = useNavCategories();
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 md:py-0.5">
+      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-1.5 sm:px-6 md:py-0.5">
         <button className="md:hidden" aria-label="Open menu" onClick={() => setMobileOpen((o) => !o)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
@@ -165,17 +166,29 @@ export function Header() {
               className="w-full rounded-full border border-stone-300 px-4 py-2 text-sm"
             />
           </form>
-          <div className="grid grid-cols-2 gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700"
-              >
-                {link.label}
-              </Link>
-            ))}
+          {/* Same Cinzel look as the web menu. Phones have no hover, so a tap (and the page you are on)
+              fills the item with maroon and draws the gold line. */}
+          <div style={MENU_FONT} className="grid grid-cols-2 gap-2">
+            {navLinks.map((link) => {
+              const current = pathname === link.to;
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={`group/m relative rounded-lg px-3 pb-3.5 pt-2.5 text-[12px] font-medium uppercase leading-snug tracking-[0.04em] transition-colors duration-200 active:bg-[#7a1730] active:text-white ${
+                    current ? "bg-[#7a1730] text-white" : "bg-stone-50 text-stone-700"
+                  }`}
+                >
+                  {link.label}
+                  <span
+                    className={`pointer-events-none absolute inset-x-0 bottom-1.5 mx-auto h-px bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-300 group-active/m:w-[75%] ${
+                      current ? "w-[75%]" : "w-0"
+                    }`}
+                  />
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
