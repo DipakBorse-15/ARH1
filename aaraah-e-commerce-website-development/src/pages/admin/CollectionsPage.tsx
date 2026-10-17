@@ -6,7 +6,7 @@ import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection } from "@/
 import { supabase, friendlyError } from "@/lib/supabase";
 import type { Collection } from "@/types";
 
-const EMPTY: Partial<Collection> = { name: "", slug: "", description: "", image: "", active: true };
+const EMPTY: Partial<Collection> = { name: "", slug: "", description: "", image: "", mobile_image: "", active: true };
 
 function slugify(v: string) {
   return v.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -17,7 +17,7 @@ export default function AdminCollectionsPage() {
   const [items, setItems] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<Collection>>(EMPTY);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<"image" | "mobile_image" | null>(null);
 
   useEffect(() => {
     load();
@@ -34,25 +34,25 @@ export default function AdminCollectionsPage() {
     }
   }
 
-  async function handleUpload(file: File) {
-    setUploading(true);
+  async function handleUpload(file: File, field: "image" | "mobile_image") {
+    setUploading(field);
     try {
       const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("collection-images").upload(path, file, { upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from("collection-images").getPublicUrl(path);
-      setForm((f) => ({ ...f, image: data.publicUrl }));
+      setForm((f) => ({ ...f, [field]: data.publicUrl }));
     } catch (err) {
       show(friendlyError(err, "Image upload failed."), "error");
     } finally {
-      setUploading(false);
+      setUploading(null);
     }
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await upsertCollection({ ...form, slug: form.slug || slugify(form.name || "") });
+      await upsertCollection({ ...form, mobile_image: form.mobile_image || null, slug: form.slug || slugify(form.name || "") });
       setForm(EMPTY);
       show("Collection saved", "success");
       load();
@@ -90,10 +90,26 @@ export default function AdminCollectionsPage() {
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className={`${inputClass} sm:col-span-2`}
         />
-        <div className="sm:col-span-2 flex items-center gap-3">
-          <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} className="text-sm" />
-          {uploading && <span className="text-xs text-stone-400">Uploading…</span>}
-          {form.image && <img src={form.image} alt="" className="h-10 w-10 rounded object-cover" />}
+        <div className="sm:col-span-2">
+          <p className="mb-1 text-xs font-medium text-stone-600">Web (laptop) image</p>
+          <div className="flex items-center gap-3">
+            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "image")} className="text-sm" />
+            {uploading === "image" && <span className="text-xs text-stone-400">Uploading…</span>}
+            {form.image && <img src={form.image} alt="" className="h-10 w-10 rounded object-cover" />}
+          </div>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="mb-1 text-xs font-medium text-stone-600">Mobile image (optional — phones show this instead of the web image)</p>
+          <div className="flex items-center gap-3">
+            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "mobile_image")} className="text-sm" />
+            {uploading === "mobile_image" && <span className="text-xs text-stone-400">Uploading…</span>}
+            {form.mobile_image && <img src={form.mobile_image} alt="" className="h-10 w-10 rounded object-cover" />}
+            {form.mobile_image && (
+              <button type="button" onClick={() => setForm({ ...form, mobile_image: "" })} className="text-xs text-stone-500 underline">
+                Remove
+              </button>
+            )}
+          </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={!!form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />

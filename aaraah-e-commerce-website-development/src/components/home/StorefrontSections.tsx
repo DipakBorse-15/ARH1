@@ -89,25 +89,27 @@ function ComingSoon({ name }: { name: string }) {
 }
 
 /**
- * Collections, in groups of 4.
+ * Collections as a "bento" mosaic, in groups of 4 — on phone AND web:
  *
- *  Desktop/tablet (sm+) - "bento":      Phone - normal 2 x 2 grid:
- *    ┌──────┬──────┬──────┐               ┌──────┬──────┐
- *    │      │  B   │      │               │  A   │  B   │
- *    │  A   ├──────┤  D   │               ├──────┼──────┤
- *    │      │  C   │      │               │  C   │  D   │
- *    └──────┴──────┴──────┘               └──────┴──────┘
+ *    ┌──────┬────────┬──────┐
+ *    │      │   B    │      │
+ *    │  A   ├────────┤  D   │      A and D are tall; B and C stack in the
+ *    │      │   C    │      │      middle, which is a bit wider (1 : 1.2 : 1).
+ *    └──────┴────────┴──────┘
  *
- * On the phone each group of 4 is two rows of rounded cards, about 4.5 inch
- * tall in total (2 x 212px). A last group with fewer than 4 collections adapts
- * (an odd last card spans the full width on the phone). Hover: tile lifts,
- * photo zooms, shade deepens, name rises and an underline draws in.
+ * Size: on a phone one group is 5.5 inch tall (MOBILE_BLOCK_HEIGHT); from
+ * tablet up it is 2 rows of 210px (300px on desktop). A last group with fewer
+ * than 4 collections adapts (3 → tall + two stacked, 2 → two tall, 1 → one tall).
+ * Phones use the collection's mobile_image when one is uploaded.
  *
+ * Hover: tile lifts, photo zooms, shade deepens, name rises, underline draws in.
  * The entrance animation sits on a wrapper and the hover effects on the inner
  * link on purpose: a finished CSS animation (fill-mode "both") keeps owning its
  * element's `transform`, which would silently swallow any hover transform
  * placed on that same element.
  */
+const MOBILE_BLOCK_HEIGHT = "h-[5.5in]"; // change this one value to resize the phone layout
+
 function CollectionTiles({ collections, categorySlug }: { collections: Collection[]; categorySlug?: string }) {
   if (!collections.length) return null;
 
@@ -115,20 +117,20 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
   for (let i = 0; i < collections.length; i += 4) groups.push(collections.slice(i, i + 4));
 
   return (
-    <section className="mx-auto max-w-7xl space-y-3 px-3 py-6 sm:space-y-4 sm:px-6 sm:py-10">
+    <section className="mx-auto max-w-7xl space-y-2 px-3 py-6 sm:space-y-4 sm:px-6 sm:py-10">
       {groups.map((group, gi) => {
         const layout = BENTO[group.length];
         return (
           <div
             key={gi}
-            className={`grid auto-rows-[212px] grid-cols-2 gap-3 sm:auto-rows-[210px] sm:gap-4 lg:auto-rows-[300px] ${layout.grid}`}
+            className={`grid grid-rows-2 gap-2 ${MOBILE_BLOCK_HEIGHT} sm:h-auto sm:grid-rows-[repeat(2,210px)] sm:gap-4 lg:grid-rows-[repeat(2,300px)] ${layout.grid}`}
           >
             {group.map((c, i) => (
               <CollectionTile
                 key={c.id}
                 collection={c}
                 href={collectionHref(c.slug, categorySlug)}
-                cell={`${layout.cells[i]} ${group.length % 2 === 1 && i === group.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}
+                cell={layout.cells[i]}
                 delay={Math.min(gi * 4 + i, 9) * 90}
               />
             ))}
@@ -139,29 +141,28 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
   );
 }
 
-// Layout from sm (tablet/desktop) upward; the phone is a plain 2-column grid.
 // Static class strings (not built dynamically) so Tailwind keeps every one of them.
 const BENTO: Record<number, { grid: string; cells: string[] }> = {
   4: {
-    grid: "sm:grid-cols-3 sm:grid-rows-2",
+    grid: "grid-cols-[1fr_1.2fr_1fr]",
     cells: [
-      "sm:col-start-1 sm:row-start-1 sm:row-span-2",
-      "sm:col-start-2 sm:row-start-1",
-      "sm:col-start-2 sm:row-start-2",
-      "sm:col-start-3 sm:row-start-1 sm:row-span-2",
+      "col-start-1 row-start-1 row-span-2",
+      "col-start-2 row-start-1",
+      "col-start-2 row-start-2",
+      "col-start-3 row-start-1 row-span-2",
     ],
   },
   3: {
-    grid: "sm:grid-cols-2 sm:grid-rows-2",
-    cells: ["sm:col-start-1 sm:row-start-1 sm:row-span-2", "sm:col-start-2 sm:row-start-1", "sm:col-start-2 sm:row-start-2"],
+    grid: "grid-cols-[1fr_1.2fr]",
+    cells: ["col-start-1 row-start-1 row-span-2", "col-start-2 row-start-1", "col-start-2 row-start-2"],
   },
   2: {
-    grid: "sm:grid-cols-2 sm:grid-rows-2",
-    cells: ["sm:col-start-1 sm:row-start-1 sm:row-span-2", "sm:col-start-2 sm:row-start-1 sm:row-span-2"],
+    grid: "grid-cols-2",
+    cells: ["col-start-1 row-start-1 row-span-2", "col-start-2 row-start-1 row-span-2"],
   },
   1: {
-    grid: "sm:mx-auto sm:max-w-md sm:grid-cols-1 sm:grid-rows-2",
-    cells: ["sm:row-span-2"],
+    grid: "grid-cols-1 sm:mx-auto sm:max-w-md",
+    cells: ["row-span-2"],
   },
 };
 
@@ -172,20 +173,23 @@ function CollectionTile({ collection: c, href, cell, delay }: { collection: Coll
         to={href}
         className="group relative block h-full w-full overflow-hidden rounded-2xl bg-stone-800 shadow-md shadow-stone-900/10 ring-0 ring-rose-900/0 transition-all duration-500 ease-out hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-rose-900/30 hover:ring-4 hover:ring-rose-900/30 active:scale-[0.98] sm:rounded-3xl"
       >
-        {c.image ? (
-          <img
-            src={c.image}
-            alt={c.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-          />
+        {c.image || c.mobile_image ? (
+          <picture className="block h-full w-full">
+            {c.mobile_image && <source media="(max-width: 639px)" srcSet={c.mobile_image} />}
+            <img
+              src={c.image || c.mobile_image || ""}
+              alt={c.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+            />
+          </picture>
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-900 to-amber-700 text-5xl transition-transform duration-700 group-hover:scale-110 sm:text-6xl">
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-900 to-amber-700 text-4xl transition-transform duration-700 group-hover:scale-110 sm:text-6xl">
             🪷
           </div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent transition-opacity duration-500 group-hover:from-rose-950/80" />
-        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-1.5 pb-2.5 text-center transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:gap-1.5 sm:px-3 sm:pb-5">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-1.5 pb-3 text-center transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:gap-1.5 sm:px-3 sm:pb-5">
           <span className="line-clamp-2 font-serif text-sm font-semibold leading-tight text-white drop-shadow-md sm:text-xl lg:text-2xl">
             {c.name}
           </span>

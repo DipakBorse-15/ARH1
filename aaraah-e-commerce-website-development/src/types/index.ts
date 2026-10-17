@@ -33,6 +33,8 @@ export interface Collection {
   slug: string;
   description: string | null;
   image: string | null;
+  /** Optional image used on phones (< 640px) instead of `image`. */
+  mobile_image?: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
