@@ -26,44 +26,50 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   return (
     <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-transparent">
       {/* All slides share one grid cell so the banner never changes height while rotating.
-          Web: centred frame, 74.8% of the screen wide. Phones: full width. */}
-      <div className="relative grid w-full sm:mx-auto sm:w-[74.8%] sm:aspect-[1.789] sm:overflow-hidden">
+          Web: centred frame, 74.8% of the screen wide (max 1418px, so zooming out does not stretch it). Phones: full width. */}
+      <div className="relative grid w-full sm:mx-auto sm:w-[74.8%] sm:max-w-[1418px] sm:aspect-[1.988] sm:overflow-hidden">
         {/* Slide 1 — default banner */}
         <div
           aria-hidden={active !== 0}
           className={`col-start-1 row-start-1 bg-gradient-to-br from-rose-950 via-rose-900 to-amber-800 ${active === 0 ? "" : "invisible"}`}
         >
           <div className="mx-auto grid h-full max-w-7xl gap-8 px-4 py-16 sm:content-center sm:px-6 sm:py-6 md:grid-cols-2 md:items-center md:py-10">
-            <div className="flex flex-col justify-center gap-5">
+            <div className="flex flex-col justify-center gap-3 2xl:gap-5">
               <span className="w-fit rounded-full bg-white/10 px-3 py-1 text-xs font-medium tracking-wide">
                 Handpicked Indian Ethnic Wear
               </span>
-              <h1 className="font-serif text-4xl font-bold leading-tight sm:text-5xl">
+              <h1 className="font-serif text-4xl font-bold leading-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
                 Drape yourself in timeless Indian elegance
               </h1>
-              <p className="max-w-md text-rose-50/90">
+              <p className="max-w-md text-rose-50/90 sm:text-sm 2xl:text-base">
                 Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Link to="/category/sarees" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-900 shadow-lg">
+                <Link to="/category/sarees" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   Shop Sarees
                 </Link>
-                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold">
+                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   New Arrivals
                 </Link>
               </div>
             </div>
             <div className="hidden items-center justify-center md:flex">
               {logo ? (
-                <div className="flex h-60 w-60 items-center justify-center rounded-full bg-amber-50 shadow-2xl shadow-black/30 lg:h-72 lg:w-72">
+                <div
+                  className="flex items-center justify-center rounded-full bg-amber-50 shadow-2xl shadow-black/30"
+                  style={{ width: "clamp(200px, 22vw, 420px)", height: "clamp(200px, 22vw, 420px)" }}
+                >
                   <img
                     src={logo}
                     alt={settings?.site_name || "AARAAH"}
-                    className="max-h-[58%] max-w-[62%] object-contain"
+                    className="max-h-[86%] max-w-[86%] object-contain"
                   />
                 </div>
               ) : (
-                <div className="h-60 w-60 rounded-full bg-white/10 backdrop-blur lg:h-72 lg:w-72" />
+                <div
+                  className="rounded-full bg-white/10 backdrop-blur"
+                  style={{ width: "clamp(200px, 22vw, 420px)", height: "clamp(200px, 22vw, 420px)" }}
+                />
               )}
             </div>
           </div>

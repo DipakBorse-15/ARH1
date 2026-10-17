@@ -502,7 +502,7 @@ function BannersTab() {
           </label>
 
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Banner image — web (e.g. 1600×900)</label>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Banner image — web (e.g. 1600×800)</label>
             <input
               type="file"
               accept="image/*"
