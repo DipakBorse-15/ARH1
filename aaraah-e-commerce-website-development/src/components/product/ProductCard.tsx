@@ -57,9 +57,8 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
           </span>
         )}
       </div>
-      <div className="space-y-1.5 p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-900/70">{product.brand}</p>
-        <h3 className="truncate text-sm font-medium text-stone-800" title={product.name}>
+      <div className="space-y-0.5 p-3 leading-tight">
+        <h3 className="truncate text-sm font-medium leading-snug text-stone-800" title={product.name}>
           {product.name}
         </h3>
         {(shown.color || otherColourCount > 0) && (
@@ -72,7 +71,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
             )}
           </p>
         )}
-        <div className="text-sm">
+        <div className="pt-0.5 text-sm">
           <PriceDisplay variant={shown} size="sm" />
         </div>
       </div>
