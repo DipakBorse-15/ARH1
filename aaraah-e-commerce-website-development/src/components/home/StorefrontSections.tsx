@@ -89,18 +89,20 @@ function ComingSoon({ name }: { name: string }) {
 }
 
 /**
- * Collections as a "bento" mosaic, in groups of 4 — on phone AND web:
+ * Collections, in groups of 4.
  *
- *    ┌──────┬────────┬──────┐
- *    │      │   B    │      │
- *    │  A   ├────────┤  D   │      A and D are tall; B and C stack in the
- *    │      │   C    │      │      middle, which is a bit wider (1 : 1.2 : 1).
- *    └──────┴────────┴──────┘
+ *  Web (sm and up) - "bento":            Phone - normal 2 x 2 grid:
+ *    ┌──────┬────────┬──────┐               ┌───────┬───────┐
+ *    │      │   B    │      │               │   A   │   B   │
+ *    │  A   ├────────┤  D   │               ├───────┼───────┤
+ *    │      │   C    │      │               │   C   │   D   │
+ *    └──────┴────────┴──────┘               └───────┴───────┘
  *
- * Size: on a phone one group is 5.5 inch tall (MOBILE_BLOCK_HEIGHT); from
- * tablet up it is 2 rows of 210px (300px on desktop). A last group with fewer
- * than 4 collections adapts (3 → tall + two stacked, 2 → two tall, 1 → one tall).
- * Phones use the collection's mobile_image when one is uploaded.
+ * Size: on a phone one group of 4 is 5.5 inch tall (MOBILE_BLOCK_HEIGHT),
+ * i.e. two rows of rounded cards. On web it is 2 rows of 210px (tablet) /
+ * 300px (desktop), the middle column a bit wider (1 : 1.2 : 1). A last group
+ * with fewer than 4 collections adapts. Phones use the collection's
+ * mobile_image when one is uploaded.
  *
  * Hover: tile lifts, photo zooms, shade deepens, name rises, underline draws in.
  * The entrance animation sits on a wrapper and the hover effects on the inner
@@ -123,7 +125,7 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
         return (
           <div
             key={gi}
-            className={`grid grid-rows-2 gap-2 ${MOBILE_BLOCK_HEIGHT} sm:h-auto sm:grid-rows-[repeat(2,210px)] sm:gap-4 lg:grid-rows-[repeat(2,300px)] ${layout.grid}`}
+            className={`grid grid-rows-2 gap-3 ${MOBILE_BLOCK_HEIGHT} sm:h-auto sm:grid-rows-[repeat(2,210px)] sm:gap-4 lg:grid-rows-[repeat(2,300px)] ${layout.grid}`}
           >
             {group.map((c, i) => (
               <CollectionTile
@@ -141,28 +143,33 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
   );
 }
 
+// Phone: plain 2-column grid (2 rows). sm and up: the bento from the diagram above.
 // Static class strings (not built dynamically) so Tailwind keeps every one of them.
 const BENTO: Record<number, { grid: string; cells: string[] }> = {
   4: {
-    grid: "grid-cols-[1fr_1.2fr_1fr]",
+    grid: "grid-cols-2 sm:grid-cols-[1fr_1.2fr_1fr]",
     cells: [
-      "col-start-1 row-start-1 row-span-2",
-      "col-start-2 row-start-1",
-      "col-start-2 row-start-2",
-      "col-start-3 row-start-1 row-span-2",
+      "sm:col-start-1 sm:row-start-1 sm:row-span-2",
+      "sm:col-start-2 sm:row-start-1",
+      "sm:col-start-2 sm:row-start-2",
+      "sm:col-start-3 sm:row-start-1 sm:row-span-2",
     ],
   },
   3: {
-    grid: "grid-cols-[1fr_1.2fr]",
-    cells: ["col-start-1 row-start-1 row-span-2", "col-start-2 row-start-1", "col-start-2 row-start-2"],
+    grid: "grid-cols-2 sm:grid-cols-[1fr_1.2fr]",
+    cells: [
+      "sm:col-start-1 sm:row-start-1 sm:row-span-2",
+      "sm:col-start-2 sm:row-start-1",
+      "col-span-2 sm:col-span-1 sm:col-start-2 sm:row-start-2",
+    ],
   },
   2: {
-    grid: "grid-cols-2",
-    cells: ["col-start-1 row-start-1 row-span-2", "col-start-2 row-start-1 row-span-2"],
+    grid: "grid-cols-2 sm:grid-cols-2",
+    cells: ["row-span-2 sm:col-start-1 sm:row-start-1", "row-span-2 sm:col-start-2 sm:row-start-1"],
   },
   1: {
-    grid: "grid-cols-1 sm:mx-auto sm:max-w-md",
-    cells: ["row-span-2"],
+    grid: "grid-cols-2 sm:grid-cols-1 sm:mx-auto sm:max-w-md",
+    cells: ["col-span-2 row-span-2 sm:col-span-1"],
   },
 };
 
