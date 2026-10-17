@@ -6,6 +6,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useNavCategories } from "@/hooks/useNavCategories";
 
+// Web menu look: spaced serif capitals, a gold line that draws in from the centre
+// and a soft maroon colour change on hover.
+const NAV_LINK =
+  "group/nav relative whitespace-nowrap px-0.5 py-4 font-serif text-[12px] font-medium uppercase tracking-[0.06em] text-stone-700 transition-all duration-300 hover:-translate-y-px hover:text-rose-900 lg:tracking-[0.12em] xl:text-[13px] xl:tracking-[0.16em]";
+const NAV_LINE =
+  "pointer-events-none absolute inset-x-0 bottom-2.5 mx-auto h-px w-0 bg-gradient-to-r from-transparent via-amber-600 to-transparent transition-all duration-500 ease-out group-hover/nav:w-full group-focus-visible/nav:w-full";
+
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -33,7 +40,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 md:py-0.5">
         <button className="md:hidden" aria-label="Open menu" onClick={() => setMobileOpen((o) => !o)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
@@ -54,17 +61,26 @@ export function Header() {
             so six long category names still fit on one line. */}
         <nav className="hidden flex-1 items-center justify-center gap-5 text-sm font-medium tracking-wide text-stone-700 md:flex">
           {categoryLinks.map((link) => (
-            <Link key={link.to} to={link.to} className="whitespace-nowrap py-4 transition hover:text-rose-900">
+            <Link key={link.to} to={link.to} className={NAV_LINK}>
               {link.label}
+              <span className={NAV_LINE} />
             </Link>
           ))}
           <div className="group relative">
-            <button type="button" className="whitespace-nowrap py-4 transition hover:text-rose-900" aria-haspopup="true">
-              COLLECTIONS ▾
+            <button type="button" className={NAV_LINK} aria-haspopup="true">
+              COLLECTIONS
+              <span aria-hidden="true" className="ml-1.5 inline-block text-[9px] text-amber-700 transition-transform duration-300 group-hover:rotate-180">
+                ▼
+              </span>
+              <span className={NAV_LINE} />
             </button>
-            <div className="invisible absolute left-1/2 top-full z-50 w-48 -translate-x-1/2 rounded-lg border border-stone-200 bg-white py-2 opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+            <div className="invisible absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 translate-y-2 rounded-xl border border-amber-200/70 border-t-2 border-t-amber-600 bg-white py-2 opacity-0 shadow-xl shadow-rose-900/10 transition-all duration-300 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
               {collectionLinks.map((link) => (
-                <Link key={link.to} to={link.to} className="block px-4 py-2 text-stone-700 hover:bg-stone-50 hover:text-rose-900">
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="relative block px-6 py-2.5 font-serif text-[13px] tracking-[0.12em] text-stone-700 transition-all duration-300 before:absolute before:left-3 before:top-1/2 before:h-px before:w-0 before:bg-amber-600 before:transition-all before:duration-300 hover:bg-rose-50/70 hover:pl-8 hover:text-rose-900 hover:before:w-3.5"
+                >
                   {link.label}
                 </Link>
               ))}
