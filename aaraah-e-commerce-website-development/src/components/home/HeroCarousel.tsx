@@ -52,9 +52,9 @@ export function HeroCarousel({ slides, fallback }: { slides: HeroSlide[]; fallba
   const hasMobileImages = slides.some((x) => !!x.mobile_image);
 
   return (
-    <section className="relative overflow-hidden bg-stone-900 text-white">
+    <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-transparent">
       {/* Phones: a taller 4:5 frame when the banners have mobile images, else the original wide strip. */}
-      <div className={`relative w-full sm:aspect-[16/6] ${hasMobileImages ? "aspect-[4/5]" : "aspect-[16/7]"}`}>
+      <div className={`relative w-full sm:mx-auto sm:w-[74.8%] sm:aspect-[1.789] sm:overflow-hidden ${hasMobileImages ? "aspect-[4/5]" : "aspect-[16/7]"}`}>
         <picture>
           {slide.mobile_image && <source media="(max-width: 639px)" srcSet={slide.mobile_image} />}
           <img src={slide.image} alt={slide.title} className="absolute inset-0 h-full w-full object-cover" />
