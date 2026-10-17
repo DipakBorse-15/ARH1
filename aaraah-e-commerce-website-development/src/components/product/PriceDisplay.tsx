@@ -38,7 +38,8 @@ export function PriceDisplay({ variant, size = "md" }: { variant: ProductVariant
           </>
         )}
       </div>
-      {hasSale && savedAmount > 0 && (
+      {/* "You save" is left out of the small listing cards (size="sm"); the product page still shows it. */}
+      {size !== "sm" && hasSale && savedAmount > 0 && (
         <p className="mt-0.5 text-xs text-emerald-700">You save {formatINR(savedAmount)}</p>
       )}
     </div>

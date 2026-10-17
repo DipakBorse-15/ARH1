@@ -62,13 +62,19 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
         <h3 className="truncate text-sm font-medium text-stone-800" title={product.name}>
           {product.name}
         </h3>
-        {shown.color && <p className="text-xs text-stone-500">{shown.color}</p>}
+        {(shown.color || otherColourCount > 0) && (
+          <p className="text-xs text-stone-500">
+            {shown.color}
+            {otherColourCount > 0 && (
+              <span className="text-stone-400">
+                {shown.color ? " " : ""}(+{otherColourCount} more colour{otherColourCount > 1 ? "s" : ""})
+              </span>
+            )}
+          </p>
+        )}
         <div className="text-sm">
           <PriceDisplay variant={shown} size="sm" />
         </div>
-        {otherColourCount > 0 && (
-          <p className="pt-0.5 text-[11px] text-stone-400">+{otherColourCount} more colour{otherColourCount > 1 ? "s" : ""}</p>
-        )}
       </div>
     </Link>
   );
