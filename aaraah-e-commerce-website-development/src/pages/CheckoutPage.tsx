@@ -11,6 +11,10 @@ import { placeOrder } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
 
+/** Cash on Delivery is switched off for launch. Set to true (and in the create-order Edge Function
+ *  ENABLED_PAYMENT_METHODS) to turn it back on. */
+const COD_ENABLED = false;
+
 interface DirectItemState {
   variant_id: string;
   quantity: number;
@@ -39,7 +43,7 @@ const EMPTY_FORM: FormState = {
   city: "",
   state: "",
   pincode: "",
-  payment_method: "cod",
+  payment_method: "upi",
 };
 
 export default function CheckoutPage() {
@@ -140,6 +144,10 @@ export default function CheckoutPage() {
     }
     if (!lines.length) {
       show("There is nothing to check out.", "error");
+      return;
+    }
+    if (form.payment_method === "cod" && !COD_ENABLED) {
+      show("Cash on Delivery is coming soon. Please pay via UPI.", "error");
       return;
     }
     if (!validate()) return;
@@ -248,13 +256,21 @@ export default function CheckoutPage() {
 
             <div className="rounded-2xl border border-stone-200 p-5">
               <h2 className="mb-4 text-sm font-semibold text-stone-900">Payment method</h2>
-              <label className="flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm">
+              <label
+                className={`flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm ${
+                  COD_ENABLED ? "" : "cursor-not-allowed bg-stone-50 text-stone-400"
+                }`}
+              >
                 <input
                   type="radio"
-                  checked={form.payment_method === "cod"}
+                  disabled={!COD_ENABLED}
+                  checked={COD_ENABLED && form.payment_method === "cod"}
                   onChange={() => setForm({ ...form, payment_method: "cod" })}
                 />
-                Cash on Delivery
+                <span>Cash on Delivery</span>
+                {!COD_ENABLED && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Coming Soon</span>
+                )}
               </label>
               <label className="mt-2 flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm">
                 <input

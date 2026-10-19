@@ -31,6 +31,9 @@ interface Payload {
 }
 
 const VALID_PAYMENT_METHODS = new Set(["cod", "upi"]);
+// Cash on Delivery is switched off for launch. To turn it back on, add "cod" here
+// (and set COD_ENABLED = true in src/pages/CheckoutPage.tsx).
+const ENABLED_PAYMENT_METHODS = new Set(["upi"]);
 
 const SHIPPING_FEE = 0; // Flat free shipping for now — adjust as needed.
 const corsHeaders = {
@@ -71,6 +74,9 @@ Deno.serve(async (req) => {
     }
     if (!VALID_PAYMENT_METHODS.has(payload.payment_method)) {
       return json({ error: "Invalid payment method" }, 400);
+    }
+    if (!ENABLED_PAYMENT_METHODS.has(payload.payment_method)) {
+      return json({ error: "Cash on Delivery is coming soon. Please pay via UPI." }, 400);
     }
 
     const variantIds = payload.items.map((i) => i.variant_id);
