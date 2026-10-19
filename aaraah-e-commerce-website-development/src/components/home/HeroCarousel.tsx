@@ -33,7 +33,6 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   const total = slides.length + 1; // +1 = the built-in default banner (always first)
   const active = index % total;
-  const hasMobileImages = slides.some((x) => !!x.mobile_image);
 
   // The default banner stays 5 s only the first time the page loads. After that every slide
   // (including the default one) stays the seconds set in Admin → Home Editor → Banners.
@@ -70,41 +69,40 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   }
 
   return (
-    <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-amber-50">
+    <section className="relative overflow-hidden bg-amber-50 text-white">
       {/* All slides share one grid cell so the banner never changes height while rotating.
           Web: centred frame, 74.8% of the screen wide (max 1418px, so zooming out does not stretch it). Phones: full width. */}
       <style>{SLIDE_CSS}</style>
-      <div className="relative grid w-full sm:mx-auto sm:w-[74.8%] sm:max-w-[1418px] sm:aspect-[1.988] sm:overflow-hidden">
+      <div className="@container relative mx-auto grid aspect-[1.988] w-full overflow-hidden sm:w-[74.8%] sm:max-w-[1418px]">
         {/* Slide 1 — default banner */}
         <div
           aria-hidden={active !== 0}
           className={`col-start-1 row-start-1 bg-gradient-to-br from-rose-950 via-rose-900 to-amber-800 ${slideClass(0)}`}
         >
-          <div className="mx-auto grid h-full max-w-7xl gap-8 px-4 py-16 sm:content-center sm:px-6 sm:py-6 md:grid-cols-2 md:items-center md:py-10">
-            <div className="flex flex-col justify-center gap-3 2xl:gap-5">
-              <span className="w-fit rounded-full bg-white/10 px-3 py-1 text-xs font-medium tracking-wide">
+          <div className="mx-auto grid h-full max-w-7xl grid-cols-[1.35fr_1fr] items-center gap-[2cqw] px-[4cqw] py-[3cqw] sm:content-center sm:gap-8 sm:px-6 sm:py-6 md:grid-cols-2 md:py-10">
+            <div className="flex flex-col justify-center gap-[1.4cqw] sm:gap-3 2xl:gap-5">
+              <span className="w-fit rounded-full bg-white/10 px-[2cqw] py-[0.6cqw] text-[2cqw] font-medium tracking-wide sm:px-3 sm:py-1 sm:text-xs">
                 Handpicked Indian Ethnic Wear
               </span>
-              <h1 className="font-serif text-4xl font-bold leading-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
+              <h1 className="font-serif text-[4.6cqw] font-bold leading-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
                 Drape yourself in timeless Indian elegance
               </h1>
-              <p className="max-w-md text-rose-50/90 sm:text-sm 2xl:text-base">
+              <p className="max-w-md text-[2.3cqw] leading-snug text-rose-50/90 sm:text-sm sm:leading-normal 2xl:text-base">
                 Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Link to="/category/sarees" className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
+              <div className="flex flex-wrap gap-[1.6cqw] sm:gap-3">
+                <Link to="/category/sarees" className="rounded-full bg-white px-[3cqw] py-[1.3cqw] text-[2.2cqw] font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   Shop Sarees
                 </Link>
-                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
+                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-[3cqw] py-[1.3cqw] text-[2.2cqw] font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   New Arrivals
                 </Link>
               </div>
             </div>
-            <div className="hidden items-center justify-center md:flex">
+            <div className="flex items-center justify-center">
               {logo ? (
                 <div
-                  className="flex items-center justify-center rounded-full bg-amber-50 shadow-2xl shadow-black/30"
-                  style={{ width: "clamp(200px, 22vw, 420px)", height: "clamp(200px, 22vw, 420px)" }}
+                  className="flex h-[27cqw] w-[27cqw] sm:h-[clamp(200px,22vw,420px)] sm:w-[clamp(200px,22vw,420px)] items-center justify-center rounded-full bg-amber-50 shadow-2xl shadow-black/30"
                 >
                   <img
                     src={logo}
@@ -113,10 +111,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   />
                 </div>
               ) : (
-                <div
-                  className="rounded-full bg-white/10 backdrop-blur"
-                  style={{ width: "clamp(200px, 22vw, 420px)", height: "clamp(200px, 22vw, 420px)" }}
-                />
+                <div className="h-[27cqw] w-[27cqw] sm:h-[clamp(200px,22vw,420px)] sm:w-[clamp(200px,22vw,420px)] rounded-full bg-white/10 backdrop-blur" />
               )}
             </div>
           </div>
@@ -129,23 +124,20 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             <div
               key={slide.id}
               aria-hidden={active !== i + 1}
-              className={`relative col-start-1 row-start-1 bg-stone-900 ${hasMobileImages ? "aspect-[4/5]" : "aspect-[16/7]"} sm:aspect-auto ${slideClass(i + 1)}`}
+              className={`relative col-start-1 row-start-1 bg-stone-900 ${slideClass(i + 1)}`}
             >
               {isShown && (
                 <>
-                  <picture>
-                    {slide.mobile_image && <source media="(max-width: 639px)" srcSet={slide.mobile_image} />}
-                    <img src={slide.image} alt={slide.title} className="absolute inset-0 h-full w-full object-cover" />
-                  </picture>
+                  <img src={slide.image} alt={slide.title} className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-6 sm:p-10">
+                  <div className="absolute inset-x-0 bottom-0 p-[3cqw] sm:p-10">
                     <div className="mx-auto max-w-7xl">
-                      <h2 className="font-serif text-2xl font-bold sm:text-4xl">{slide.title}</h2>
-                      {slide.subtitle && <p className="mt-1 max-w-md text-sm text-white/90 sm:text-base">{slide.subtitle}</p>}
+                      <h2 className="font-serif text-[4.4cqw] font-bold leading-tight sm:text-4xl">{slide.title}</h2>
+                      {slide.subtitle && <p className="mt-[0.4cqw] max-w-md text-[2.4cqw] text-white/90 sm:mt-1 sm:text-base">{slide.subtitle}</p>}
                       {slide.cta_text && slide.cta_link && (
                         <Link
                           to={slide.cta_link}
-                          className="mt-4 inline-block rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-rose-900 shadow-lg"
+                          className="mt-[1.6cqw] inline-block rounded-full bg-white px-[3.4cqw] py-[1.2cqw] text-[2.3cqw] font-semibold text-rose-900 shadow-lg sm:mt-4 sm:px-6 sm:py-2.5 sm:text-sm"
                         >
                           {slide.cta_text}
                         </Link>
@@ -164,7 +156,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               type="button"
               onClick={() => go((active - 1 + total) % total, -1)}
               aria-label="Previous slide"
-              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-stone-900 hover:bg-white"
+              className="absolute left-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-stone-900 hover:bg-white sm:left-3 sm:h-auto sm:w-auto sm:p-2"
             >
               ‹
             </button>
@@ -172,7 +164,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               type="button"
               onClick={() => go((active + 1) % total, 1)}
               aria-label="Next slide"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-stone-900 hover:bg-white"
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-stone-900 hover:bg-white sm:right-3 sm:h-auto sm:w-auto sm:p-2"
             >
               ›
             </button>

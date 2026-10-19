@@ -153,6 +153,7 @@ export default function ProductPage() {
     selectedVariant.color ? `Colour: ${selectedVariant.color}` : "",
     `Quantity: ${quantity}`,
     `Price: ${formatINR(sellingPrice)}`,
+    `${siteConfig.url}/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`,
     "",
     "Kripya order process batayein.",
   ]
