@@ -1,7 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { HeroSlide } from "@/types";
+
+const SLIDE_MS = 700;
+
+/** True once the carousel has moved at least once since the page was loaded (survives going to another page and back). */
+let carouselHasMoved = false;
+
+const SLIDE_CSS = `
+@keyframes hero-in-r{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes hero-out-l{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@keyframes hero-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes hero-out-r{from{transform:translateX(0)}to{transform:translateX(100%)}}
+.hero-in-r{animation:hero-in-r ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) both}
+.hero-out-l{animation:hero-out-l ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) both}
+.hero-in-l{animation:hero-in-l ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) both}
+.hero-out-r{animation:hero-out-r ${SLIDE_MS}ms cubic-bezier(.65,0,.35,1) both}
+@media (prefers-reduced-motion: reduce){.hero-in-r,.hero-out-l,.hero-in-l,.hero-out-r{animation:none}}
+`;
 
 /** Auto-rotating banner carousel. Slide 1 is always the built-in AARAAH banner;
  *  the banners uploaded from the admin panel follow as slide 2, 3, ... */
@@ -9,29 +26,59 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const { settings } = useSiteSettings();
   const logo = settings?.logo_url;
   const [index, setIndex] = useState(0);
+  const [leaving, setLeaving] = useState<number | null>(null); // slide that is sliding out
+  const [dir, setDir] = useState<1 | -1>(1); // 1 = next (slides to the left), -1 = previous
+  const [cycled, setCycled] = useState(carouselHasMoved); // true once the carousel has moved at least once
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const total = slides.length + 1; // +1 = the built-in default banner (always first)
   const active = index % total;
   const hasMobileImages = slides.some((x) => !!x.mobile_image);
 
-  // Default banner: fixed 5 s. Uploaded banners: the seconds set in Admin → Home Editor → Banners.
+  // The default banner stays 5 s only the first time the page loads. After that every slide
+  // (including the default one) stays the seconds set in Admin → Home Editor → Banners.
   const adminSeconds = Math.min(60, Math.max(2, Number(settings?.hero_slide_seconds) || 5));
-  const delay = active === 0 ? 5000 : adminSeconds * 1000;
+  const delay = !cycled ? 5000 : adminSeconds * 1000;
+
+  function go(next: number, direction: 1 | -1) {
+    if (next === active) return;
+    setDir(direction);
+    setLeaving(active);
+    setIndex(next);
+    carouselHasMoved = true;
+    setCycled(true);
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    leaveTimer.current = setTimeout(() => setLeaving(null), SLIDE_MS);
+  }
 
   useEffect(() => {
     if (total <= 1) return;
-    const t = setTimeout(() => setIndex((active + 1) % total), delay);
+    const t = setTimeout(() => go((active + 1) % total, 1), delay);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, total, delay]);
+
+  useEffect(() => () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+  }, []);
+
+  /** Slide animation class for a slide: the new one comes in, the old one goes out. */
+  function slideClass(i: number): string {
+    if (i === active) return leaving !== null ? (dir === 1 ? "hero-in-r" : "hero-in-l") : "";
+    if (i === leaving) return dir === 1 ? "hero-out-l" : "hero-out-r";
+    return "invisible";
+  }
 
   return (
     <section className="relative overflow-hidden bg-stone-900 text-white sm:bg-amber-50">
       {/* All slides share one grid cell so the banner never changes height while rotating.
           Web: centred frame, 74.8% of the screen wide (max 1418px, so zooming out does not stretch it). Phones: full width. */}
+      <style>{SLIDE_CSS}</style>
       <div className="relative grid w-full sm:mx-auto sm:w-[74.8%] sm:max-w-[1418px] sm:aspect-[1.988] sm:overflow-hidden">
         {/* Slide 1 — default banner */}
         <div
           aria-hidden={active !== 0}
-          className={`col-start-1 row-start-1 bg-gradient-to-br from-rose-950 via-rose-900 to-amber-800 ${active === 0 ? "" : "invisible"}`}
+          className={`col-start-1 row-start-1 bg-gradient-to-br from-rose-950 via-rose-900 to-amber-800 ${slideClass(0)}`}
         >
           <div className="mx-auto grid h-full max-w-7xl gap-8 px-4 py-16 sm:content-center sm:px-6 sm:py-6 md:grid-cols-2 md:items-center md:py-10">
             <div className="flex flex-col justify-center gap-3 2xl:gap-5">
@@ -77,14 +124,14 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
         {/* Slides 2.. — banners uploaded from the admin panel (only the visible one loads its image) */}
         {slides.map((slide, i) => {
-          const isActive = active === i + 1;
+          const isShown = active === i + 1 || leaving === i + 1;
           return (
             <div
               key={slide.id}
-              aria-hidden={!isActive}
-              className={`relative col-start-1 row-start-1 bg-stone-900 ${hasMobileImages ? "aspect-[4/5]" : "aspect-[16/7]"} sm:aspect-auto ${isActive ? "" : "invisible"}`}
+              aria-hidden={active !== i + 1}
+              className={`relative col-start-1 row-start-1 bg-stone-900 ${hasMobileImages ? "aspect-[4/5]" : "aspect-[16/7]"} sm:aspect-auto ${slideClass(i + 1)}`}
             >
-              {isActive && (
+              {isShown && (
                 <>
                   <picture>
                     {slide.mobile_image && <source media="(max-width: 639px)" srcSet={slide.mobile_image} />}
@@ -115,7 +162,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           <>
             <button
               type="button"
-              onClick={() => setIndex((active - 1 + total) % total)}
+              onClick={() => go((active - 1 + total) % total, -1)}
               aria-label="Previous slide"
               className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-stone-900 hover:bg-white"
             >
@@ -123,7 +170,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             </button>
             <button
               type="button"
-              onClick={() => setIndex((active + 1) % total)}
+              onClick={() => go((active + 1) % total, 1)}
               aria-label="Next slide"
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 text-stone-900 hover:bg-white"
             >
@@ -135,7 +182,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   key={i}
                   type="button"
                   aria-label={`Go to slide ${i + 1}`}
-                  onClick={() => setIndex(i)}
+                  onClick={() => go(i, i > active ? 1 : -1)}
                   className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-white" : "w-1.5 bg-white/50"}`}
                 />
               ))}
