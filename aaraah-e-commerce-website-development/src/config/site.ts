@@ -13,12 +13,16 @@ export const siteConfig = {
   currency: "INR",
   currencySymbol: "₹",
   supportEmail: "care@aaraah.in",
-  supportPhone: "+91 90000 00000",
+  supportPhone: "+91 98983 52989",
+  // WhatsApp Business number for "Direct Purchase" (country code + number, digits only).
+  whatsappNumber: "919898352989",
   // Manual UPI collection: customer scans this on the confirmation page,
   // admin marks the order "paid" by hand once the payment is seen. Set the
   // real values via VITE_UPI_ID / VITE_UPI_PAYEE_NAME before going live.
   upiId: import.meta.env.VITE_UPI_ID || "set-upi-id@bank",
   upiPayeeName: import.meta.env.VITE_UPI_PAYEE_NAME || "AARAAH",
+  // true only when a real UPI ID has been configured (not the placeholder).
+  upiConfigured: Boolean(import.meta.env.VITE_UPI_ID) && !String(import.meta.env.VITE_UPI_ID).startsWith("set-upi-id"),
   categories: [
     { name: "Sarees", slug: "sarees" },
     { name: "Kurties & Kurta Sets", slug: "kurties-kurta-sets" },

@@ -49,7 +49,7 @@ export function Footer() {
               </a>
             </li>
             <li>
-              <a href={`tel:${siteConfig.supportPhone}`} className="hover:text-rose-900">
+              <a href={`tel:${siteConfig.supportPhone.replace(/\s/g, "")}`} className="hover:text-rose-900">
                 {siteConfig.supportPhone}
               </a>
             </li>
