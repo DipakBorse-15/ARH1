@@ -90,7 +90,7 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
   return (
     <>
       <CollectionTiles collections={shownCollections} categorySlug={category?.slug} comingSoonIds={comingSoonIds} />
-      <LatestLaunches items={feed.latest} />
+      <LatestLaunches items={feed.latest} category={category} />
       {feed.collectionRows.map((row) => (
         <CollectionProducts key={row.collection.id} row={row} perCollection={PER_COLLECTION} categorySlug={category?.slug} />
       ))}
@@ -288,14 +288,30 @@ function collectionHref(collectionSlug: string, categorySlug?: string) {
 }
 
 /** The newest colours across the whole store, 4 per row. */
-function LatestLaunches({ items }: { items: SimilarItem[] }) {
+function LatestLaunches({ items, category }: { items: SimilarItem[]; category?: { slug: string; name: string } }) {
   if (!items.length) return null;
   return (
     <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-      <div className="mb-6 text-center">
-        <h2 className="font-serif text-3xl font-semibold text-stone-900">Latest Launches</h2>
-        <p className="mt-1 text-sm text-stone-500">Fresh off the loom — our newest arrivals</p>
-      </div>
+      {category ? (
+        // Category page: heading on the left, "Show all <category>" on the right.
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div>
+            <h2 className="font-serif text-3xl font-semibold text-stone-900">Latest Launches</h2>
+            <p className="mt-1 text-sm text-stone-500">Fresh off the loom — our newest arrivals</p>
+          </div>
+          <Link
+            to={`/category/${category.slug}/all`}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-rose-900 px-4 py-2 text-sm font-semibold text-rose-900 transition-all duration-300 hover:bg-rose-900 hover:text-white sm:px-5"
+          >
+            Show all {category.name} <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="mb-6 text-center">
+          <h2 className="font-serif text-3xl font-semibold text-stone-900">Latest Launches</h2>
+          <p className="mt-1 text-sm text-stone-500">Fresh off the loom — our newest arrivals</p>
+        </div>
+      )}
       <ProductGrid items={items} columnsClass="grid-cols-2 md:grid-cols-4" />
     </section>
   );

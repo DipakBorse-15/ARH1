@@ -9,14 +9,13 @@ import {
   setCategoryCollectionPosition,
   updateCategoryCollectionImages,
 } from "@/services/categoryCollections";
-import { isSareeSlug } from "@/lib/categoryLinks";
 import type { CategoryCollection, Collection } from "@/types";
 
 /**
  * Admin → Categories → "Collections" for one category: which collections appear on that
  * category's page, in which position, and the web + mobile image each one uses there.
  */
-export function CategoryCollectionsManager({ categoryId, categorySlug }: { categoryId: string; categorySlug: string }) {
+export function CategoryCollectionsManager({ categoryId }: { categoryId: string; categorySlug?: string }) {
   const { show } = useToast();
   const [rows, setRows] = useState<CategoryCollection[]>([]);
   const [all, setAll] = useState<Collection[]>([]);
@@ -121,11 +120,6 @@ export function CategoryCollectionsManager({ categoryId, categorySlug }: { categ
 
   return (
     <div className="rounded-xl bg-stone-50 p-4">
-      {isSareeSlug(categorySlug) && (
-        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Note: the Sarees menu item opens the full list of saree products directly, so these collection tiles are not shown for Sarees.
-        </p>
-      )}
       <p className="mb-3 text-xs text-stone-500">
         Collections shown on this category's page, in order (1 = first). On the web, positions 1 and 4 are tall tiles (image 800 × 1250) and 2 and 3 are
         wide tiles (1000 × 630). On phones all tiles are the same (720 × 1050). A collection without products in this category shows "Coming Soon".

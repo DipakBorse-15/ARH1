@@ -8,7 +8,6 @@ import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchActiveHeroSlides } from "@/services/heroSlides";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
-import { isSareeSlug } from "@/lib/categoryLinks";
 import type { Category, HeroSlide } from "@/types";
 
 // Old category URLs (before the 6-category restructure) keep working.
@@ -33,7 +32,7 @@ export default function CategoryPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug || LEGACY_CATEGORY_SLUGS[slug] || isSareeSlug(slug)) return;
+    if (!slug || LEGACY_CATEGORY_SLUGS[slug]) return;
     load(slug);
   }, [slug]);
 
@@ -51,8 +50,6 @@ export default function CategoryPage() {
     }
   }
 
-  // Sarees has no landing page: it opens the full list of saree products.
-  if (slug && isSareeSlug(slug)) return <Navigate to={`/category/${slug === "saree" ? "sarees" : slug}/all`} replace />;
   if (slug && LEGACY_CATEGORY_SLUGS[slug]) return <Navigate to={`/category/${LEGACY_CATEGORY_SLUGS[slug]}`} replace />;
   if (loading) return <LoadingState label="Loading…" />;
   if (error) return <ErrorState message={error} onRetry={() => slug && load(slug)} />;
