@@ -235,5 +235,7 @@ export interface SiteSettings {
   font_family: string;
   /** Seconds each uploaded hero banner stays before the next one (default banner is fixed 5 s). */
   hero_slide_seconds?: number;
+  /** Set when the admin resets orders; "Total Customers" only counts sign-ups after this time. */
+  stats_reset_at?: string | null;
   updated_at: string;
 }

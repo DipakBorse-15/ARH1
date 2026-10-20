@@ -2,6 +2,12 @@ import { supabase } from "@/lib/supabase";
 import type { DashboardStats } from "@/types";
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
+  // After "Reset orders" the customer count starts again from that moment.
+  const { data: settingsRow } = await supabase.from("site_settings").select("stats_reset_at").eq("id", true).maybeSingle();
+  const resetAt = (settingsRow as { stats_reset_at?: string | null } | null)?.stats_reset_at ?? null;
+  let customersQuery = supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer");
+  if (resetAt) customersQuery = customersQuery.gt("created_at", resetAt);
+
   const [
     { count: totalProducts },
     { count: activeProducts },
@@ -21,7 +27,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     supabase.from("orders").select("id", { count: "exact", head: true }),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "delivered"),
-    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "customer"),
+    customersQuery,
     supabase.from("product_variants").select("id", { count: "exact", head: true }).lte("stock_quantity", 5).eq("active", true),
     supabase.from("orders").select("total").eq("payment_status", "paid"),
   ]);

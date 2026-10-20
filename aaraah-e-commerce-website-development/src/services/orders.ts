@@ -110,3 +110,20 @@ export async function updateOrderPaymentStatus(
   const { error } = await supabase.from("orders").update(patch).eq("id", orderId);
   if (error) throw error;
 }
+
+/** Reads the real message of a failed database function call (e.g. "Wrong code"). */
+function rpcMessage(error: unknown): string {
+  return (error as { message?: string })?.message || "Something went wrong. Please try again.";
+}
+
+/** Admin: delete one order. The server checks the code = last 4 characters of the order number. */
+export async function deleteOrderAdmin(orderId: string, code: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_delete_order", { p_order_id: orderId, p_code: code.trim() });
+  if (error) throw new Error(rpcMessage(error));
+}
+
+/** Admin: delete ALL orders and restart the dashboard numbers from zero. */
+export async function resetOrdersAdmin(confirmText: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_reset_orders", { p_confirm: confirmText });
+  if (error) throw new Error(rpcMessage(error));
+}
