@@ -12,7 +12,7 @@ export const siteConfig = {
   basePath: import.meta.env.VITE_BASE_PATH || "/",
   currency: "INR",
   currencySymbol: "₹",
-  supportEmail: "care@aaraah.in",
+  supportEmail: "aaraah.in@gmail.com",
   supportPhone: "+91 98983 52989",
   // WhatsApp Business number for "Direct Purchase" (country code + number, digits only).
   whatsappNumber: "919898352989",

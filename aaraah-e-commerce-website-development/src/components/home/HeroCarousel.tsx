@@ -91,10 +91,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
               </p>
               <div className="flex flex-wrap gap-[1.6cqw] sm:gap-3">
-                <Link to="/category/sarees" className="rounded-full bg-white px-[3cqw] py-[1.3cqw] text-[2.2cqw] font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
+                <Link to="/category/sarees" className="rounded-full bg-white px-[2.4cqw] py-[1.04cqw] text-[1.76cqw] font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   Shop Sarees
                 </Link>
-                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-[3cqw] py-[1.3cqw] text-[2.2cqw] font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
+                <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-[2.4cqw] py-[1.04cqw] text-[1.76cqw] font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   New Arrivals
                 </Link>
               </div>
@@ -128,22 +128,26 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             >
               {isShown && (
                 <>
-                  <img src={slide.image} alt={slide.title} className="absolute inset-0 h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-[3cqw] sm:p-10">
-                    <div className="mx-auto max-w-7xl">
-                      <h2 className="font-serif text-[4.4cqw] font-bold leading-tight sm:text-4xl">{slide.title}</h2>
-                      {slide.subtitle && <p className="mt-[0.4cqw] max-w-md text-[2.4cqw] text-white/90 sm:mt-1 sm:text-base">{slide.subtitle}</p>}
-                      {slide.cta_text && slide.cta_link && (
-                        <Link
-                          to={slide.cta_link}
-                          className="mt-[1.6cqw] inline-block rounded-full bg-white px-[3.4cqw] py-[1.2cqw] text-[2.3cqw] font-semibold text-rose-900 shadow-lg sm:mt-4 sm:px-6 sm:py-2.5 sm:text-sm"
-                        >
-                          {slide.cta_text}
-                        </Link>
-                      )}
+                  <img src={slide.image} alt={slide.title || "AARAAH banner"} className="absolute inset-0 h-full w-full object-cover" />
+                  {(slide.title || slide.subtitle || (slide.cta_text && slide.cta_link)) && (
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  )}
+                  {(slide.title || slide.subtitle || (slide.cta_text && slide.cta_link)) && (
+                    <div className="absolute inset-x-0 bottom-0 p-[3cqw] sm:p-10">
+                      <div className="mx-auto max-w-7xl">
+                        {slide.title && <h2 className="font-serif text-[4.4cqw] font-bold leading-tight sm:text-4xl">{slide.title}</h2>}
+                        {slide.subtitle && <p className="mt-[0.4cqw] max-w-md text-[2.4cqw] text-white/90 sm:mt-1 sm:text-base">{slide.subtitle}</p>}
+                        {slide.cta_text && slide.cta_link && (
+                          <Link
+                            to={slide.cta_link}
+                            className="mt-[1.6cqw] inline-block rounded-full bg-white px-[3.4cqw] py-[1.2cqw] text-[2.3cqw] font-semibold text-rose-900 shadow-lg sm:mt-4 sm:px-6 sm:py-2.5 sm:text-sm"
+                          >
+                            {slide.cta_text}
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
             </div>

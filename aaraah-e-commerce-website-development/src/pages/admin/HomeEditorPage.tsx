@@ -377,10 +377,6 @@ function BannersTab() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title?.trim()) {
-      show("Please enter a title.", "error");
-      return;
-    }
     if (!form.image) {
       show("Please upload a banner image.", "error");
       return;
@@ -445,14 +441,14 @@ function BannersTab() {
         <form onSubmit={handleSave} className="grid gap-3 sm:grid-cols-2">
           {form.id && (
             <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:col-span-2">
-              Editing "{form.title}" —{" "}
+              Editing "{form.title || "banner without title"}" —{" "}
               <button type="button" className="underline" onClick={() => setForm(EMPTY_SLIDE)}>
                 cancel and add a new one instead
               </button>
             </div>
           )}
           <input
-            placeholder="Title (e.g. Rakhi Sale — Upto 65% Off)"
+            placeholder="Title (optional — leave empty if the text is already in the image)"
             value={form.title || ""}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             className="rounded-lg border border-stone-300 px-3 py-2 text-sm sm:col-span-2"
@@ -571,9 +567,9 @@ function BannersTab() {
                   ▼
                 </button>
               </div>
-              <img src={s.image} alt={s.title} className="h-16 w-28 shrink-0 rounded-lg object-cover" />
+              <img src={s.image} alt={s.title || "Banner"} className="h-16 w-28 shrink-0 rounded-lg object-cover" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-stone-900">{s.title}</p>
+                <p className="truncate text-sm font-semibold text-stone-900">{s.title || "(No title — image only)"}</p>
                 <p className="truncate text-xs text-stone-500">
                   {s.category_id ? `${categories.find((c) => c.id === s.category_id)?.name ?? "Category"} page` : "Home page"} · {s.active ? "Active" : "Hidden"}
                 </p>
@@ -587,7 +583,7 @@ function BannersTab() {
               </button>
               <button
                 type="button"
-                onClick={() => handleDelete(s.id, s.title)}
+                onClick={() => handleDelete(s.id, s.title || "this banner")}
                 className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
               >
                 Delete
