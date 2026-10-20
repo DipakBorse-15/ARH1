@@ -10,7 +10,8 @@ export default function CartPage() {
   const { items, loading, subtotal } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const shipping = subtotal > 0 && subtotal < 999 ? 79 : 0;
+  // Free shipping on every order (must match SHIPPING_FEE in create-order and CheckoutPage).
+  const shipping = 0;
 
   function goToCheckout() {
     if (!user) {

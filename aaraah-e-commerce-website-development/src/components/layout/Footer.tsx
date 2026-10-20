@@ -56,6 +56,14 @@ export function Footer() {
           </ul>
         </div>
       </div>
+      <div className="border-t border-stone-200 px-4 py-4 text-center text-xs text-stone-500">
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2" aria-label="Policies">
+          <Link to="/shipping-policy" className="hover:text-rose-900">Shipping Policy</Link>
+          <Link to="/returns-and-refunds" className="hover:text-rose-900">Returns &amp; Refunds</Link>
+          <Link to="/privacy-policy" className="hover:text-rose-900">Privacy Policy</Link>
+          <Link to="/terms-and-conditions" className="hover:text-rose-900">Terms &amp; Conditions</Link>
+        </nav>
+      </div>
       <div className="border-t border-stone-200 py-4 text-center text-xs text-stone-400">
         © {new Date().getFullYear()} {siteConfig.name}. All rights reserved. Made for Indian ethnic fashion lovers.
       </div>

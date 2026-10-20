@@ -19,6 +19,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import CartPage from "@/pages/CartPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
+const LegalPage = lazy(() => import("@/pages/LegalPage"));
 const ProductPage = lazy(() => import("@/pages/ProductPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 const OrderConfirmationPage = lazy(() => import("@/pages/OrderConfirmationPage"));
@@ -60,6 +61,10 @@ export default function App() {
                   <Route path="cart" element={<CartPage />} />
                   <Route path="login" element={<LoginPage />} />
                   <Route path="register" element={<RegisterPage />} />
+                  <Route path="privacy-policy" element={<LegalPage doc="privacy" />} />
+                  <Route path="terms-and-conditions" element={<LegalPage doc="terms" />} />
+                  <Route path="returns-and-refunds" element={<LegalPage doc="returns" />} />
+                  <Route path="shipping-policy" element={<LegalPage doc="shipping" />} />
 
                   <Route element={<ProtectedRoute />}>
                     <Route path="checkout" element={<CheckoutPage />} />
