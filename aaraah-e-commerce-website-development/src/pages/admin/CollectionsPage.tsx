@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection } from "@/services/collections";
+import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection, setCollectionPosition } from "@/services/collections";
 import { supabase, friendlyError } from "@/lib/supabase";
 import type { Collection } from "@/types";
 
@@ -18,6 +18,7 @@ export default function AdminCollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<Collection>>(EMPTY);
   const [uploading, setUploading] = useState<"image" | "mobile_image" | null>(null);
+  const [moving, setMoving] = useState(false);
 
   useEffect(() => {
     load();
@@ -49,10 +50,34 @@ export default function AdminCollectionsPage() {
     }
   }
 
+  // Swap this collection's position with its neighbour (dir -1 = earlier, +1 = later).
+  async function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    // Give everyone a clean 1..N position, then swap the two.
+    const order = items.map((c) => c.id);
+    [order[index], order[target]] = [order[target], order[index]];
+    setMoving(true);
+    try {
+      await Promise.all(order.map((id, i) => setCollectionPosition(id, i + 1)));
+      await load();
+    } catch (err) {
+      show(friendlyError(err, "Could not change the order. Run the 0023 SQL first."), "error");
+    } finally {
+      setMoving(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await upsertCollection({ ...form, mobile_image: form.mobile_image || null, slug: form.slug || slugify(form.name || "") });
+      const nextPosition = items.reduce((m, c) => Math.max(m, c.sort_order ?? 0), 0) + 1;
+      await upsertCollection({
+        ...form,
+        mobile_image: form.mobile_image || null,
+        slug: form.slug || slugify(form.name || ""),
+        sort_order: form.id ? form.sort_order : nextPosition,
+      });
       setForm(EMPTY);
       show("Collection saved", "success");
       load();
@@ -73,7 +98,11 @@ export default function AdminCollectionsPage() {
   return (
     <div>
       <SEO title="Manage Collections" canonicalPath="/admin/collections" />
-      <h1 className="mb-6 font-serif text-2xl font-semibold text-stone-900">Collections</h1>
+      <h1 className="mb-2 font-serif text-2xl font-semibold text-stone-900">Collections</h1>
+      <p className="mb-6 text-xs text-stone-500">
+        Use ▲ ▼ to set the order on the website (1 = first). On the web, positions 1 and 4 are tall tiles and 2 and 3 are wide tiles; on phones all four
+        are equal.
+      </p>
 
       <form onSubmit={handleSave} className="mb-8 grid gap-3 rounded-2xl border border-stone-200 bg-white p-5 sm:grid-cols-2">
         <input
@@ -134,6 +163,7 @@ export default function AdminCollectionsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-50 text-xs uppercase text-stone-500">
               <tr>
+                <th className="p-3">Position</th>
                 <th className="p-3">Name</th>
                 <th className="p-3">Slug</th>
                 <th className="p-3">Active</th>
@@ -141,8 +171,36 @@ export default function AdminCollectionsPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((c) => (
+              {items.map((c, i) => (
                 <tr key={c.id} className="border-t border-stone-100">
+                  <td className="p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-5 text-center font-semibold text-stone-700">{i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => move(i, -1)}
+                        disabled={moving || i === 0}
+                        aria-label={`Move ${c.name} earlier`}
+                        title="Move earlier"
+                        className="rounded border border-stone-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(i, 1)}
+                        disabled={moving || i === items.length - 1}
+                        aria-label={`Move ${c.name} later`}
+                        title="Move later"
+                        className="rounded border border-stone-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    {items.length >= 4 && i < 4 && (
+                      <p className="mt-0.5 text-[10px] text-stone-400">Web: {i === 0 || i === 3 ? "tall tile" : "wide tile"}</p>
+                    )}
+                  </td>
                   <td className="p-3 font-medium text-stone-800">{c.name}</td>
                   <td className="p-3 text-stone-500">{c.slug}</td>
                   <td className="p-3">{c.active ? "Yes" : "No"}</td>
