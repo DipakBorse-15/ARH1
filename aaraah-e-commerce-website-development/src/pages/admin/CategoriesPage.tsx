@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAllCategoriesAdmin, upsertCategory, deleteCategory } from "@/services/categories";
 import { supabase, friendlyError } from "@/lib/supabase";
+import { CategoryCollectionsManager } from "@/components/admin/CategoryCollectionsManager";
 import type { Category } from "@/types";
 
 const EMPTY: Partial<Category> = { name: "", slug: "", description: "", image: "", active: true };
@@ -18,6 +19,7 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<Partial<Category>>(EMPTY);
   const [uploading, setUploading] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -126,7 +128,8 @@ export default function AdminCategoriesPage() {
             </thead>
             <tbody>
               {items.map((c) => (
-                <tr key={c.id} className="border-t border-stone-100">
+                <Fragment key={c.id}>
+                <tr className="border-t border-stone-100">
                   <td className="p-3 font-medium text-stone-800">{c.name}</td>
                   <td className="p-3 text-stone-500">{c.slug}</td>
                   <td className="p-3">{c.active ? "Yes" : "No"}</td>
@@ -134,11 +137,22 @@ export default function AdminCategoriesPage() {
                     <button onClick={() => setForm(c)} className="mr-3 text-rose-900 hover:underline">
                       Edit
                     </button>
+                    <button onClick={() => setOpenId(openId === c.id ? null : c.id)} className="mr-3 text-rose-900 hover:underline">
+                      {openId === c.id ? "Hide collections" : "Collections"}
+                    </button>
                     <button onClick={() => handleDelete(c.id)} className="text-stone-400 hover:text-rose-700 hover:underline">
                       Delete
                     </button>
                   </td>
                 </tr>
+                {openId === c.id && (
+                  <tr className="border-t border-stone-100">
+                    <td colSpan={4} className="p-3">
+                      <CategoryCollectionsManager categoryId={c.id} categorySlug={c.slug} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

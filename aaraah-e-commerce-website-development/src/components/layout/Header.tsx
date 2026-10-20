@@ -5,6 +5,7 @@ import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useNavCategories } from "@/hooks/useNavCategories";
+import { categoryHref } from "@/lib/categoryLinks";
 
 // Web menu look: Cinzel capitals; on hover the item fills with deep maroon, the text turns
 // white and a gold line draws in under it (with a clear gap between the text and the line).
@@ -39,7 +40,7 @@ export function Header() {
     ensureMenuFont();
   }, []);
 
-  const categoryLinks = categories.map((c) => ({ label: c.name.toUpperCase(), to: `/category/${c.slug}` }));
+  const categoryLinks = categories.map((c) => ({ label: c.name.toUpperCase(), to: categoryHref(c.slug) }));
   const collectionLinks = siteConfig.collections.map((c) => ({ label: c.name.toUpperCase(), to: `/collection/${c.slug}` }));
   // Mobile menu shows everything in one grid.
   const navLinks = [...categoryLinks, ...collectionLinks];

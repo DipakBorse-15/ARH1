@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { HeroSlide } from "@/types";
+import { categoryHref } from "@/lib/categoryLinks";
 
 const SLIDE_MS = 700;
 
@@ -91,7 +92,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
               </p>
               <div className="flex flex-wrap gap-[1.6cqw] sm:gap-3">
-                <Link to="/category/sarees" className="rounded-full bg-white px-[2.4cqw] py-[1.04cqw] text-[1.76cqw] font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
+                <Link to={categoryHref("sarees")} className="rounded-full bg-white px-[2.4cqw] py-[1.04cqw] text-[1.76cqw] font-semibold text-rose-900 shadow-lg sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">
                   Shop Sarees
                 </Link>
                 <Link to="/collection/new-arrival" className="rounded-full border border-white/60 px-[2.4cqw] py-[1.04cqw] text-[1.76cqw] font-semibold sm:px-4 sm:py-2 sm:text-xs xl:px-5 xl:text-sm 2xl:px-6 2xl:py-3">

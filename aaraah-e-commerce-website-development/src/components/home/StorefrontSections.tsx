@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { fetchCollections } from "@/services/collections";
+import { fetchCategoryCollections } from "@/services/categoryCollections";
 import { fetchHomeFeed, type HomeCollectionRow, type HomeFeed, type SimilarItem } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
-import type { Collection } from "@/types";
+import type { Collection, CategoryCollection } from "@/types";
 
 export const LATEST_COUNT = 12; // 3 rows of 4
 export const PER_COLLECTION = 8; // 2 rows of 4
@@ -27,6 +28,7 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
   const [feed, setFeed] = useState<HomeFeed>({ latest: [], collectionRows: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [configured, setConfigured] = useState<CategoryCollection[]>([]);
 
   const categoryId = category?.id;
 
@@ -39,9 +41,16 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
     setLoading(true);
     setError(null);
     try {
-      const cols = await fetchCollections();
-      const f = await fetchHomeFeed(cols, { latestCount: LATEST_COUNT, perCollection: PER_COLLECTION, categoryId });
+      const [cols, cfg] = await Promise.all([
+        fetchCollections(),
+        categoryId ? fetchCategoryCollections(categoryId) : Promise.resolve([] as CategoryCollection[]),
+      ]);
+      // Collections the admin set up for this category come first, in their position order.
+      const cfgCols = cfg.map((r) => r.collection as Collection);
+      const ordered = cfg.length ? [...cfgCols, ...cols.filter((c) => !cfgCols.some((x) => x.id === c.id))] : cols;
+      const f = await fetchHomeFeed(ordered, { latestCount: LATEST_COUNT, perCollection: PER_COLLECTION, categoryId });
       setCollections(cols);
+      setConfigured(cfg);
       setFeed(f);
     } catch (err) {
       setError(friendlyError(err, "Could not load products right now."));
@@ -55,7 +64,24 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
 
   // On a category page only the collections that actually have products in
   // that category are listed; on the home page every active collection is.
-  const shownCollections = category ? feed.collectionRows.map((r) => r.collection) : collections;
+  // If the admin set up collections for this category (Admin → Categories → Collections), those are
+  // shown, each with this category's own images; one without products here says "Coming Soon".
+  const withProducts = new Set(feed.collectionRows.map((r) => r.collection.id));
+  const shownCollections: Collection[] = !category
+    ? collections
+    : configured.length
+      ? configured.map((r) => {
+          const col = r.collection as Collection;
+          return {
+            ...col,
+            image: r.image || col.image,
+            mobile_image: r.mobile_image || (r.image ? null : col.mobile_image),
+          };
+        })
+      : feed.collectionRows.map((r) => r.collection);
+  const comingSoonIds = new Set(
+    category && configured.length ? configured.filter((r) => !withProducts.has(r.collection_id)).map((r) => r.collection_id) : []
+  );
 
   if (category && feed.latest.length === 0) {
     return <ComingSoon name={category.name} />;
@@ -63,7 +89,7 @@ export function StorefrontSections({ category }: { category?: { id: string; slug
 
   return (
     <>
-      <CollectionTiles collections={shownCollections} categorySlug={category?.slug} />
+      <CollectionTiles collections={shownCollections} categorySlug={category?.slug} comingSoonIds={comingSoonIds} />
       <LatestLaunches items={feed.latest} />
       {feed.collectionRows.map((row) => (
         <CollectionProducts key={row.collection.id} row={row} perCollection={PER_COLLECTION} categorySlug={category?.slug} />
@@ -112,7 +138,7 @@ function ComingSoon({ name }: { name: string }) {
  */
 const MOBILE_BLOCK_HEIGHT = "h-[5.5in]"; // change this one value to resize the phone layout
 
-function CollectionTiles({ collections, categorySlug }: { collections: Collection[]; categorySlug?: string }) {
+function CollectionTiles({ collections, categorySlug, comingSoonIds }: { collections: Collection[]; categorySlug?: string; comingSoonIds?: Set<string> }) {
   if (!collections.length) return null;
 
   const groups: Collection[][] = [];
@@ -148,6 +174,7 @@ function CollectionTiles({ collections, categorySlug }: { collections: Collectio
                 collection={c}
                 href={collectionHref(c.slug, categorySlug)}
                 cell={layout.cells[i]}
+                comingSoon={comingSoonIds?.has(c.id)}
                 delay={Math.min(gi * 4 + i, 9) * 90}
               />
             ))}
@@ -216,7 +243,7 @@ const BENTO: Record<number, { grid: string; cells: string[] }> = {
   },
 };
 
-function CollectionTile({ collection: c, href, cell, delay }: { collection: Collection; href: string; cell: string; delay: number }) {
+function CollectionTile({ collection: c, href, cell, delay, comingSoon }: { collection: Collection; href: string; cell: string; delay: number; comingSoon?: boolean }) {
   return (
     <div className={`${cell} animate-fade-rise-in min-h-0`} style={{ animationDelay: `${delay}ms` }}>
       <Link
@@ -237,6 +264,11 @@ function CollectionTile({ collection: c, href, cell, delay }: { collection: Coll
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-900 to-amber-700 text-4xl transition-transform duration-700 group-hover:scale-110 sm:text-6xl">
             🪷
           </div>
+        )}
+        {comingSoon && (
+          <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-rose-900 sm:right-3 sm:top-3 sm:text-xs">
+            Coming Soon
+          </span>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent transition-opacity duration-500 group-hover:from-rose-950/80" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-1.5 pb-3 text-center transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:gap-1.5 sm:px-3 sm:pb-5">

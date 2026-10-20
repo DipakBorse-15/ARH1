@@ -42,6 +42,17 @@ export interface Collection {
   updated_at: string;
 }
 
+/** A collection shown on one category's page, with that category's own images and position. */
+export interface CategoryCollection {
+  id: string;
+  category_id: string;
+  collection_id: string;
+  image: string | null;
+  mobile_image: string | null;
+  sort_order: number;
+  collection?: Collection | null;
+}
+
 /** Extendable variant attribute set. Today: color. Tomorrow: size, fabric... */
 export interface VariantAttributes {
   color?: string;

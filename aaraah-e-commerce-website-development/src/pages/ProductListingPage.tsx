@@ -8,6 +8,7 @@ import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchCollectionBySlug } from "@/services/collections";
 import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
+import { categoryHref } from "@/lib/categoryLinks";
 import type { Category, Collection, ProductWithVariants } from "@/types";
 
 type Mode = "category" | "collection" | "search";
@@ -94,7 +95,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   if (mode === "category" && slug && LEGACY_CATEGORY_SLUGS[slug]) {
-    return <Navigate to={`/category/${LEGACY_CATEGORY_SLUGS[slug]}`} replace />;
+    return <Navigate to={categoryHref(LEGACY_CATEGORY_SLUGS[slug])} replace />;
   }
 
   if ((mode === "category" || mode === "collection") && !loading && !taxonomy && !error) {
@@ -130,7 +131,14 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
           {loading && <LoadingState label="Loading products…" />}
           {error && <ErrorState message={error} onRetry={load} />}
-          {!loading && !error && <ProductGrid products={products} byVariant />}
+          {!loading && !error && mode === "collection" && total === 0 && (
+            <div className="rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
+              <p className="text-xs font-semibold tracking-[0.3em] text-amber-800/80">{(taxonomy?.name || "").toUpperCase()}</p>
+              <h2 className="mt-2 font-serif text-3xl font-bold text-stone-900">Coming Soon</h2>
+              <p className="mt-2 text-sm text-stone-500">New styles are on their way. Please check back soon.</p>
+            </div>
+          )}
+          {!loading && !error && !(mode === "collection" && total === 0) && <ProductGrid products={products} byVariant />}
 
           {!loading && !error && totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-2">

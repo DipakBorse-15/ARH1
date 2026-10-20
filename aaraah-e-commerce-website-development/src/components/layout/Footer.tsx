@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { useNavCategories } from "@/hooks/useNavCategories";
+import { categoryHref } from "@/lib/categoryLinks";
 
 export function Footer() {
   const categories = useNavCategories();
@@ -16,7 +17,7 @@ export function Footer() {
           <ul className="space-y-2 text-sm text-stone-600">
             {categories.map((c) => (
               <li key={c.slug}>
-                <Link to={`/category/${c.slug}`} className="hover:text-rose-900">
+                <Link to={categoryHref(c.slug)} className="hover:text-rose-900">
                   {c.name}
                 </Link>
               </li>
