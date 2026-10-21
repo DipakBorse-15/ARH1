@@ -16,6 +16,7 @@ export function useLiveOrder(orderId: string | undefined) {
     if (!orderId) return;
     try {
       const o = await fetchOrderById(orderId);
+      setError(null);
       setOrder((prev) =>
         prev && o && prev.status === o.status && prev.payment_status === o.payment_status ? prev : o
       );
@@ -27,6 +28,7 @@ export function useLiveOrder(orderId: string | undefined) {
   useEffect(() => {
     if (!orderId) return;
     setLoading(true);
+    setError(null);
     fetchOrderById(orderId)
       .then(setOrder)
       .catch((err) => setError(friendlyError(err)))

@@ -4,7 +4,7 @@ import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { fetchSiteSettings, updateSiteSettings } from "@/services/siteSettings";
-import { fetchAllHeroSlidesAdmin, upsertHeroSlide, deleteHeroSlide } from "@/services/heroSlides";
+import { fetchAllHeroSlidesAdmin, upsertHeroSlide, deleteHeroSlide, setHeroSlideOrder } from "@/services/heroSlides";
 import { fetchCategories } from "@/services/categories";
 import { supabase, friendlyError } from "@/lib/supabase";
 import type { Category } from "@/types";
@@ -418,10 +418,9 @@ function BannersTab() {
     if (target < 0 || target >= items.length) return;
     const b = items[target];
     try {
-      await Promise.all([
-        upsertHeroSlide({ id: a.id, sort_order: b.sort_order }),
-        upsertHeroSlide({ id: b.id, sort_order: a.sort_order }),
-      ]);
+      // If two banners share the same number, swapping would change nothing — nudge instead.
+      const aOrder = a.sort_order === b.sort_order ? b.sort_order + direction : b.sort_order;
+      await Promise.all([setHeroSlideOrder(a.id, aOrder), setHeroSlideOrder(b.id, a.sort_order)]);
       load();
     } catch (err) {
       show(friendlyError(err), "error");

@@ -62,6 +62,14 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
+    // Moving an order backwards (or re-opening a cancelled one) is allowed but easy to do by mistake.
+    const rank = (s: OrderStatus) => STATUS_FLOW.indexOf(s);
+    if (order.status === "cancelled") {
+      if (!confirm("This order is cancelled. Re-open it? The stock will be taken again (it fails if there is not enough stock).")) return;
+    } else if (rank(status) !== -1 && rank(order.status) !== -1 && rank(status) < rank(order.status)) {
+      if (!confirm(`Move this order BACK from "${order.status}" to "${status}"?`)) return;
+    }
+
     const alsoMarkPaid = status === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
     if (alsoMarkPaid && !confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
 

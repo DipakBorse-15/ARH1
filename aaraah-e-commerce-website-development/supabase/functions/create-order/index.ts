@@ -79,6 +79,58 @@ Deno.serve(async (req) => {
       return json({ error: "Cash on Delivery is coming soon. Please pay via UPI." }, 400);
     }
 
+    // ---- Input checks (never trust the browser) --------------------------------
+    if (!Array.isArray(payload.items) || payload.items.length > 30) return json({ error: "Invalid cart" }, 400);
+    const merged = new Map<string, number>();
+    for (const it of payload.items) {
+      const qty = Number(it?.quantity);
+      if (typeof it?.variant_id !== "string" || !it.variant_id) return json({ error: "Invalid product in cart" }, 400);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 20) {
+        return json({ error: "Quantity must be a whole number between 1 and 20" }, 400);
+      }
+      merged.set(it.variant_id, (merged.get(it.variant_id) ?? 0) + qty);
+    }
+    payload.items = Array.from(merged, ([variant_id, quantity]) => ({ variant_id, quantity }));
+    if (payload.items.some((i) => i.quantity > 20)) return json({ error: "Quantity must be between 1 and 20" }, 400);
+
+    const clean = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+    payload.full_name = clean(payload.full_name, 100);
+    payload.mobile = clean(payload.mobile, 20);
+    payload.email = clean(payload.email, 150);
+    payload.address_line1 = clean(payload.address_line1, 200);
+    payload.address_line2 = clean(payload.address_line2, 200);
+    payload.city = clean(payload.city, 80);
+    payload.state = clean(payload.state, 80);
+    payload.pincode = clean(payload.pincode, 6);
+    if (!payload.full_name || !payload.address_line1 || !payload.city || !payload.state) {
+      return json({ error: "Missing required address fields" }, 400);
+    }
+    if (!/^\+?[\d\s-]{10,16}$/.test(payload.mobile)) return json({ error: "Enter a valid mobile number" }, 400);
+    if (!/^\S+@\S+\.\S+$/.test(payload.email)) return json({ error: "Enter a valid email address" }, 400);
+    if (!/^\d{6}$/.test(payload.pincode)) return json({ error: "Enter a valid 6-digit pincode" }, 400);
+
+    // ---- Double-click / retry protection ---------------------------------------
+    // If this same customer already placed an identical, still-pending order in the
+    // last 2 minutes, hand that order back instead of creating (and charging stock for) a second one.
+    const itemKey = (rows: { variant_id: string | null; quantity: number }[]) =>
+      rows.map((r) => `${r.variant_id}:${r.quantity}`).sort().join("|");
+    const wantedKey = itemKey(payload.items);
+    const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: recentOrders } = await admin
+      .from("orders")
+      .select("id, order_number, total, items:order_items(variant_id, quantity)")
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    const duplicate = (recentOrders || []).find(
+      (o: { items: { variant_id: string | null; quantity: number }[] }) => itemKey(o.items || []) === wantedKey
+    );
+    if (duplicate) {
+      return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
+    }
+
     const variantIds = payload.items.map((i) => i.variant_id);
     const { data: variants, error: variantError } = await admin
       .from("product_variants")
@@ -127,6 +179,7 @@ Deno.serve(async (req) => {
 
     const { data: orderNumberData } = await admin.rpc("generate_order_number");
     const orderNumber = orderNumberData as string;
+    if (!orderNumber) return json({ error: "Could not create order. Please try again." }, 500);
 
     const { data: order, error: orderError } = await admin
       .from("orders")
@@ -155,7 +208,11 @@ Deno.serve(async (req) => {
 
     const itemsToInsert = orderItems.map((i) => ({ ...i, order_id: order.id }));
     const { error: itemsError } = await admin.from("order_items").insert(itemsToInsert);
-    if (itemsError) return json({ error: "Could not save order items" }, 500);
+    if (itemsError) {
+      // Don't leave an empty order behind.
+      await admin.from("orders").delete().eq("id", order.id);
+      return json({ error: "Could not save your order. Please try again." }, 500);
+    }
 
     // Decrement stock atomically per-variant (never touches other colors).
     // decrement_variant_stock raises an exception (and the `.error` below is

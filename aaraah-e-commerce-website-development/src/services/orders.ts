@@ -26,7 +26,18 @@ export interface CreateOrderResponse {
  */
 export async function placeOrder(payload: CheckoutPayload): Promise<CreateOrderResponse> {
   const { data, error } = await supabase.functions.invoke("create-order", { body: payload });
-  if (error) throw error;
+  if (error) {
+    // The function replies with a readable reason (e.g. "items just sold out") — show that, not "non-2xx".
+    let message = "";
+    try {
+      const res = (error as { context?: Response }).context;
+      if (res) message = (await res.json())?.error ?? "";
+    } catch {
+      /* fall through to the generic error */
+    }
+    if (message) throw new Error(message);
+    throw error;
+  }
   if (data?.error) throw new Error(data.error);
   return data as CreateOrderResponse;
 }

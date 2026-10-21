@@ -29,7 +29,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "delivered"),
     customersQuery,
     supabase.from("product_variants").select("id", { count: "exact", head: true }).lte("stock_quantity", 5).eq("active", true),
-    supabase.from("orders").select("total").eq("payment_status", "paid"),
+    supabase.from("orders").select("total").eq("payment_status", "paid").neq("status", "cancelled"),
   ]);
 
   const totalSales = (paidOrders || []).reduce((sum, o: { total: number }) => sum + Number(o.total), 0);

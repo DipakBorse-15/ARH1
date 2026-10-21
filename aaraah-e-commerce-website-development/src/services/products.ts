@@ -120,8 +120,10 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
     collectionId = col.id;
   }
 
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%,description.ilike.%${search}%`);
+  // Remove characters that have a special meaning inside the PostgREST filter string.
+  const safeSearch = (search || "").replace(/[,()%*\\"':;]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  if (safeSearch) {
+    query = query.or(`name.ilike.%${safeSearch}%,brand.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`);
   }
 
   query = query.order("created_at", { ascending: false });
@@ -356,8 +358,24 @@ export async function updateProductQuick(
 }
 
 export async function deleteProduct(id: string) {
+  // Collect this product's image files first so they don't stay in storage (and cost space) after it is gone.
+  let filePaths: string[] = [];
+  try {
+    const { data: vars } = await supabase.from("product_variants").select("id").eq("product_id", id);
+    const ids = (vars || []).map((v: { id: string }) => v.id);
+    if (ids.length) {
+      const { data: imgs } = await supabase.from("product_images").select("url").in("variant_id", ids);
+      filePaths = (imgs || [])
+        .map((i: { url: string }) => i.url.split("/product-images/")[1])
+        .filter(Boolean)
+        .map((p: string) => decodeURIComponent(p.split("?")[0]));
+    }
+  } catch {
+    /* cleanup is best-effort; never block the delete */
+  }
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
+  if (filePaths.length) await supabase.storage.from("product-images").remove(filePaths).catch(() => {});
 }
 
 export async function upsertVariant(variant: Partial<ProductVariant>) {

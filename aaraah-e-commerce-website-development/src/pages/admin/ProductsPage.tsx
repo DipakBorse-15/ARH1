@@ -213,6 +213,15 @@ export default function AdminProductsPage() {
       show("No changes to save.", "error");
       return;
     }
+    const bad = edits.find(
+      (e) =>
+        (e.patch.stock_quantity !== undefined && (!Number.isInteger(e.patch.stock_quantity) || e.patch.stock_quantity < 0)) ||
+        (e.patch.sale_price !== undefined && e.patch.sale_price !== null && !(Number(e.patch.sale_price) > 0))
+    );
+    if (bad) {
+      show("Check the numbers: stock must be 0 or more (whole number) and price must be more than 0.", "error");
+      return;
+    }
 
     setSavingAll(true);
     try {
@@ -220,7 +229,9 @@ export default function AdminProductsPage() {
       if (succeeded.length > 0) show(`${succeeded.length} variant${succeeded.length > 1 ? "s" : ""} updated`, "success");
       if (failed.length > 0) show(`${failed.length} failed to save — check SKUs for conflicts`, "error");
       await load();
-      setDrafts({});
+      // Keep what you typed for the rows that failed, so you can fix and retry without re-entering.
+      const failedIds = new Set(failed.map((f) => f.id));
+      setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => failedIds.has(id))));
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {

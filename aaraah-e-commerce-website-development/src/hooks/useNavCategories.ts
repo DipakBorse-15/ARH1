@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { siteConfig, isSupabaseConfigured } from "@/config/site";
 import { fetchCategoriesByRecentActivity } from "@/services/categories";
+import { fetchCollections } from "@/services/collections";
 
 export interface NavCategory {
   name: string;
@@ -46,4 +47,27 @@ export function useNavCategories(): NavCategory[] {
     };
   }, []);
   return cats;
+}
+
+const COLLECTION_FALLBACK: NavCategory[] = siteConfig.collections.map((c) => ({ name: c.name, slug: c.slug }));
+let collectionCache: NavCategory[] | null = null;
+
+/** Collections for the menu, in the order and with the names set in Admin → Collections. */
+export function useNavCollections(): NavCategory[] {
+  const [cols, setCols] = useState<NavCategory[]>(collectionCache || COLLECTION_FALLBACK);
+  useEffect(() => {
+    if (!isSupabaseConfigured || collectionCache) return;
+    let alive = true;
+    fetchCollections()
+      .then((list) => {
+        const mapped = list.map((c) => ({ name: c.name, slug: c.slug }));
+        collectionCache = mapped.length ? mapped : COLLECTION_FALLBACK;
+        if (alive) setCols(collectionCache);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return cols;
 }

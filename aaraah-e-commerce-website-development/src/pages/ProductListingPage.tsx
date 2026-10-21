@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGrid } from "@/components/product/ProductGrid";
@@ -36,21 +36,34 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ProductFilters>({ sort: "newest", page: 1, pageSize: PAGE_SIZE });
 
-  useEffect(() => {
-    setFilters({ sort: "newest", page: 1, pageSize: PAGE_SIZE });
-  }, [mode, slug, query, categoryParam]);
+  // One effect = one fetch. When the page itself changes (another category / search),
+  // the filters are reset first and the fetch happens once with the fresh filters.
+  const pageKey = `${mode}|${slug}|${query}|${categoryParam}`;
+  const lastKey = useRef(pageKey);
+  const requestId = useRef(0);
 
   useEffect(() => {
+    if (lastKey.current !== pageKey) {
+      lastKey.current = pageKey;
+      const isDefault = filters.sort === "newest" && filters.page === 1 && Object.keys(filters).every((k) => ["sort", "page", "pageSize"].includes(k));
+      if (!isDefault) {
+        setFilters({ sort: "newest", page: 1, pageSize: PAGE_SIZE });
+        return;
+      }
+    }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, slug, query, categoryParam, filters]);
+  }, [pageKey, filters]);
 
   async function load() {
+    const myId = ++requestId.current;
+    const stale = () => myId !== requestId.current;
     setLoading(true);
     setError(null);
     try {
       if (mode === "category" && slug) {
         const cat = await fetchCategoryBySlug(slug);
+        if (stale()) return;
         setTaxonomy(cat);
         if (!cat) {
           setProducts([]);
@@ -58,10 +71,12 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
           return;
         }
         const res = await fetchProducts({ ...filters, categorySlug: slug });
+        if (stale()) return;
         setProducts(res.products);
         setTotal(res.total);
       } else if (mode === "collection" && slug) {
         const col = await fetchCollectionBySlug(slug);
+        if (stale()) return;
         setTaxonomy(col);
         if (!col) {
           setProducts([]);
@@ -69,17 +84,19 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
           return;
         }
         const res = await fetchProducts({ ...filters, collectionSlug: slug, categorySlug: categoryParam });
+        if (stale()) return;
         setProducts(res.products);
         setTotal(res.total);
       } else {
         const res = await fetchProducts({ ...filters, search: query });
+        if (stale()) return;
         setProducts(res.products);
         setTotal(res.total);
       }
     } catch (err) {
-      setError(friendlyError(err, "Could not load products."));
+      if (!stale()) setError(friendlyError(err, "Could not load products."));
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   }
 

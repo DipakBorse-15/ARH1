@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { siteConfig } from "@/config/site";
-import { useNavCategories } from "@/hooks/useNavCategories";
+import { useNavCategories, useNavCollections } from "@/hooks/useNavCategories";
 import { categoryHref } from "@/lib/categoryLinks";
 
 export function Footer() {
   const categories = useNavCategories();
+  const navCollections = useNavCollections();
   return (
     <footer className="mt-16 border-t border-stone-200 bg-stone-50">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 py-12 sm:px-6 md:grid-cols-4">
@@ -27,7 +28,7 @@ export function Footer() {
         <div>
           <h4 className="mb-3 text-sm font-semibold text-stone-900">Collections</h4>
           <ul className="space-y-2 text-sm text-stone-600">
-            {siteConfig.collections.map((c) => (
+            {navCollections.map((c) => (
               <li key={c.slug}>
                 <Link to={`/collection/${c.slug}`} className="hover:text-rose-900">
                   {c.name}

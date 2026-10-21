@@ -28,6 +28,11 @@ export async function fetchAllHeroSlidesAdmin(): Promise<HeroSlide[]> {
   return (data || []) as HeroSlide[];
 }
 
+export async function setHeroSlideOrder(id: string, sort_order: number) {
+  const { error } = await supabase.from("hero_slides").update({ sort_order }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function upsertHeroSlide(slide: Partial<HeroSlide>) {
   const { data, error } = await supabase.from("hero_slides").upsert(slide).select().single();
   if (error) throw error;

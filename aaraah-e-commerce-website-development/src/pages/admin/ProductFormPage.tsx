@@ -103,9 +103,26 @@ export default function ProductFormPage() {
     }
   }
 
+  /** Returns a message if the price/stock numbers don't make sense, otherwise null. */
+  function checkNumbers(price: unknown, sale: unknown, stock: unknown): string | null {
+    const p = Number(price);
+    const s = sale === null || sale === "" || sale === undefined ? null : Number(sale);
+    const st = Number(stock);
+    if (!Number.isFinite(p) || p <= 0) return "Price must be more than 0";
+    if (s !== null && (!Number.isFinite(s) || s <= 0)) return "Sale price must be more than 0 (or leave it empty)";
+    if (s !== null && s > p) return "Sale price cannot be higher than the price";
+    if (!Number.isInteger(st) || st < 0) return "Stock must be a whole number, 0 or more";
+    return null;
+  }
+
   async function handleAddVariant(e: React.FormEvent) {
     e.preventDefault();
     if (!product.id) return;
+    const numberProblem = checkNumbers(newVariant.price, newVariant.sale_price, newVariant.stock_quantity);
+    if (numberProblem) {
+      show(numberProblem, "error");
+      return;
+    }
     try {
       await upsertVariant({
         product_id: product.id,
@@ -129,6 +146,11 @@ export default function ProductFormPage() {
   }
 
   async function handleUpdateVariant(v: ProductVariant) {
+    const numberProblem = checkNumbers(v.price, v.sale_price, v.stock_quantity);
+    if (numberProblem) {
+      show(numberProblem, "error");
+      return;
+    }
     try {
       // Availability is derived from stock, not set by hand — in stock shows
       // on the site automatically, out of stock shows "Out of stock"

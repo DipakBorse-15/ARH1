@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { formatINR } from "@/components/product/PriceDisplay";
@@ -8,6 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
 import { placeOrder } from "@/services/orders";
+import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
 
@@ -59,6 +60,7 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false); // stops a fast double-tap from sending two orders
 
   useEffect(() => {
     // Only fill fields the customer hasn't typed yet — a profile refresh
@@ -151,6 +153,12 @@ export default function CheckoutPage() {
       return;
     }
     if (!validate()) return;
+    if (form.payment_method === "upi" && !siteConfig.upiConfigured) {
+      show("Online payment is being set up. Please contact us on WhatsApp to order.", "error");
+      return;
+    }
+    if (submitLock.current) return;
+    submitLock.current = true;
 
     setSubmitting(true);
     try {
@@ -184,6 +192,7 @@ export default function CheckoutPage() {
     } catch (err) {
       show(friendlyError(err, "Could not place your order. Please try again."), "error");
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   }
