@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { resizeImage } from "@/lib/imageResize";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
@@ -42,6 +43,7 @@ export default function AdminHeroSlidesPage() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
+      file = await resizeImage(file, 2400);
       const path = `${Date.now()}-${file.name}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;

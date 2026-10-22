@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { resizeImage } from "@/lib/imageResize";
 import { useToast } from "@/contexts/ToastContext";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { fetchAllCollectionsAdmin } from "@/services/collections";
@@ -92,6 +93,7 @@ export function CategoryCollectionsManager({ categoryId }: { categoryId: string;
   async function upload(row: CategoryCollection, field: "image" | "mobile_image", file: File) {
     setBusy(`${row.id}:${field}`);
     try {
+      file = await resizeImage(file, 1600);
       const path = `cat-${categoryId.slice(0, 8)}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("collection-images").upload(path, file, { upsert: true });
       if (error) throw error;

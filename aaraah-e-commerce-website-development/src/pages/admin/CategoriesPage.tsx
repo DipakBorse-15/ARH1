@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import { resizeImage } from "@/lib/imageResize";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
@@ -39,6 +40,7 @@ export default function AdminCategoriesPage() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
+      file = await resizeImage(file, 1600);
       const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("category-images").upload(path, file, { upsert: true });
       if (error) throw error;

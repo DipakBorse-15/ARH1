@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { resizeImage } from "@/lib/imageResize";
 import type { Collection, Product, ProductVariant, ProductWithVariants } from "@/types";
 
 const PRODUCT_SELECT = `
@@ -9,6 +10,27 @@ const PRODUCT_SELECT = `
     *,
     images:product_images(*),
     collection:collections(*)
+  )
+`;
+
+// Lighter select for storefront cards: no category/variant-collection embeds.
+const CARD_SELECT = `
+  *,
+  collection:collections(*),
+  variants:product_variants(
+    *,
+    images:product_images(*)
+  )
+`;
+
+// Same, but only products that have at least one ACTIVE variant (inner join),
+// so the database can count and page them correctly.
+const CARD_SELECT_ACTIVE = `
+  *,
+  collection:collections(*),
+  variants:product_variants!inner(
+    *,
+    images:product_images(*)
   )
 `;
 
@@ -102,7 +124,15 @@ export function productColors(product: ProductWithVariants): { color: string; he
 export async function fetchProducts(filters: ProductFilters = {}): Promise<ProductFilterResult> {
   const { categorySlug, collectionSlug, search, page = 1, pageSize = 12 } = filters;
 
-  let query = supabase.from("products").select(PRODUCT_SELECT, { count: "exact" }).eq("active", true);
+  // Plain browsing (category or search, newest first, no variant-level filter) is paged
+  // by the database, so only one page of products is ever downloaded.
+  const needsClientFilter =
+    !!filters.color || !!filters.size || !!filters.inStockOnly || typeof filters.minPrice === "number" || typeof filters.maxPrice === "number" ||
+    !!collectionSlug || filters.sort === "price-asc" || filters.sort === "price-desc";
+
+  let query = needsClientFilter
+    ? supabase.from("products").select(CARD_SELECT, { count: "exact" }).eq("active", true)
+    : supabase.from("products").select(CARD_SELECT_ACTIVE, { count: "exact" }).eq("active", true).eq("variants.active", true);
 
   if (categorySlug) {
     const { data: cat } = await supabase.from("categories").select("id").eq("slug", categorySlug).maybeSingle();
@@ -127,6 +157,14 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
   }
 
   query = query.order("created_at", { ascending: false });
+
+  if (!needsClientFilter) {
+    const from = (page - 1) * pageSize;
+    const { data, error, count } = await query.range(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+    return { products: rows, total: count ?? rows.length };
+  }
 
   const { data, error, count } = await query;
   if (error) throw error;
@@ -226,7 +264,7 @@ export async function fetchHomeFeed(
 ): Promise<HomeFeed> {
   const { latestCount = 12, perCollection = 8, categoryId } = opts;
 
-  const { data, error } = await supabase.from("products").select(PRODUCT_SELECT).eq("active", true);
+  const { data, error } = await supabase.from("products").select(CARD_SELECT).eq("active", true);
   if (error) throw error;
 
   const pool: SimilarItem[] = [];
@@ -259,10 +297,10 @@ export async function fetchBestsellers(limit = 8): Promise<SimilarItem[]> {
   // a reasonable stand-in that also doubles as a "deals" section.
   const { data, error } = await supabase
     .from("products")
-    .select(PRODUCT_SELECT)
+    .select(CARD_SELECT)
     .eq("active", true)
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(40);
   if (error) throw error;
 
   const products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
@@ -288,10 +326,10 @@ export async function fetchSimilarVariants(currentVariantId: string, limit = 8):
   // one variant the customer is currently looking at.
   const { data, error } = await supabase
     .from("products")
-    .select(PRODUCT_SELECT)
+    .select(CARD_SELECT)
     .eq("active", true)
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(24);
   if (error) throw error;
 
   const products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
@@ -448,7 +486,8 @@ export async function reorderVariantImages(orderedImageIds: string[]): Promise<v
   if (failed) throw new Error("Could not save the new image order");
 }
 
-export async function uploadProductImage(file: File, variantId: string): Promise<{ path: string; url: string }> {
+export async function uploadProductImage(original: File, variantId: string): Promise<{ path: string; url: string }> {
+  const file = await resizeImage(original, 1600);
   const ext = file.name.split(".").pop();
   const path = `${variantId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: false });

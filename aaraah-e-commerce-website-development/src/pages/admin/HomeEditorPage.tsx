@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { resizeImage } from "@/lib/imageResize";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
@@ -363,6 +364,7 @@ function BannersTab() {
   async function handleUpload(file: File, field: "image" | "mobile_image") {
     setUploading(field);
     try {
+      file = await resizeImage(file, 2400);
       const path = `${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;
