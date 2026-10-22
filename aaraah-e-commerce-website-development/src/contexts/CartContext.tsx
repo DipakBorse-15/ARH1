@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import * as cartService from "@/services/cart";
+import { CartLimitError, MAX_PER_ITEM } from "@/services/cart";
 import { effectivePrice } from "@/services/products";
 import { friendlyError, isSupabaseConfigured } from "@/lib/supabase";
 import type { CartItem } from "@/types";
@@ -58,7 +59,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         show("Added to cart", "success");
         return true;
       } catch (err) {
-        show(friendlyError(err, "Could not add item to cart."), "error");
+        show(err instanceof CartLimitError ? err.message : friendlyError(err, "Could not add item to cart."), "error");
         return false;
       }
     },
@@ -70,6 +71,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const stock = item.variant?.stock_quantity ?? 0;
       if (item.quantity + 1 > stock) {
         show("No more stock available for this item.", "error");
+        return;
+      }
+      if (item.quantity + 1 > MAX_PER_ITEM) {
+        show(`You can order up to ${MAX_PER_ITEM} of one item at a time.`, "error");
         return;
       }
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i)));

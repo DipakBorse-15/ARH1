@@ -18,7 +18,7 @@ export function useLiveOrder(orderId: string | undefined) {
       const o = await fetchOrderById(orderId);
       setError(null);
       setOrder((prev) =>
-        prev && o && prev.status === o.status && prev.payment_status === o.payment_status ? prev : o
+        prev && o && prev.status === o.status && prev.payment_status === o.payment_status && prev.payment_reference === o.payment_reference ? prev : o
       );
     } catch (err) {
       setError((e) => e ?? friendlyError(err));

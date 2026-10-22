@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
@@ -23,6 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  // Which user's profile is already loaded (so token refreshes / tab focus do not show a spinner again).
+  const profileUserId = useRef<string | null>(null);
 
   async function loadProfile(userId: string, metaMobile?: string) {
     const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!error) row = { ...row, mobile: metaMobile };
     }
     setProfile(row);
+    profileUserId.current = userId;
   }
 
   function metaMobileOf(u: User | null | undefined): string | undefined {
@@ -61,8 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
-        loadProfile(newSession.user.id, metaMobileOf(newSession.user));
+        const uid = newSession.user.id;
+        if (profileUserId.current !== uid) {
+          // A new sign-in: hold the "checking" state until the role is known, so the admin pages
+          // do not bounce a real admin to the login page while the profile is still loading.
+          setLoading(true);
+          loadProfile(uid, metaMobileOf(newSession.user)).finally(() => setLoading(false));
+        } else {
+          loadProfile(uid, metaMobileOf(newSession.user));
+        }
       } else {
+        profileUserId.current = null;
         setProfile(null);
       }
     });
@@ -88,6 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: { data: { full_name: fullName, mobile }, emailRedirectTo },
     });
     if (error) return { error: error.message };
+    // Supabase hides "this email already exists" for privacy: it answers with a user that has no identities.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return { error: "An account with this email already exists. Please sign in instead." };
+    }
     if (data.user) {
       // Works only when a session exists (email confirmation off); otherwise the
       // metadata above + loadProfile() fill the mobile number after first sign-in.

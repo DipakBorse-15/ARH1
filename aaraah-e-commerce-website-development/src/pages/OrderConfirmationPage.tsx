@@ -9,7 +9,7 @@ export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
   const orderNumber = (location.state as { orderNumber?: string } | null)?.orderNumber;
-  const { order, loading, error } = useLiveOrder(orderId);
+  const { order, loading, error, refetch } = useLiveOrder(orderId);
 
   if (loading) return <LoadingState label="Confirming your order…" />;
   if (error) return <ErrorState message={error} />;
@@ -40,7 +40,7 @@ export default function OrderConfirmationPage() {
         </div>
       )}
 
-      {order && <UpiPaymentCard order={order} />}
+      {order && <UpiPaymentCard order={order} onSubmitted={refetch} />}
 
       <div className="mt-8 flex justify-center gap-3">
         <Link to="/account/orders" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">

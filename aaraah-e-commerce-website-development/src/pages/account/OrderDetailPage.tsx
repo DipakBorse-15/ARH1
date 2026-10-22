@@ -131,7 +131,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      <UpiPaymentCard order={order} />
+      <UpiPaymentCard order={order} onSubmitted={refetch} />
     </div>
   );
 }

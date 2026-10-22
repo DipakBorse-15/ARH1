@@ -22,6 +22,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const esc = (s: unknown) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -60,7 +63,7 @@ Deno.serve(async (req) => {
     const itemRows = (order.items || [])
       .map(
         (i: { product_name: string; color: string | null; quantity: number; line_total: number }) =>
-          `<tr><td style="padding:4px 0">${i.product_name}${i.color ? ` (${i.color})` : ""} × ${i.quantity}</td><td style="padding:4px 0;text-align:right">₹${i.line_total}</td></tr>`
+          `<tr><td style="padding:4px 0">${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${i.quantity}</td><td style="padding:4px 0;text-align:right">₹${i.line_total}</td></tr>`
       )
       .join("");
 
@@ -69,15 +72,15 @@ Deno.serve(async (req) => {
     const subject = isCod ? `Order confirmed — Order ${order.order_number}` : `Payment received — Order ${order.order_number}`;
     const html = `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2 style="color:#7a1730">${isCod ? "Order confirmed" : "Payment received"} — Order ${order.order_number}</h2>
-        <p>Hi ${order.full_name}, ${
+        <h2 style="color:#7a1730">${isCod ? "Order confirmed" : "Payment received"} — Order ${esc(order.order_number)}</h2>
+        <p>Hi ${esc(order.full_name)}, ${
           isCod
             ? "your order is confirmed and will be shipped soon. Please keep the amount ready — you pay in cash when it is delivered."
             : "we've received your payment. Your order is now confirmed and will be shipped soon."
         }</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0">${itemRows}</table>
         <p style="font-weight:bold">${isCod ? "Amount to pay on delivery" : "Total paid"}: ₹${order.total}</p>
-        <p style="color:#78716c;font-size:13px">Shipping to: ${order.address_line1}, ${order.city}, ${order.state} ${order.pincode}</p>
+        <p style="color:#78716c;font-size:13px">Shipping to: ${esc(order.address_line1)}, ${esc(order.city)}, ${esc(order.state)} ${esc(order.pincode)}</p>
       </div>`;
 
     const resendRes = await fetch("https://api.resend.com/emails", {

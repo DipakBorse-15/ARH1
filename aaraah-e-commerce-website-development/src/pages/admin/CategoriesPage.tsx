@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAllCategoriesAdmin, upsertCategory, deleteCategory } from "@/services/categories";
+import { fetchAllCategoriesAdmin, upsertCategory, deleteCategory, countProductsInCategory } from "@/services/categories";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { CategoryCollectionsManager } from "@/components/admin/CategoryCollectionsManager";
 import type { Category } from "@/types";
@@ -65,6 +65,12 @@ export default function AdminCategoriesPage() {
 
   async function handleDelete(id: string) {
     try {
+      const inUse = await countProductsInCategory(id);
+      if (inUse > 0) {
+        show(`This category has ${inUse} product${inUse > 1 ? "s" : ""}. Move them to another category first, then delete it.`, "error");
+        return;
+      }
+      if (!confirm("Delete this category? This cannot be undone.")) return;
       await deleteCategory(id);
       load();
     } catch (err) {

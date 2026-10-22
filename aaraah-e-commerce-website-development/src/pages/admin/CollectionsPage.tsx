@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection, setCollectionPosition } from "@/services/collections";
+import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection, setCollectionPosition, countItemsInCollection } from "@/services/collections";
 import { supabase, friendlyError } from "@/lib/supabase";
 import type { Collection } from "@/types";
 
@@ -88,6 +88,9 @@ export default function AdminCollectionsPage() {
 
   async function handleDelete(id: string) {
     try {
+      const inUse = await countItemsInCollection(id);
+      const warning = inUse > 0 ? `${inUse} product/colour${inUse > 1 ? "s are" : " is"} tagged with this collection and will become "no collection". ` : "";
+      if (!confirm(`${warning}Delete this collection? This cannot be undone.`)) return;
       await deleteCollection(id);
       load();
     } catch (err) {

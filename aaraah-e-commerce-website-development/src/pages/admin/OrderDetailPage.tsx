@@ -198,6 +198,25 @@ export default function AdminOrderDetailPage() {
               </span>
             )}
           </p>
+          {order.payment_method === "upi" && (
+            <p className={`mt-2 rounded-lg p-2 text-sm ${order.payment_reference ? "bg-emerald-50 text-emerald-800" : "bg-stone-50 text-stone-500"}`}>
+              {order.payment_reference ? (
+                <>
+                  Customer's UTR: <span className="font-semibold">{order.payment_reference}</span>
+                  {order.payment_reference_at && (
+                    <span className="ml-1 text-xs">({new Date(order.payment_reference_at).toLocaleString("en-IN")})</span>
+                  )}
+                  {order.status === "cancelled" && order.payment_status !== "paid" && (
+                    <span className="mt-1 block text-xs font-medium text-rose-700">
+                      This order is cancelled but the customer sent a UTR. Check your UPI app; if the money is there, re-open the order.
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Customer has not sent a UTR yet."
+              )}
+            </p>
+          )}
           <div className="mt-3 space-y-1 border-t border-stone-200 pt-3 text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>

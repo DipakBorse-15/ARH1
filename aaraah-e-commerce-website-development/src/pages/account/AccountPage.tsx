@@ -5,6 +5,7 @@ import { AccountNav } from "@/components/account/AccountNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { supabase, friendlyError } from "@/lib/supabase";
+import { isValidMobile } from "@/lib/validators";
 
 export default function AccountPage() {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -18,9 +19,13 @@ export default function AccountPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
+    if (mobile.trim() && !isValidMobile(mobile)) {
+      show("Enter a valid 10-digit mobile number.", "error");
+      return;
+    }
     setSaving(true);
     try {
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, mobile }).eq("id", profile.id);
+      const { error } = await supabase.from("profiles").update({ full_name: fullName.trim(), mobile: mobile.trim() }).eq("id", profile.id);
       if (error) throw error;
       await refreshProfile();
       show("Profile updated", "success");

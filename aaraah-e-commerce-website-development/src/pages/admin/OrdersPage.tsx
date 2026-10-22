@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { deleteOrderAdmin, fetchAllOrdersAdmin, resetOrdersAdmin } from "@/services/orders";
+import { deleteOrderAdmin, expireUnpaidOrdersAdmin, fetchAllOrdersAdmin, isExpiredUnpaid, resetOrdersAdmin, UNPAID_HOURS } from "@/services/orders";
 import { useAuth } from "@/contexts/AuthContext";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
@@ -77,6 +77,20 @@ export default function AdminOrdersPage() {
     }
   }
 
+  async function expireUnpaid() {
+    if (!confirm(`Cancel all unpaid UPI orders older than ${UNPAID_HOURS} hours (where the customer has not sent a UTR)? Their stock goes back.`)) return;
+    setBusy(true);
+    try {
+      const n = await expireUnpaidOrdersAdmin();
+      show(n > 0 ? `${n} expired order${n > 1 ? "s" : ""} cancelled, stock restored` : "No expired unpaid orders", n > 0 ? "success" : "info");
+      await load();
+    } catch (err) {
+      show((err as Error).message || friendlyError(err), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -108,6 +122,14 @@ export default function AdminOrdersPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={expireUnpaid}
+            disabled={busy}
+            className="rounded-full border border-amber-300 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+          >
+            Cancel expired unpaid orders
+          </button>
           <button
             type="button"
             onClick={() => setResetOpen(true)}
@@ -142,7 +164,15 @@ export default function AdminOrdersPage() {
                   <td className="p-3 text-stone-500">{o.full_name}</td>
                   <td className="p-3 text-stone-500">{new Date(o.created_at).toLocaleDateString("en-IN")}</td>
                   <td className="p-3 font-medium text-stone-800">{formatINR(o.total)}</td>
-                  <td className="p-3 capitalize text-stone-500">{o.payment_status}</td>
+                  <td className="p-3 capitalize text-stone-500">
+                    {o.payment_status}
+                    {o.payment_status !== "paid" && o.payment_reference && (
+                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium normal-case text-emerald-700">UTR sent</span>
+                    )}
+                    {isExpiredUnpaid(o) && (
+                      <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium normal-case text-amber-700">Expired</span>
+                    )}
+                  </td>
                   <td className="p-3 capitalize text-stone-500">{o.status}</td>
                   <td className="p-3">
                     <Link to={`/admin/orders/${o.id}`} className="mr-3 text-rose-900 hover:underline">

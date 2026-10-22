@@ -249,12 +249,53 @@ Deno.serve(async (req) => {
     // Clear purchased items from the cart.
     await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
 
+    // "Order received" email — best effort, never blocks or fails the order.
+    await sendOrderReceivedEmail(order, orderItems, total).catch((e) => console.error("order email failed", e));
+
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {
     console.error(err);
     return json({ error: "Unexpected server error" }, 500);
   }
 });
+
+const esc = (s: unknown) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+// Needs RESEND_API_KEY (and RESEND_FROM). Without the key this quietly does nothing.
+async function sendOrderReceivedEmail(
+  order: { id: string; order_number: string; full_name: string; email: string },
+  items: Record<string, unknown>[],
+  total: number
+) {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key || !order.email) return;
+  const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
+  const rows = items
+    .map(
+      (i) =>
+        `<tr><td style="padding:4px 0">${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</td><td style="padding:4px 0;text-align:right">₹${esc(i.line_total)}</td></tr>`
+    )
+    .join("");
+  const link = `https://aaraah.in/account/orders/${order.id}`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#7a1730">We received your order — ${esc(order.order_number)}</h2>
+      <p>Hi ${esc(order.full_name)}, thank you for shopping with AARAAH.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
+      <p style="font-weight:bold">Total: ₹${esc(total)}</p>
+      <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
+      Orders without payment are cancelled automatically after 3 hours so the stock can go to other customers.</p>
+      <p><a href="${link}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open my order</a></p>
+      <p style="color:#78716c;font-size:13px">Questions? Reply to this email or WhatsApp us.</p>
+    </div>`;
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [order.email], subject: `Order received — ${order.order_number}`, html }),
+    signal: AbortSignal.timeout(5000),
+  });
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

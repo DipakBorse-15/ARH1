@@ -43,6 +43,17 @@ export async function setCollectionPosition(id: string, position: number) {
   if (error) throw error;
 }
 
+/** How many products / colours are tagged with this collection. */
+export async function countItemsInCollection(id: string): Promise<number> {
+  const [p, v] = await Promise.all([
+    supabase.from("products").select("id", { count: "exact", head: true }).eq("collection_id", id),
+    supabase.from("product_variants").select("id", { count: "exact", head: true }).eq("collection_id", id),
+  ]);
+  if (p.error) throw p.error;
+  if (v.error) throw v.error;
+  return (p.count ?? 0) + (v.count ?? 0);
+}
+
 export async function deleteCollection(id: string) {
   const { error } = await supabase.from("collections").delete().eq("id", id);
   if (error) throw error;

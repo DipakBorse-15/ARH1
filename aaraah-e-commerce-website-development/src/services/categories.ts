@@ -80,6 +80,13 @@ export async function upsertCategory(category: Partial<Category>) {
   return data as Category;
 }
 
+/** How many products sit in this category (used to stop deleting a category that is in use). */
+export async function countProductsInCategory(id: string): Promise<number> {
+  const { count, error } = await supabase.from("products").select("id", { count: "exact", head: true }).eq("category_id", id);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function deleteCategory(id: string) {
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) throw error;

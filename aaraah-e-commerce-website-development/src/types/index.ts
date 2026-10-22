@@ -199,6 +199,9 @@ export interface Order {
   subtotal: number;
   shipping_fee: number;
   total: number;
+  /** UTR / transaction number the customer typed after paying by UPI. */
+  payment_reference?: string | null;
+  payment_reference_at?: string | null;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

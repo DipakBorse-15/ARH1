@@ -127,6 +127,31 @@ function rpcMessage(error: unknown): string {
   return (error as { message?: string })?.message || "Something went wrong. Please try again.";
 }
 
+/** Customer: send the UTR / transaction number of their UPI payment. */
+export async function submitPaymentReference(orderId: string, reference: string): Promise<void> {
+  const { error } = await supabase.rpc("submit_payment_reference", { p_order_id: orderId, p_reference: reference });
+  if (error) throw new Error(rpcMessage(error));
+}
+
+/** Admin: cancel unpaid UPI orders older than 3 hours (stock goes back). Returns how many were cancelled. */
+export async function expireUnpaidOrdersAdmin(): Promise<number> {
+  const { data, error } = await supabase.rpc("admin_expire_unpaid_orders");
+  if (error) throw new Error(rpcMessage(error));
+  return Number(data) || 0;
+}
+
+/** Unpaid UPI order older than 3 hours with no UTR sent — will be (or can be) cancelled. */
+export const UNPAID_HOURS = 3;
+export function isExpiredUnpaid(o: { payment_method: string; payment_status: string; status: string; payment_reference?: string | null; created_at: string }): boolean {
+  return (
+    o.payment_method === "upi" &&
+    o.payment_status === "pending" &&
+    o.status === "pending" &&
+    !o.payment_reference &&
+    Date.now() - new Date(o.created_at).getTime() > UNPAID_HOURS * 3600 * 1000
+  );
+}
+
 /** Admin: delete one order. The server checks the code = last 4 characters of the order number. */
 export async function deleteOrderAdmin(orderId: string, code: string): Promise<void> {
   const { error } = await supabase.rpc("admin_delete_order", { p_order_id: orderId, p_code: code.trim() });

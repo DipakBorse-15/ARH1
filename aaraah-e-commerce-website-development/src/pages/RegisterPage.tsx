@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { useAuth } from "@/contexts/AuthContext";
+import { isValidMobile } from "@/lib/validators";
 
 export default function RegisterPage() {
   const { signUp } = useAuth();
@@ -23,8 +24,12 @@ export default function RegisterPage() {
       setError("Password must be at least 6 characters.");
       return;
     }
+    if (!isValidMobile(mobile)) {
+      setError("Enter a valid 10-digit mobile number.");
+      return;
+    }
     setLoading(true);
-    const { error } = await signUp(email, password, fullName, mobile);
+    const { error } = await signUp(email, password, fullName, mobile.trim());
     setLoading(false);
     if (error) {
       setError(error);
@@ -58,6 +63,10 @@ export default function RegisterPage() {
             <label className="mb-1 block text-xs font-medium text-stone-600">Mobile Number</label>
             <input
               required
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="10-digit mobile number"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none"
