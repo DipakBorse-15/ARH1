@@ -10,6 +10,9 @@ const STATIC_PATHS = [
   "/terms-and-conditions",
   "/returns-and-refunds",
   "/shipping-policy",
+  "/about",
+  "/contact",
+  "/faq",
 ];
 
 async function rows(base, key, table, select) {

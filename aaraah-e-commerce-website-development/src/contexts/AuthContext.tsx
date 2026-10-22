@@ -12,6 +12,8 @@ interface AuthContextValue {
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string, mobile: string) => Promise<{ error?: string }>;
+  requestPasswordReset: (email: string) => Promise<{ error?: string }>;
+  updatePassword: (newPassword: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -112,6 +114,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {};
   }
 
+  async function requestPasswordReset(email: string) {
+    const base = siteConfig.basePath === "/" ? "" : siteConfig.basePath.replace(/\/$/, "");
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}${base}/reset-password`,
+    });
+    return { error: error?.message };
+  }
+
+  async function updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error: error?.message };
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setProfile(null);
@@ -124,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = profile?.role === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signIn, signUp, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

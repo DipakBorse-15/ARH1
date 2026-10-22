@@ -49,6 +49,11 @@ export default function LoginPage() {
         <div>
           <label className="mb-1 block text-xs font-medium text-stone-600">Password</label>
           <PasswordInput value={password} onChange={setPassword} autoComplete="current-password" />
+          <div className="mt-1.5 text-right">
+            <Link to="/forgot-password" className="text-xs font-medium text-rose-900 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
         </div>
         <button
           type="submit"

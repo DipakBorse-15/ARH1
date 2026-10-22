@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Footer } from "@/components/layout/Footer";
+import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 
 /** Browsing pages (Home, category pages, collection pages) share the soft cream background used by
  *  the hero and "Top Collections" sections. Product, cart, checkout and account pages stay white. */
@@ -19,6 +20,7 @@ export function MainLayout() {
         <Outlet />
       </main>
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 }

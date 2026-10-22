@@ -20,6 +20,9 @@ import CartPage from "@/pages/CartPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 const LegalPage = lazy(() => import("@/pages/LegalPage"));
+const InfoPage = lazy(() => import("@/pages/InfoPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ProductPage = lazy(() => import("@/pages/ProductPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 const OrderConfirmationPage = lazy(() => import("@/pages/OrderConfirmationPage"));
@@ -61,6 +64,11 @@ export default function App() {
                   <Route path="cart" element={<CartPage />} />
                   <Route path="login" element={<LoginPage />} />
                   <Route path="register" element={<RegisterPage />} />
+                  <Route path="forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="reset-password" element={<ResetPasswordPage />} />
+                  <Route path="about" element={<InfoPage doc="about" />} />
+                  <Route path="contact" element={<InfoPage doc="contact" />} />
+                  <Route path="faq" element={<InfoPage doc="faq" />} />
                   <Route path="privacy-policy" element={<LegalPage doc="privacy" />} />
                   <Route path="terms-and-conditions" element={<LegalPage doc="terms" />} />
                   <Route path="returns-and-refunds" element={<LegalPage doc="returns" />} />

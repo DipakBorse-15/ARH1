@@ -16,6 +16,8 @@ interface SEOProps {
  * correct for social shares triggered from within the app).
  */
 export function SEO({ title, description, image, canonicalPath, jsonLd }: SEOProps) {
+  // A new object is passed on every render; compare by content so the script tag is not re-added each time.
+  const jsonLdText = jsonLd ? JSON.stringify(jsonLd) : "";
   useEffect(() => {
     const fullTitle = `${title} | ${siteConfig.name}`;
     document.title = fullTitle;
@@ -24,6 +26,7 @@ export function SEO({ title, description, image, canonicalPath, jsonLd }: SEOPro
     setMeta("og:title", fullTitle, true);
     setMeta("og:description", description || siteConfig.tagline, true);
     if (image) setMeta("og:image", image, true);
+    setMeta("og:url", `${siteConfig.url}${canonicalPath || ""}`, true);
 
     const canonicalHref = `${siteConfig.url}${canonicalPath || ""}`;
     let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
@@ -35,17 +38,17 @@ export function SEO({ title, description, image, canonicalPath, jsonLd }: SEOPro
     link.href = canonicalHref;
 
     let scriptEl: HTMLScriptElement | null = null;
-    if (jsonLd) {
+    if (jsonLdText) {
       scriptEl = document.createElement("script");
       scriptEl.type = "application/ld+json";
-      scriptEl.textContent = JSON.stringify(jsonLd);
+      scriptEl.textContent = jsonLdText;
       document.head.appendChild(scriptEl);
     }
 
     return () => {
       if (scriptEl) document.head.removeChild(scriptEl);
     };
-  }, [title, description, image, canonicalPath, jsonLd]);
+  }, [title, description, image, canonicalPath, jsonLdText]);
 
   return null;
 }

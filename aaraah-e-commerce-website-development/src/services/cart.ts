@@ -22,19 +22,10 @@ export const MAX_PER_ITEM = 20;
 /** A readable "can't add that many" reason (shown to the customer as it is). */
 export class CartLimitError extends Error {}
 
-export async function addToCart(userId: string, variantId: string, quantity: number): Promise<void> {
-  const { data: existing } = await supabase
-    .from("cart_items")
-    .select("id, quantity")
-    .eq("user_id", userId)
-    .eq("variant_id", variantId)
-    .maybeSingle();
-
-  const { data: stockRow } = await supabase.from("product_variants").select("stock_quantity").eq("id", variantId).maybeSingle();
-  const limit = Math.min(MAX_PER_ITEM, Number(stockRow?.stock_quantity ?? MAX_PER_ITEM));
-  const wanted = (existing?.quantity ?? 0) + quantity;
-  if (wanted > limit) {
-    const inCart = existing?.quantity ?? 0;
+/** Throws a readable CartLimitError when `inCart + quantity` is more than the stock / per-item cap allows. */
+export function assertCartLimit(inCart: number, quantity: number, stock: number | null | undefined): void {
+  const limit = Math.min(MAX_PER_ITEM, Number(stock ?? MAX_PER_ITEM));
+  if (inCart + quantity > limit) {
     throw new CartLimitError(
       limit <= 0
         ? "Sorry, this item is out of stock."
@@ -43,6 +34,37 @@ export async function addToCart(userId: string, variantId: string, quantity: num
           : `Only ${limit} available — you already have ${inCart} in your cart.`
     );
   }
+}
+
+export async function fetchVariantStock(variantId: string): Promise<number | null> {
+  const { data } = await supabase.from("product_variants").select("stock_quantity").eq("id", variantId).maybeSingle();
+  return data ? Number(data.stock_quantity) : null;
+}
+
+/** Variants (with images + product) for the guest cart, by id. Missing ones are simply not returned. */
+export async function fetchVariantsForCart(ids: string[]): Promise<NonNullable<CartItem["variant"]>[]> {
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("*, images:product_images(*), product:products(*)")
+    .in("id", ids)
+    .eq("active", true);
+  if (error) throw error;
+  return ((data || []) as NonNullable<CartItem["variant"]>[]).map((v) => ({
+    ...v,
+    images: (v.images || []).slice().sort((a, b) => a.sort_order - b.sort_order),
+  }));
+}
+
+export async function addToCart(userId: string, variantId: string, quantity: number): Promise<void> {
+  const { data: existing } = await supabase
+    .from("cart_items")
+    .select("id, quantity")
+    .eq("user_id", userId)
+    .eq("variant_id", variantId)
+    .maybeSingle();
+
+  assertCartLimit(existing?.quantity ?? 0, quantity, await fetchVariantStock(variantId));
 
   if (existing) {
     const { error } = await supabase.from("cart_items").update({ quantity: existing.quantity + quantity }).eq("id", existing.id);

@@ -14,6 +14,10 @@ export const siteConfig = {
   currencySymbol: "₹",
   supportEmail: "aaraah.in@gmail.com",
   supportPhone: "+91 98983 52989",
+  // Seller details shown in the footer and on the About / Contact pages (India's E-Commerce Rules ask for these).
+  sellerName: "Aaraah Fashion",
+  sellerAddress: "Aaraah Fashion, Surat, Gujarat, India",
+  grievanceOfficer: "Grievance Officer, Aaraah Fashion",
   // WhatsApp Business number for "Direct Purchase" (country code + number, digits only).
   whatsappNumber: "919898352989",
   // Manual UPI collection: customer scans this on the confirmation page,

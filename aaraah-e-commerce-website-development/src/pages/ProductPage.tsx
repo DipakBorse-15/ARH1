@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGallery } from "@/components/product/ProductGallery";
@@ -13,6 +14,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { fetchProductBySlug, fetchSimilarVariants, type SimilarItem } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
+import { deliveryWindowText } from "@/lib/delivery";
 import type { ProductVariant, ProductWithVariants } from "@/types";
 
 function colorSlug(color: string | null) {
@@ -211,14 +213,19 @@ export default function ProductPage() {
           "@context": "https://schema.org",
           "@type": "Product",
           name: product.name,
-          brand: product.brand,
+          brand: { "@type": "Brand", name: product.brand },
           sku: selectedVariant.sku,
-          description: product.description,
+          color: selectedVariant.color || undefined,
+          description: product.description || undefined,
+          image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
+          url: `${siteConfig.url}/products/${product.slug}`,
           offers: {
             "@type": "Offer",
             priceCurrency: "INR",
-            price: selectedVariant.sale_price ?? selectedVariant.price,
+            price: sellingPrice,
+            url: `${siteConfig.url}/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`,
             availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            itemCondition: "https://schema.org/NewCondition",
           },
         }}
       />
@@ -242,6 +249,20 @@ export default function ProductPage() {
           <p className={`mt-2 text-sm font-medium ${inStock ? "text-emerald-600" : "text-rose-600"}`}>
             {inStock ? `In stock (${selectedVariant.stock_quantity} left)` : "Out of stock"}
           </p>
+
+          {inStock && (
+            <div className="mt-3 rounded-lg bg-stone-50 p-3 text-xs text-stone-600">
+              <p>
+                <span className="font-semibold text-stone-800">Estimated delivery: {deliveryWindowText()}</span> · Free shipping
+              </p>
+              <p className="mt-0.5">
+                Dispatched in 1–3 working days after payment is confirmed.{" "}
+                <Link to="/returns-and-refunds" className="text-rose-900 underline">
+                  7-day return for damaged or wrong items
+                </Link>
+              </p>
+            </div>
+          )}
 
           <div className="mt-6">
             <VariantSelector variants={product.variants} selectedId={selectedVariant.id} onSelect={selectVariant} />

@@ -46,6 +46,11 @@ export function Footer() {
               </Link>
             </li>
             <li>
+              <Link to="/faq" className="hover:text-rose-900">
+                FAQs
+              </Link>
+            </li>
+            <li>
               <a href={`mailto:${siteConfig.supportEmail}`} className="hover:text-rose-900">
                 {siteConfig.supportEmail}
               </a>
@@ -60,11 +65,22 @@ export function Footer() {
       </div>
       <div className="border-t border-stone-200 px-4 py-4 text-center text-xs text-stone-500">
         <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2" aria-label="Policies">
+          <Link to="/about" className="hover:text-rose-900">About Us</Link>
+          <Link to="/contact" className="hover:text-rose-900">Contact Us</Link>
+          <Link to="/faq" className="hover:text-rose-900">FAQs</Link>
           <Link to="/shipping-policy" className="hover:text-rose-900">Shipping Policy</Link>
           <Link to="/returns-and-refunds" className="hover:text-rose-900">Returns &amp; Refunds</Link>
           <Link to="/privacy-policy" className="hover:text-rose-900">Privacy Policy</Link>
           <Link to="/terms-and-conditions" className="hover:text-rose-900">Terms &amp; Conditions</Link>
         </nav>
+      </div>
+      <div className="border-t border-stone-200 px-4 py-4 text-center text-xs leading-relaxed text-stone-500">
+        <p>
+          Sold by {siteConfig.sellerName}, Surat, Gujarat, India · {siteConfig.supportEmail} · {siteConfig.supportPhone}
+        </p>
+        <p>
+          {siteConfig.grievanceOfficer}: <Link to="/contact" className="underline hover:text-rose-900">complaints &amp; contact</Link>
+        </p>
       </div>
       <div className="border-t border-stone-200 py-4 text-center text-xs text-stone-400">
         © {new Date().getFullYear()} {siteConfig.name}. All rights reserved. Made for Indian ethnic fashion lovers.

@@ -15,7 +15,8 @@ export default function CartPage() {
 
   function goToCheckout() {
     if (!user) {
-      navigate("/login", { state: { from: "/cart" } });
+      // Your items stay in the cart and move into your account when you sign in.
+      navigate("/login", { state: { from: "/checkout" } });
       return;
     }
     navigate("/checkout");
@@ -28,19 +29,7 @@ export default function CartPage() {
 
       {loading && <LoadingState label="Loading your cart…" />}
 
-      {!loading && !user && (
-        <EmptyState
-          title="Sign in to view your cart"
-          message="Create an account or sign in to add items and check out."
-          action={
-            <Link to="/login" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">
-              Sign in
-            </Link>
-          }
-        />
-      )}
-
-      {!loading && user && items.length === 0 && (
+      {!loading && items.length === 0 && (
         <EmptyState
           title="Your cart is empty"
           message="Explore our collections and add something beautiful."
@@ -52,7 +41,7 @@ export default function CartPage() {
         />
       )}
 
-      {!loading && user && items.length > 0 && (
+      {!loading && items.length > 0 && (
         <div className="grid gap-8 md:grid-cols-[1fr_320px]">
           <div>
             {items.map((item) => (
@@ -79,8 +68,11 @@ export default function CartPage() {
               onClick={goToCheckout}
               className="mt-5 w-full rounded-full bg-rose-900 py-3 text-sm font-semibold text-white transition hover:bg-rose-800"
             >
-              Proceed to Checkout
+              {user ? "Proceed to Checkout" : "Sign in to Checkout"}
             </button>
+            {!user && (
+              <p className="mt-2 text-center text-xs text-stone-500">Your cart is saved. Sign in or create an account to place the order.</p>
+            )}
           </div>
         </div>
       )}
