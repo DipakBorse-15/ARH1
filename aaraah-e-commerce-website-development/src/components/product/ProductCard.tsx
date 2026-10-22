@@ -68,7 +68,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
             {shown.color}
             {otherColourCount > 0 && (
               <span className="text-stone-400">
-                {shown.color ? " " : ""}(+{otherColourCount} more colour{otherColourCount > 1 ? "s" : ""})
+                {shown.color ? " " : ""}(+{otherColourCount} Color{otherColourCount > 1 ? "s" : ""})
               </span>
             )}
           </p>
