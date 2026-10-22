@@ -53,6 +53,19 @@ export default function OrderDetailPage() {
         <span className="font-medium capitalize text-stone-800">{order.status}</span>
       </p>
 
+      {(order.status === "shipped" || order.status === "delivered") && (order.courier_name || order.tracking_number) && (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900">
+          <h2 className="mb-1 font-semibold">{order.status === "delivered" ? "Delivered" : "Your order is on the way"}</h2>
+          {order.courier_name && <p>Courier: <b>{order.courier_name}</b></p>}
+          {order.tracking_number && <p>Tracking number: <b>{order.tracking_number}</b></p>}
+          {order.tracking_url && /^https?:\/\//i.test(order.tracking_url) && (
+            <a href={order.tracking_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block rounded-full bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+              Track package
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="mb-6 rounded-2xl border border-stone-200 p-5">
         <h2 className="mb-3 text-sm font-semibold text-stone-900">Items</h2>
         <div className="space-y-3">
@@ -96,6 +109,12 @@ export default function OrderDetailPage() {
               <span>Subtotal</span>
               <span>{formatINR(order.subtotal)}</span>
             </div>
+            {Number(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Coupon{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+                <span>− {formatINR(Number(order.discount_amount))}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Shipping</span>
               <span>{formatINR(order.shipping_fee)}</span>

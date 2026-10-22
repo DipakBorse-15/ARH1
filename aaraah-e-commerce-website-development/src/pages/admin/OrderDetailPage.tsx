@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { CancelOrderError, cancelOrder, fetchOrderById, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
+import { CancelOrderError, cancelOrder, fetchOrderById, saveShippingDetails, sendShippedEmail, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
@@ -17,6 +17,8 @@ export default function AdminOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [ship, setShip] = useState({ courier_name: "", tracking_number: "", tracking_url: "" });
+  const [shipBusy, setShipBusy] = useState(false);
 
   useEffect(() => {
     if (orderId) load(orderId);
@@ -27,7 +29,9 @@ export default function AdminOrderDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      setOrder(await fetchOrderById(id));
+      const o = await fetchOrderById(id);
+      setOrder(o);
+      if (o) setShip({ courier_name: o.courier_name || "", tracking_number: o.tracking_number || "", tracking_url: o.tracking_url || "" });
     } catch (err) {
       setError(friendlyError(err));
     } finally {
@@ -96,6 +100,34 @@ export default function AdminOrderDetailPage() {
     }
   }
 
+  // Courier + tracking. "Ship" also moves the order to shipped and emails the customer.
+  async function handleShipping(mode: "ship" | "save" | "resend") {
+    if (!order) return;
+    if (mode !== "resend") {
+      if (mode === "ship" && !ship.courier_name.trim()) return show("Enter the courier name first (e.g. India Post, Delhivery).", "error");
+      if (ship.tracking_url.trim() && !/^https?:\/\//i.test(ship.tracking_url.trim())) return show("Tracking link must start with http:// or https://", "error");
+    }
+    if (mode === "ship" && order.payment_status !== "paid" && !confirm("Payment is not marked received for this order. Mark it shipped anyway?")) return;
+    setShipBusy(true);
+    try {
+      if (mode !== "resend") {
+        const patch = await saveShippingDetails(order.id, ship, mode === "ship");
+        setOrder({ ...order, ...patch } as Order);
+      }
+      if (mode === "save") {
+        show("Shipping details saved", "success");
+      } else {
+        const ok = await sendShippedEmail(order.id);
+        if (ok) show(mode === "ship" ? "Marked shipped and customer emailed" : "Tracking email sent", "success");
+        else show(mode === "ship" ? "Marked shipped, but the email couldn't be sent." : "The email couldn't be sent.", "error");
+      }
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setShipBusy(false);
+    }
+  }
+
   // Fire-and-forget: a failed email shouldn't undo the payment confirmation
   // that already succeeded, so this only ever shows a soft warning toast.
   async function sendPaymentConfirmedEmail(id: string) {
@@ -149,6 +181,30 @@ export default function AdminOrderDetailPage() {
           </button>
         </div>
       </div>
+
+      {order.status !== "cancelled" && order.status !== "pending" && (
+        <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
+          <h2 className="mb-3 text-sm font-semibold text-stone-900">Shipping &amp; tracking</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input value={ship.courier_name} onChange={(e) => setShip({ ...ship, courier_name: e.target.value })} placeholder="Courier (e.g. Delhivery)" maxLength={60} className="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none" />
+            <input value={ship.tracking_number} onChange={(e) => setShip({ ...ship, tracking_number: e.target.value })} placeholder="Tracking number" maxLength={60} className="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none" />
+            <input value={ship.tracking_url} onChange={(e) => setShip({ ...ship, tracking_url: e.target.value })} placeholder="Tracking link (optional, https://…)" maxLength={300} className="rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none sm:col-span-2" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {order.status === "shipped" || order.status === "delivered" ? (
+              <>
+                <button disabled={shipBusy} onClick={() => handleShipping("save")} className="rounded-full border border-stone-300 px-4 py-2 text-xs font-medium text-stone-700 disabled:opacity-50">Save details</button>
+                <button disabled={shipBusy} onClick={() => handleShipping("ship")} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">Save &amp; email customer again</button>
+              </>
+            ) : (
+              <button disabled={shipBusy} onClick={() => handleShipping("ship")} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">
+                {shipBusy ? "Saving…" : "Mark shipped & email customer"}
+              </button>
+            )}
+          </div>
+          {order.shipped_at && <p className="mt-2 text-xs text-stone-400">Shipped on {new Date(order.shipped_at).toLocaleString("en-IN")}</p>}
+        </div>
+      )}
 
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
         <h2 className="mb-3 text-sm font-semibold text-stone-900">Items</h2>
@@ -222,6 +278,12 @@ export default function AdminOrderDetailPage() {
               <span>Subtotal</span>
               <span>{formatINR(order.subtotal)}</span>
             </div>
+            {Number(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>Coupon{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+                <span>− {formatINR(Number(order.discount_amount))}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Shipping</span>
               <span>{formatINR(order.shipping_fee)}</span>

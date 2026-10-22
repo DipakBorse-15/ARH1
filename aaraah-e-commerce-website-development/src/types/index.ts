@@ -202,6 +202,13 @@ export interface Order {
   /** UTR / transaction number the customer typed after paying by UPI. */
   payment_reference?: string | null;
   payment_reference_at?: string | null;
+  /** Coupon applied at checkout and the amount it took off (already included in `total`). */
+  coupon_code?: string | null;
+  discount_amount?: number | null;
+  courier_name?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  shipped_at?: string | null;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

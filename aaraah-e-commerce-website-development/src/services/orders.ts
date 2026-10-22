@@ -12,6 +12,7 @@ export interface CheckoutPayload {
   state: string;
   pincode: string;
   payment_method: "cod" | "upi";
+  coupon_code?: string;
 }
 
 export interface CreateOrderResponse {
@@ -162,4 +163,36 @@ export async function deleteOrderAdmin(orderId: string, code: string): Promise<v
 export async function resetOrdersAdmin(confirmText: string): Promise<void> {
   const { error } = await supabase.rpc("admin_reset_orders", { p_confirm: confirmText });
   if (error) throw new Error(rpcMessage(error));
+}
+
+export interface ShippingInput {
+  courier_name: string;
+  tracking_number: string;
+  tracking_url: string;
+}
+
+/** Admin: save courier/tracking details; with `markShipped` the order also becomes "shipped". */
+export async function saveShippingDetails(orderId: string, input: ShippingInput, markShipped: boolean): Promise<Partial<Order>> {
+  const patch: Record<string, unknown> = {
+    courier_name: input.courier_name.trim() || null,
+    tracking_number: input.tracking_number.trim() || null,
+    tracking_url: input.tracking_url.trim() || null,
+  };
+  if (markShipped) {
+    patch.status = "shipped";
+    patch.shipped_at = new Date().toISOString();
+  }
+  const { error } = await supabase.from("orders").update(patch).eq("id", orderId);
+  if (error) throw error;
+  return patch as Partial<Order>;
+}
+
+/** Admin: email the customer their tracking details. Returns false if the email could not be sent. */
+export async function sendShippedEmail(orderId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke("send-shipped-email", { body: { order_id: orderId } });
+    return !error && !data?.error;
+  } catch {
+    return false;
+  }
 }

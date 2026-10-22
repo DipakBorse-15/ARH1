@@ -1,3 +1,4 @@
+import { WishlistProvider } from "@/contexts/WishlistContext";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -39,6 +40,9 @@ const AdminCollectionsPage = lazy(() => import("@/pages/admin/CollectionsPage"))
 const AdminOrdersPage = lazy(() => import("@/pages/admin/OrdersPage"));
 const AdminImportPage = lazy(() => import("@/pages/admin/ImportPage"));
 const AdminHomeEditorPage = lazy(() => import("@/pages/admin/HomeEditorPage"));
+const WishlistPage = lazy(() => import("@/pages/account/WishlistPage"));
+const AdminCouponsPage = lazy(() => import("@/pages/admin/CouponsPage"));
+const AdminReviewsPage = lazy(() => import("@/pages/admin/ReviewsPage"));
 const AdminOrderDetailPage = lazy(() => import("@/pages/admin/OrderDetailPage"));
 
 // Normalize basename: BrowserRouter expects no trailing slash (except root "/").
@@ -51,6 +55,7 @@ export default function App() {
         <SiteSettingsProvider>
         <AuthProvider>
           <CartProvider>
+          <WishlistProvider>
             <ScrollToTop />
             <Suspense fallback={<LoadingState label="Loading AARAAH…" />}>
               <Routes>
@@ -80,6 +85,7 @@ export default function App() {
                     <Route path="account" element={<AccountPage />} />
                     <Route path="account/orders" element={<OrdersPage />} />
                     <Route path="account/orders/:orderId" element={<OrderDetailPage />} />
+                    <Route path="account/wishlist" element={<WishlistPage />} />
                     <Route path="account/addresses" element={<AddressesPage />} />
                   </Route>
 
@@ -98,11 +104,14 @@ export default function App() {
                     <Route path="categories" element={<AdminCategoriesPage />} />
                     <Route path="collections" element={<AdminCollectionsPage />} />
                     <Route path="orders" element={<AdminOrdersPage />} />
+                    <Route path="coupons" element={<AdminCouponsPage />} />
+                    <Route path="reviews" element={<AdminReviewsPage />} />
                     <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
                   </Route>
                 </Route>
               </Routes>
             </Suspense>
+          </WishlistProvider>
           </CartProvider>
         </AuthProvider>
         </SiteSettingsProvider>

@@ -8,6 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
 import { placeOrder } from "@/services/orders";
+import { previewCoupon } from "@/services/coupons";
 import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
@@ -110,7 +111,36 @@ export default function CheckoutPage() {
   // Must match SHIPPING_FEE in the create-order Edge Function exactly — this
   // number is only ever a preview, the server computes the order's real total.
   const shipping = 0;
-  const total = subtotal + shipping;
+  // Coupon: the discount shown here is a preview; the server re-checks the code and sets the real total.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponMsg, setCouponMsg] = useState<string | null>(null);
+  const discount = coupon ? Math.min(coupon.discount, subtotal) : 0;
+  const total = subtotal - discount + shipping;
+
+  // The cart changed after the code was applied: make the customer apply it again.
+  useEffect(() => {
+    if (coupon) {
+      setCoupon(null);
+      setCouponMsg("Your cart changed — please apply the coupon again.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal]);
+
+  async function applyCoupon() {
+    if (!couponInput.trim()) return;
+    setCouponBusy(true);
+    setCouponMsg(null);
+    try {
+      setCoupon(await previewCoupon(couponInput, subtotal));
+    } catch (err) {
+      setCoupon(null);
+      setCouponMsg(err instanceof Error ? err.message : "This coupon cannot be used.");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
 
   function applyAddress(a: Address) {
     setForm((f) => ({
@@ -185,6 +215,7 @@ export default function CheckoutPage() {
         state: form.state,
         pincode: form.pincode,
         payment_method: form.payment_method,
+        coupon_code: coupon?.code,
       });
 
       if (!directItem) await refresh();
@@ -310,11 +341,47 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+            <div className="mb-4 border-t border-stone-200 pt-3">
+              {coupon ? (
+                <p className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  <span>
+                    <b>{coupon.code}</b> applied — you save {formatINR(discount)}
+                  </span>
+                  <button type="button" onClick={() => { setCoupon(null); setCouponInput(""); setCouponMsg(null); }} className="text-xs underline">
+                    Remove
+                  </button>
+                </p>
+              ) : (
+                <div>
+                  <div className="flex gap-2">
+                    <input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
+                      placeholder="Coupon code"
+                      maxLength={30}
+                      aria-label="Coupon code"
+                      className="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm uppercase focus:border-rose-900 focus:outline-none"
+                    />
+                    <button type="button" onClick={applyCoupon} disabled={couponBusy || !couponInput.trim()} className="rounded-lg border border-rose-900 px-4 text-sm font-medium text-rose-900 hover:bg-rose-50 disabled:opacity-40">
+                      {couponBusy ? "…" : "Apply"}
+                    </button>
+                  </div>
+                  {couponMsg && <p className="mt-1.5 text-xs text-rose-700">{couponMsg}</p>}
+                </div>
+              )}
+            </div>
             <div className="space-y-2 border-t border-stone-200 pt-3 text-sm text-stone-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>{formatINR(subtotal)}</span>
               </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Coupon ({coupon?.code})</span>
+                  <span>− {formatINR(discount)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>Shipping</span>
                 <span>{shipping === 0 ? "Free" : formatINR(shipping)}</span>

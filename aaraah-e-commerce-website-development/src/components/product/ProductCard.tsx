@@ -1,3 +1,4 @@
+import { WishlistButton } from "@/components/product/WishlistButton";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PriceDisplay } from "./PriceDisplay";
@@ -51,6 +52,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
             Out of stock
           </span>
         )}
+        <WishlistButton variantId={shown.id} className="absolute bottom-2 right-2" />
         {product.collection?.name && (
           <span className="absolute right-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-rose-900">
             {product.collection.name}

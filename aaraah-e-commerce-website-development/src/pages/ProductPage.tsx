@@ -1,3 +1,4 @@
+import { WishlistButton } from "@/components/product/WishlistButton";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -15,6 +16,7 @@ import { fetchProductBySlug, fetchSimilarVariants, type SimilarItem } from "@/se
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
 import { deliveryWindowText } from "@/lib/delivery";
+import { ReviewsSection, Stars, useReviews } from "@/components/product/ReviewsSection";
 import type { ProductVariant, ProductWithVariants } from "@/types";
 
 function colorSlug(color: string | null) {
@@ -55,6 +57,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const rv = useReviews(product?.id);
 
   useEffect(() => {
     load();
@@ -219,6 +222,18 @@ export default function ProductPage() {
           description: product.description || undefined,
           image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
           url: `${siteConfig.url}/products/${product.slug}`,
+          ...(rv.count > 0
+            ? {
+                aggregateRating: { "@type": "AggregateRating", ratingValue: Number(rv.average.toFixed(1)), reviewCount: rv.count },
+                review: rv.reviews.slice(0, 5).map((r) => ({
+                  "@type": "Review",
+                  reviewRating: { "@type": "Rating", ratingValue: r.rating },
+                  author: { "@type": "Person", name: r.reviewer_name },
+                  reviewBody: r.body,
+                  datePublished: r.created_at.slice(0, 10),
+                })),
+              }
+            : {}),
           offers: {
             "@type": "Offer",
             priceCurrency: "INR",
@@ -239,8 +254,18 @@ export default function ProductPage() {
 
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-rose-900/70">{product.brand}</p>
-          <h1 className="mt-1 break-words text-2xl font-semibold text-stone-900 sm:text-3xl">{product.name}</h1>
+          <div className="mt-1 flex items-start justify-between gap-3">
+            <h1 className="min-w-0 break-words text-2xl font-semibold text-stone-900 sm:text-3xl">{product.name}</h1>
+            <WishlistButton variantId={selectedVariant.id} className="flex-shrink-0 border border-stone-200" />
+          </div>
           <p className="mt-1 text-xs text-stone-400">SKU: {selectedVariant.sku}</p>
+          {rv.count > 0 && (
+            <a href="#reviews" className="mt-2 inline-flex items-center gap-2 text-sm text-stone-600 hover:text-rose-900">
+              <Stars value={rv.average} />
+              <span className="font-medium">{rv.average.toFixed(1)}</span>
+              <span className="text-stone-400">({rv.count})</span>
+            </a>
+          )}
 
           <div className="mt-4">
             <PriceDisplay variant={selectedVariant} size="lg" />
@@ -354,6 +379,8 @@ export default function ProductPage() {
           </p>
         </div>
       </div>
+
+      <ReviewsSection productId={product.id} reviews={rv.reviews} average={rv.average} onChanged={rv.reload} />
 
       {similar.length > 0 && (
         <section className="mt-16">

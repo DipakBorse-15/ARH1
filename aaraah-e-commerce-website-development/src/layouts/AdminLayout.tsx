@@ -9,6 +9,8 @@ const links = [
   { to: "/admin/categories", label: "Categories" },
   { to: "/admin/collections", label: "Collections" },
   { to: "/admin/orders", label: "Orders" },
+  { to: "/admin/coupons", label: "Coupons" },
+  { to: "/admin/reviews", label: "Reviews" },
 ];
 
 export function AdminLayout() {
