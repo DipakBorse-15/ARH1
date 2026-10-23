@@ -32,10 +32,12 @@ export default async function handler(req, res) {
   const urls = STATIC_PATHS.map((p) => ({ loc: SITE + p, priority: p === "/" ? "1.0" : "0.3" }));
   try {
     if (base && key) {
-      const [cats, products] = await Promise.all([
+      const [cats, products, cols] = await Promise.all([
         rows(base, key, "categories", "slug"),
         rows(base, key, "products", "slug,updated_at"),
+        rows(base, key, "collections", "slug").catch(() => []),
       ]);
+      for (const c of cols) urls.push({ loc: `${SITE}/collection/${c.slug}`, priority: "0.7" });
       for (const c of cats) {
         urls.push({ loc: `${SITE}/category/${c.slug}`, priority: "0.8" });
         urls.push({ loc: `${SITE}/category/${c.slug}/all`, priority: "0.7" });

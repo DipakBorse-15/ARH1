@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchOrderById } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Order } from "@/types";
@@ -11,6 +11,8 @@ export function useLiveOrder(orderId: string | undefined) {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasOrder = useRef(false);
+  hasOrder.current = !!order;
 
   const refetch = useCallback(async () => {
     if (!orderId) return;
@@ -21,7 +23,8 @@ export function useLiveOrder(orderId: string | undefined) {
         prev && o && prev.status === o.status && prev.payment_status === o.payment_status && prev.payment_reference === o.payment_reference ? prev : o
       );
     } catch (err) {
-      setError((e) => e ?? friendlyError(err));
+      // A background refresh that fails (weak network) must not throw away an order that is already on screen.
+      if (!hasOrder.current) setError((e) => e ?? friendlyError(err));
     }
   }, [orderId]);
 
@@ -35,7 +38,11 @@ export function useLiveOrder(orderId: string | undefined) {
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  const waiting = !!order && (order.status === "pending" || (order.payment_method === "upi" && order.payment_status !== "paid"));
+  // A cancelled order never changes again (its payment stays "pending" for ever), so stop asking.
+  const waiting =
+    !!order &&
+    order.status !== "cancelled" &&
+    (order.status === "pending" || (order.payment_method === "upi" && order.payment_status !== "paid"));
 
   useEffect(() => {
     if (!waiting) return;

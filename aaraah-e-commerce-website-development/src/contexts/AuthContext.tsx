@@ -21,6 +21,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** Returns `prev` when `next` is the same, unchanged user (so React sees no change), otherwise `next`. */
+function sameUser(prev: User | null, next: User | null | undefined): User | null {
+  if (!next) return null;
+  if (prev && prev.id === next.id && prev.updated_at === next.updated_at && prev.email === next.email) return prev;
+  return next;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -40,7 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.from("profiles").update({ mobile: metaMobile }).eq("user_id", userId);
       if (!error) row = { ...row, mobile: metaMobile };
     }
-    setProfile(row);
+    // Same data as before -> keep the old object, so nothing re-renders or reloads for no reason.
+    setProfile((prev) => (prev && row && JSON.stringify(prev) === JSON.stringify(row) ? prev : row));
     profileUserId.current = userId;
   }
 
@@ -57,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      setUser(data.session?.user ?? null);
+      setUser((prev) => sameUser(prev, data.session?.user));
       if (data.session?.user) {
         await loadProfile(data.session.user.id, metaMobileOf(data.session.user));
       }
@@ -73,7 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (_event === "PASSWORD_RECOVERY") navigate("/reset-password", { replace: true });
       setSession(newSession);
-      setUser(newSession?.user ?? null);
+      // Supabase repeats SIGNED_IN with a brand-new user object whenever the tab is opened again or the
+      // token renews. If it is the same person, keep the old object: otherwise the cart, wishlist and
+      // checkout would reload (and flash a spinner) each time.
+      setUser((prev) => sameUser(prev, newSession?.user));
       if (newSession?.user) {
         const uid = newSession.user.id;
         if (profileUserId.current !== uid) {

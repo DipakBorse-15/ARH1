@@ -85,9 +85,9 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               <span className="w-fit rounded-full bg-white/10 px-[2cqw] py-[0.6cqw] text-[2cqw] font-medium tracking-wide sm:px-3 sm:py-1 sm:text-xs">
                 Handpicked Indian Ethnic Wear
               </span>
-              <h1 className="font-serif text-[4.6cqw] font-bold leading-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
+              <h2 className="font-serif text-[4.6cqw] font-bold leading-tight sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl">
                 Drape yourself in timeless Indian elegance
-              </h1>
+              </h2>
               <p className="max-w-md text-[2.3cqw] leading-snug text-rose-50/90 sm:text-sm sm:leading-normal 2xl:text-base">
                 Discover sarees, kurties, lehengas, dupattas and more, crafted for celebrations and everyday grace.
               </p>

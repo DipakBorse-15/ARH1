@@ -53,7 +53,13 @@ export default function CategoryPage() {
   if (slug && LEGACY_CATEGORY_SLUGS[slug]) return <Navigate to={`/category/${LEGACY_CATEGORY_SLUGS[slug]}`} replace />;
   if (loading) return <LoadingState label="Loading…" />;
   if (error) return <ErrorState message={error} onRetry={() => slug && load(slug)} />;
-  if (!category) return <ErrorState message="This page could not be found." />;
+  if (!category)
+    return (
+      <>
+        <SEO title="Page not found" canonicalPath="/404" />
+        <ErrorState message="This page could not be found." />
+      </>
+    );
 
   return (
     <div>
@@ -62,6 +68,9 @@ export default function CategoryPage() {
         description={category.description || `Shop ${category.name} at ${siteConfig.name}.`}
         canonicalPath={`/category/${category.slug}`}
       />
+
+      {/* The page's one real heading for Google (the banner text is not it). Not visible. */}
+      <h1 className="sr-only">{category.name} — {siteConfig.name}</h1>
 
       {/* Same banner as the Home page unless this category has banners of its own. */}
       <HeroCarousel slides={slides} />

@@ -145,7 +145,13 @@ export default function ProductPage() {
 
   if (loading) return <LoadingState label="Loading product…" />;
   if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!product || !selectedVariant) return <ErrorState message="Product not found." />;
+  if (!product || !selectedVariant)
+    return (
+      <>
+        <SEO title="Product not found" canonicalPath="/404" />
+        <ErrorState message="Product not found." />
+      </>
+    );
 
   // "Direct Purchase": opens WhatsApp with a ready message naming the exact product,
   // SKU, colour, quantity, price and page link. No login needed; order is handled manually.
@@ -209,7 +215,8 @@ export default function ProductPage() {
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-8 sm:px-6">
       <SEO
         title={`${product.name} — ${selectedVariant.color || ""}`}
-        description={product.description || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
+        description={activeDescription || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
+        ogType="product"
         image={selectedVariant.images?.[0]?.url}
         canonicalPath={`/products/${product.slug}`}
         jsonLd={{
@@ -219,7 +226,7 @@ export default function ProductPage() {
           brand: { "@type": "Brand", name: product.brand },
           sku: selectedVariant.sku,
           color: selectedVariant.color || undefined,
-          description: product.description || undefined,
+          description: activeDescription || undefined,
           image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
           url: `${siteConfig.url}/products/${product.slug}`,
           ...(rv.count > 0

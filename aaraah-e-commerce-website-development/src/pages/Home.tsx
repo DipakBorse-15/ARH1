@@ -28,6 +28,9 @@ export default function Home() {
         }}
       />
 
+      {/* The page's one real heading for Google (the banner text is not it). Not visible. */}
+      <h1 className="sr-only">{siteConfig.name} — Premium Indian Ethnic Wear Online</h1>
+
       <HeroCarousel slides={slides} />
 
       {!isSupabaseConfigured && (
