@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   // Which user's profile is already loaded (so token refreshes / tab focus do not show a spinner again).
   const profileUserId = useRef<string | null>(null);
 
@@ -62,7 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
+    // A password-reset email link can land on any page (e.g. the home page when the reset
+    // address is not allowed in Supabase). Always take the customer to the "new password" form.
+    if (/type=recovery/.test(window.location.hash) || /type=recovery/.test(window.location.search)) {
+      navigate("/reset-password", { replace: true });
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (_event === "PASSWORD_RECOVERY") navigate("/reset-password", { replace: true });
       setSession(newSession);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
