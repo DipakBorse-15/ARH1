@@ -19,6 +19,7 @@ export default function AdminOrderDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [ship, setShip] = useState({ courier_name: "", tracking_number: "", tracking_url: "" });
   const [shipBusy, setShipBusy] = useState(false);
+  const [command, setCommand] = useState("");
 
   useEffect(() => {
     if (orderId) load(orderId);
@@ -51,7 +52,10 @@ export default function AdminOrderDetailPage() {
     // and emails the customer.
     if (status === "cancelled") {
       if (order.status === "cancelled") return;
-      if (!confirm("Cancel this order? The customer will be emailed and the stock will be added back.")) return;
+      if (order.status === "delivered") {
+        show("A delivered order cannot be cancelled.", "error");
+        return;
+      }
       setUpdating(true);
       try {
         const res = await cancelOrder(order.id);
@@ -66,12 +70,20 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
-    // Moving an order backwards (or re-opening a cancelled one) is allowed but easy to do by mistake.
+    // Status only moves forward: pending → confirmed → processing → shipped → delivered.
     const rank = (s: OrderStatus) => STATUS_FLOW.indexOf(s);
     if (order.status === "cancelled") {
-      if (!confirm("This order is cancelled. Re-open it? The stock will be taken again (it fails if there is not enough stock).")) return;
-    } else if (rank(status) !== -1 && rank(order.status) !== -1 && rank(status) < rank(order.status)) {
-      if (!confirm(`Move this order BACK from "${order.status}" to "${status}"?`)) return;
+      show("This order is cancelled. A cancelled order cannot be changed.", "error");
+      return;
+    }
+    if (rank(status) <= rank(order.status)) {
+      show(`This order is already "${order.status}". Status cannot go back.`, "error");
+      return;
+    }
+    // Nothing ships (or is delivered) before the payment is confirmed.
+    if ((status === "shipped" || status === "delivered") && order.payment_status !== "paid" && order.payment_method !== "cod") {
+      show("Payment is not confirmed yet. Type \"confirm\" first.", "error");
+      return;
     }
 
     const alsoMarkPaid = status === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
@@ -100,17 +112,44 @@ export default function AdminOrderDetailPage() {
     }
   }
 
+  // Status is changed by typing a word, so it cannot happen by an accidental click.
+  const COMMANDS: Record<string, OrderStatus> = { confirm: "confirmed", process: "processing", delivered: "delivered", cancel: "cancelled" };
+  async function runCommand(e: React.FormEvent) {
+    e.preventDefault();
+    const word = command.trim().toLowerCase();
+    if (word === "shipped") {
+      show("To ship an order, fill the courier details below and press \"Mark shipped & email customer\".", "error");
+      return;
+    }
+    const target = COMMANDS[word];
+    if (!target) {
+      show("Type one of: confirm, process, delivered, cancel", "error");
+      return;
+    }
+    setCommand("");
+    await handleStatusChange(target);
+  }
+
   // Courier + tracking. "Ship" also moves the order to shipped and emails the customer.
-  async function handleShipping(mode: "ship" | "save" | "resend") {
+  async function handleShipping(mode: "ship" | "save" | "email") {
     if (!order) return;
-    if (mode !== "resend") {
+    if (mode === "ship") {
+      if (order.status === "shipped" || order.status === "delivered" || order.status === "cancelled" || order.status === "pending") {
+        show(order.status === "pending" ? "Confirm the order first (type \"confirm\")." : `This order is already ${order.status}.`, "error");
+        return;
+      }
+      if (order.payment_status !== "paid" && order.payment_method !== "cod") {
+        show("Payment is not confirmed yet. Type \"confirm\" first.", "error");
+        return;
+      }
+    }
+    {
       if (mode === "ship" && !ship.courier_name.trim()) return show("Enter the courier name first (e.g. India Post, Delhivery).", "error");
       if (ship.tracking_url.trim() && !/^https?:\/\//i.test(ship.tracking_url.trim())) return show("Tracking link must start with http:// or https://", "error");
     }
-    if (mode === "ship" && order.payment_status !== "paid" && !confirm("Payment is not marked received for this order. Mark it shipped anyway?")) return;
     setShipBusy(true);
     try {
-      if (mode !== "resend") {
+      {
         const patch = await saveShippingDetails(order.id, ship, mode === "ship");
         setOrder({ ...order, ...patch } as Order);
       }
@@ -118,7 +157,7 @@ export default function AdminOrderDetailPage() {
         show("Shipping details saved", "success");
       } else {
         const ok = await sendShippedEmail(order.id);
-        if (ok) show(mode === "ship" ? "Marked shipped and customer emailed" : "Tracking email sent", "success");
+        if (ok) show(mode === "ship" ? "Marked shipped and customer emailed" : "Details saved and tracking email sent", "success");
         else show(mode === "ship" ? "Marked shipped, but the email couldn't be sent." : "The email couldn't be sent.", "error");
       }
     } catch (err) {
@@ -153,33 +192,35 @@ export default function AdminOrderDetailPage() {
 
       <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
         <h2 className="mb-3 text-sm font-semibold text-stone-900">Update status</h2>
-        <div className="flex flex-wrap gap-2">
-          {STATUS_FLOW.map((s) => {
-            const needsPaymentConfirm = s === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
-            return (
-              <button
-                key={s}
-                disabled={updating}
-                onClick={() => handleStatusChange(s)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium capitalize disabled:opacity-50 ${
-                  order.status === s ? "bg-rose-900 text-white" : "border border-stone-300 text-stone-600"
-                }`}
-              >
-                {s}
-                {needsPaymentConfirm && " · confirm UPI payment"}
-              </button>
-            );
-          })}
-          <button
-            disabled={updating}
-            onClick={() => handleStatusChange("cancelled")}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
-              order.status === "cancelled" ? "bg-rose-700 text-white" : "border border-rose-300 text-rose-600"
-            }`}
-          >
-            Cancelled
-          </button>
-        </div>
+        <ol className="mb-4 flex flex-wrap gap-2 text-xs">
+          {STATUS_FLOW.map((s) => (
+            <li key={s} className={`rounded-full px-3 py-1.5 font-medium capitalize ${order.status === s ? "bg-rose-900 text-white" : STATUS_FLOW.indexOf(s) < STATUS_FLOW.indexOf(order.status) ? "bg-stone-100 text-stone-400 line-through" : "border border-stone-300 text-stone-600"}`}>
+              {s}
+            </li>
+          ))}
+          <li className={`rounded-full px-3 py-1.5 font-medium ${order.status === "cancelled" ? "bg-rose-700 text-white" : "border border-rose-200 text-rose-400"}`}>Cancelled</li>
+        </ol>
+        {order.status === "delivered" || order.status === "cancelled" ? (
+          <p className="text-xs text-stone-500">This order is {order.status}. No more changes are possible.</p>
+        ) : (
+          <form onSubmit={runCommand} className="flex flex-wrap items-center gap-2">
+            <input
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              disabled={updating}
+              placeholder="Type a command"
+              aria-label="Status command"
+              autoComplete="off"
+              className="w-48 rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none"
+            />
+            <button type="submit" disabled={updating || !command.trim()} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">
+              Go
+            </button>
+            <p className="w-full text-xs text-stone-500">
+              <b>confirm</b> = confirmed{order.payment_method === "upi" && order.payment_status !== "paid" ? " (also marks the UPI payment received)" : ""} · <b>process</b> = processing · <b>delivered</b> = delivered · <b>cancel</b> = cancelled. Shipping: use the box below. Status can only move forward.
+            </p>
+          </form>
+        )}
       </div>
 
       {order.status !== "cancelled" && order.status !== "pending" && (
@@ -194,7 +235,7 @@ export default function AdminOrderDetailPage() {
             {order.status === "shipped" || order.status === "delivered" ? (
               <>
                 <button disabled={shipBusy} onClick={() => handleShipping("save")} className="rounded-full border border-stone-300 px-4 py-2 text-xs font-medium text-stone-700 disabled:opacity-50">Save details</button>
-                <button disabled={shipBusy} onClick={() => handleShipping("ship")} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">Save &amp; email customer again</button>
+                <button disabled={shipBusy} onClick={() => handleShipping("email")} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">Save &amp; email tracking again</button>
               </>
             ) : (
               <button disabled={shipBusy} onClick={() => handleShipping("ship")} className="rounded-full bg-rose-900 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">
