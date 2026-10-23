@@ -92,16 +92,20 @@ export function Header() {
               </span>
               <span className={NAV_LINE} />
             </button>
-            <div className="invisible absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 translate-y-2 rounded-xl border border-amber-200/70 border-t-2 border-t-amber-600 bg-white py-2 opacity-0 shadow-xl shadow-rose-900/10 transition-all duration-300 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-              {collectionLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className="relative block px-6 py-2.5 text-[12.5px] tracking-[0.08em] text-stone-700 transition-all duration-300 before:absolute before:left-3 before:top-1/2 before:h-px before:w-0 before:bg-white before:transition-all before:duration-300 hover:bg-[#7a1730] hover:pl-8 hover:text-white hover:before:w-3.5"
-                >
-                  {link.label}
-                </Link>
-              ))}
+            {/* The outer box has no gap: its top padding keeps the hover alive while the mouse
+                travels from the button to the list, and the short delay stops it vanishing on a wobble. */}
+            <div className="invisible absolute left-1/2 top-full z-50 w-56 -translate-x-1/2 pt-1 opacity-0 transition-[opacity,visibility] delay-200 duration-200 group-focus-within:visible group-focus-within:opacity-100 group-focus-within:delay-0 group-hover:visible group-hover:opacity-100 group-hover:delay-0">
+              <div className="rounded-xl border border-amber-200/70 border-t-2 border-t-amber-600 bg-white py-2 shadow-xl shadow-rose-900/10">
+                {collectionLinks.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className="block px-5 py-2 text-[12px] font-normal tracking-[0.06em] text-stone-600 transition-colors duration-200 hover:bg-[#7a1730] hover:text-white"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </nav>

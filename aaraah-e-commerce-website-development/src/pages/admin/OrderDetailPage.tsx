@@ -52,8 +52,8 @@ export default function AdminOrderDetailPage() {
     // and emails the customer.
     if (status === "cancelled") {
       if (order.status === "cancelled") return;
-      if (order.status === "delivered") {
-        show("A delivered order cannot be cancelled.", "error");
+      if (order.status === "delivered" || order.status === "shipped") {
+        show(`A ${order.status} order cannot be cancelled.`, "error");
         return;
       }
       setUpdating(true);
@@ -101,6 +101,12 @@ export default function AdminOrderDetailPage() {
         await updateOrderStatus(order.id, status);
         setOrder({ ...order, status });
         show("Order status updated", "success");
+        // Delivered: thank-you + review request (soft failure only).
+        if (status === "delivered") {
+          sendShippedEmail(order.id, "delivered").then((ok) => {
+            if (!ok) show("Marked delivered, but the review-request email couldn't be sent.", "error");
+          });
+        }
         // COD has no payment step, so "Confirmed" is the customer's order-confirmation mail.
         if (firstConfirm && order.payment_method === "cod") sendPaymentConfirmedEmail(order.id);
       }

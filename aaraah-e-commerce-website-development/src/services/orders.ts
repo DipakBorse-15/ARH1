@@ -188,9 +188,9 @@ export async function saveShippingDetails(orderId: string, input: ShippingInput,
 }
 
 /** Admin: email the customer their tracking details. Returns false if the email could not be sent. */
-export async function sendShippedEmail(orderId: string): Promise<boolean> {
+export async function sendShippedEmail(orderId: string, kind: "shipped" | "delivered" = "shipped"): Promise<boolean> {
   try {
-    const { data, error } = await supabase.functions.invoke("send-shipped-email", { body: { order_id: orderId } });
+    const { data, error } = await supabase.functions.invoke("send-shipped-email", { body: { order_id: orderId, kind } });
     return !error && !data?.error;
   } catch {
     return false;

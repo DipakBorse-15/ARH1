@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCart } from "@/contexts/CartContext";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
@@ -17,6 +18,21 @@ export default function OrderDetailPage() {
   const { order, loading, error, refetch } = useLiveOrder(orderId);
   const { show } = useToast();
   const [cancelling, setCancelling] = useState(false);
+  const [rebuying, setRebuying] = useState(false);
+  const { addItem } = useCart();
+  const navigate = useNavigate();
+
+  // Puts every item of this order back into the cart (items that are gone or sold out are skipped with a message).
+  async function handleBuyAgain() {
+    if (!order?.items?.length) return;
+    setRebuying(true);
+    let added = 0;
+    for (const it of order.items) {
+      if (it.variant_id && (await addItem(it.variant_id, it.quantity))) added++;
+    }
+    setRebuying(false);
+    if (added > 0) navigate("/cart");
+  }
 
   async function handleCancel() {
     if (!order) return;
@@ -146,6 +162,16 @@ export default function OrderDetailPage() {
             className="rounded-full border border-rose-300 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
           >
             {cancelling ? "Cancelling…" : "Cancel order"}
+          </button>
+        </div>
+      )}
+
+      {(order.status === "delivered" || order.status === "cancelled") && order.items?.some((i) => i.variant_id) && (
+        <div className="mb-6 rounded-2xl border border-stone-200 p-5">
+          <h2 className="mb-1 text-sm font-semibold text-stone-900">{order.status === "delivered" ? "Loved it?" : "Still want these?"}</h2>
+          <p className="mb-3 text-xs text-stone-500">Add the same items to your cart again. Prices and stock are checked again.</p>
+          <button onClick={handleBuyAgain} disabled={rebuying} className="rounded-full bg-rose-900 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-800 disabled:opacity-50">
+            {rebuying ? "Adding…" : "Buy again"}
           </button>
         </div>
       )}
