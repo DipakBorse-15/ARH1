@@ -28,6 +28,7 @@ interface Payload {
   state: string;
   pincode: string;
   payment_method: "cod" | "upi";
+  coupon_code?: string;
 }
 
 const VALID_PAYMENT_METHODS = new Set(["cod", "upi"]);
@@ -102,6 +103,7 @@ Deno.serve(async (req) => {
     payload.city = clean(payload.city, 80);
     payload.state = clean(payload.state, 80);
     payload.pincode = clean(payload.pincode, 6);
+    const couponCode = clean(payload.coupon_code, 30).toUpperCase();
     if (!payload.full_name || !payload.address_line1 || !payload.city || !payload.state) {
       return json({ error: "Missing required address fields" }, 400);
     }
@@ -118,14 +120,15 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: recentOrders } = await admin
       .from("orders")
-      .select("id, order_number, total, items:order_items(variant_id, quantity)")
+      .select("id, order_number, total, coupon_code, items:order_items(variant_id, quantity)")
       .eq("user_id", userId)
       .eq("status", "pending")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5);
     const duplicate = (recentOrders || []).find(
-      (o: { items: { variant_id: string | null; quantity: number }[] }) => itemKey(o.items || []) === wantedKey
+      (o: { coupon_code: string | null; items: { variant_id: string | null; quantity: number }[] }) =>
+        itemKey(o.items || []) === wantedKey && (o.coupon_code || "") === couponCode
     );
     if (duplicate) {
       return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
@@ -175,7 +178,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    const total = subtotal + SHIPPING_FEE;
+    // ---- Coupon (re-checked here; the checkout page's preview is not trusted) ----
+    let couponId: string | null = null;
+    let appliedCode: string | null = null;
+    let discount = 0;
+    if (couponCode) {
+      const { data: c, error: couponError } = await admin.rpc("compute_coupon", {
+        p_code: couponCode,
+        p_user: userId,
+        p_subtotal: subtotal,
+      });
+      if (couponError) return json({ error: couponError.message || "This coupon cannot be used" }, 400);
+      const row = Array.isArray(c) ? c[0] : c;
+      if (!row) return json({ error: "This coupon cannot be used" }, 400);
+      couponId = row.coupon_id;
+      appliedCode = row.code;
+      discount = Math.min(Number(row.discount) || 0, subtotal);
+    }
+
+    const total = subtotal - discount + SHIPPING_FEE;
 
     const { data: orderNumberData } = await admin.rpc("generate_order_number");
     const orderNumber = orderNumberData as string;
@@ -199,6 +220,8 @@ Deno.serve(async (req) => {
         status: "pending",
         subtotal,
         shipping_fee: SHIPPING_FEE,
+        coupon_code: appliedCode,
+        discount_amount: discount,
         total,
       })
       .select()
@@ -212,6 +235,17 @@ Deno.serve(async (req) => {
       // Don't leave an empty order behind.
       await admin.from("orders").delete().eq("id", order.id);
       return json({ error: "Could not save your order. Please try again." }, 500);
+    }
+
+    // Record the coupon use. A cancelled/expired order stops counting automatically.
+    if (couponId) {
+      const { error: redeemError } = await admin
+        .from("coupon_redemptions")
+        .insert({ coupon_id: couponId, order_id: order.id, user_id: userId });
+      if (redeemError) {
+        await admin.from("orders").delete().eq("id", order.id);
+        return json({ error: "Could not apply the coupon. Please try again." }, 500);
+      }
     }
 
     // Decrement stock atomically per-variant (never touches other colors).
@@ -250,7 +284,7 @@ Deno.serve(async (req) => {
     await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
 
     // "Order received" email — best effort, never blocks or fails the order.
-    await sendOrderReceivedEmail(order, orderItems, total).catch((e) => console.error("order email failed", e));
+    await sendOrderReceivedEmail(order, orderItems, total, discount, appliedCode).catch((e) => console.error("order email failed", e));
 
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {
@@ -266,7 +300,9 @@ const esc = (s: unknown) =>
 async function sendOrderReceivedEmail(
   order: { id: string; order_number: string; full_name: string; email: string },
   items: Record<string, unknown>[],
-  total: number
+  total: number,
+  discount = 0,
+  couponCode: string | null = null
 ) {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key || !order.email) return;
@@ -283,6 +319,7 @@ async function sendOrderReceivedEmail(
       <h2 style="color:#7a1730">We received your order — ${esc(order.order_number)}</h2>
       <p>Hi ${esc(order.full_name)}, thank you for shopping with AARAAH.</p>
       <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
+      ${discount > 0 ? `<p style="color:#047857;margin:0">Coupon ${esc(couponCode)}: −₹${esc(discount)}</p>` : ""}
       <p style="font-weight:bold">Total: ₹${esc(total)}</p>
       <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
       Orders without payment are cancelled automatically after 3 hours so the stock can go to other customers.</p>
