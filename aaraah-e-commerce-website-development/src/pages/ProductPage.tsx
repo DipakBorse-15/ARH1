@@ -16,6 +16,7 @@ import { fetchProductBySlug, fetchSimilarVariants, type SimilarItem } from "@/se
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
 import { deliveryWindowText } from "@/lib/delivery";
+import { categoryHref } from "@/lib/categoryLinks";
 import { ReviewsSection, Stars, useReviews } from "@/components/product/ReviewsSection";
 import type { ProductVariant, ProductWithVariants } from "@/types";
 
@@ -214,41 +215,73 @@ export default function ProductPage() {
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-8 sm:px-6">
       <SEO
-        title={`${product.name} — ${selectedVariant.color || ""}`}
-        description={activeDescription || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
+        title={product.seo_title?.trim() || `${product.name}${selectedVariant.color ? ` — ${selectedVariant.color}` : ""}`}
+        description={product.seo_description?.trim() || activeDescription || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
         ogType="product"
         image={selectedVariant.images?.[0]?.url}
         canonicalPath={`/products/${product.slug}`}
         jsonLd={{
           "@context": "https://schema.org",
-          "@type": "Product",
-          name: product.name,
-          brand: { "@type": "Brand", name: product.brand },
-          sku: selectedVariant.sku,
-          color: selectedVariant.color || undefined,
-          description: activeDescription || undefined,
-          image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
-          url: `${siteConfig.url}/products/${product.slug}`,
-          ...(rv.count > 0
-            ? {
-                aggregateRating: { "@type": "AggregateRating", ratingValue: Number(rv.average.toFixed(1)), reviewCount: rv.count },
-                review: rv.reviews.slice(0, 5).map((r) => ({
-                  "@type": "Review",
-                  reviewRating: { "@type": "Rating", ratingValue: r.rating },
-                  author: { "@type": "Person", name: r.reviewer_name },
-                  reviewBody: r.body,
-                  datePublished: r.created_at.slice(0, 10),
-                })),
-              }
-            : {}),
-          offers: {
-            "@type": "Offer",
-            priceCurrency: "INR",
-            price: sellingPrice,
-            url: `${siteConfig.url}/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`,
-            availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-            itemCondition: "https://schema.org/NewCondition",
-          },
+          "@graph": [
+            {
+              "@type": "Product",
+              name: product.name,
+              brand: { "@type": "Brand", name: product.brand },
+              sku: selectedVariant.sku,
+              color: selectedVariant.color || undefined,
+              description: activeDescription || undefined,
+              image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
+              url: `${siteConfig.url}/products/${product.slug}`,
+              ...(rv.count > 0
+                ? {
+                    aggregateRating: { "@type": "AggregateRating", ratingValue: Number(rv.average.toFixed(1)), reviewCount: rv.count },
+                    review: rv.reviews.slice(0, 5).map((r) => ({
+                      "@type": "Review",
+                      reviewRating: { "@type": "Rating", ratingValue: r.rating },
+                      author: { "@type": "Person", name: r.reviewer_name },
+                      reviewBody: r.body,
+                      datePublished: r.created_at.slice(0, 10),
+                    })),
+                  }
+                : {}),
+              offers: {
+                "@type": "Offer",
+                priceCurrency: "INR",
+                price: sellingPrice,
+                url: `${siteConfig.url}/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`,
+                availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                itemCondition: "https://schema.org/NewCondition",
+                seller: { "@type": "Organization", name: siteConfig.name },
+                // Same promises as the Shipping Policy and Returns pages.
+                shippingDetails: {
+                  "@type": "OfferShippingDetails",
+                  shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "INR" },
+                  shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+                  deliveryTime: {
+                    "@type": "ShippingDeliveryTime",
+                    handlingTime: { "@type": "QuantitativeValue", minValue: 1, maxValue: 3, unitCode: "DAY" },
+                    transitTime: { "@type": "QuantitativeValue", minValue: 5, maxValue: 7, unitCode: "DAY" },
+                  },
+                },
+                hasMerchantReturnPolicy: {
+                  "@type": "MerchantReturnPolicy",
+                  applicableCountry: "IN",
+                  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+                  merchantReturnDays: 7,
+                },
+              },
+            },
+            {
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
+                ...(product.category
+                  ? [{ "@type": "ListItem", position: 2, name: product.category.name, item: `${siteConfig.url}${categoryHref(product.category.slug)}` }]
+                  : []),
+                { "@type": "ListItem", position: product.category ? 3 : 2, name: product.name },
+              ],
+            },
+          ],
         }}
       />
 

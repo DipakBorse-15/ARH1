@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
+import { SeoFields } from "@/components/admin/SeoFields";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchCategories } from "@/services/categories";
@@ -299,6 +300,14 @@ export default function ProductFormPage() {
           onChange={(e) => setProduct({ ...product, description: e.target.value })}
           className={`${inputClass} sm:col-span-2`}
           rows={3}
+        />
+        <SeoFields
+          title={product.seo_title ?? ""}
+          description={product.seo_description ?? ""}
+          onTitle={(v) => setProduct({ ...product, seo_title: v })}
+          onDescription={(v) => setProduct({ ...product, seo_description: v })}
+          fallbackTitle={product.name || ""}
+          fallbackDescription={product.description || ""}
         />
         <textarea
           placeholder="Bullet points — one per line (e.g. Pure silk fabric)"

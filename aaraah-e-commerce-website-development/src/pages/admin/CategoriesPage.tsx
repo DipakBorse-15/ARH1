@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { resizeImage } from "@/lib/imageResize";
 import { SEO } from "@/components/ui/SEO";
+import { SeoFields } from "@/components/admin/SeoFields";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAllCategoriesAdmin, upsertCategory, deleteCategory, countProductsInCategory } from "@/services/categories";
@@ -99,6 +100,14 @@ export default function AdminCategoriesPage() {
           value={form.description ?? ""}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className={`${inputClass} sm:col-span-2`}
+        />
+        <SeoFields
+          title={form.seo_title ?? ""}
+          description={form.seo_description ?? ""}
+          onTitle={(v) => setForm({ ...form, seo_title: v })}
+          onDescription={(v) => setForm({ ...form, seo_description: v })}
+          fallbackTitle={form.name || ""}
+          fallbackDescription={form.description || ""}
         />
         <div className="sm:col-span-2 flex items-center gap-3">
           <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} className="text-sm" />

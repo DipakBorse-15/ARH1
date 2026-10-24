@@ -22,6 +22,9 @@ export interface Category {
   slug: string;
   description: string | null;
   image: string | null;
+  /** Optional text for Google (empty = use name / description). */
+  seo_title?: string | null;
+  seo_description?: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -33,6 +36,9 @@ export interface Collection {
   slug: string;
   description: string | null;
   image: string | null;
+  /** Optional text for Google (empty = use name / description). */
+  seo_title?: string | null;
+  seo_description?: string | null;
   /** Optional image used on phones (< 640px) instead of `image`. */
   mobile_image?: string | null;
   /** Position on the website: 1 = first. Set from Admin → Collections (▲ ▼). */
@@ -72,6 +78,9 @@ export interface Product {
   name: string;
   slug: string;
   description: string | null;
+  /** Optional text for Google (empty = use name / description). */
+  seo_title?: string | null;
+  seo_description?: string | null;
   bullet_points: string[];
   category_id: string | null;
   collection_id: string | null;

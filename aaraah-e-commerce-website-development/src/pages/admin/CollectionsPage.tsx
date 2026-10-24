@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { resizeImage } from "@/lib/imageResize";
 import { SEO } from "@/components/ui/SEO";
+import { SeoFields } from "@/components/admin/SeoFields";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAllCollectionsAdmin, upsertCollection, deleteCollection, setCollectionPosition, countItemsInCollection } from "@/services/collections";
@@ -123,6 +124,14 @@ export default function AdminCollectionsPage() {
           value={form.description ?? ""}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           className={`${inputClass} sm:col-span-2`}
+        />
+        <SeoFields
+          title={form.seo_title ?? ""}
+          description={form.seo_description ?? ""}
+          onTitle={(v) => setForm({ ...form, seo_title: v })}
+          onDescription={(v) => setForm({ ...form, seo_description: v })}
+          fallbackTitle={form.name || ""}
+          fallbackDescription={form.description || ""}
         />
         <div className="sm:col-span-2">
           <p className="mb-1 text-xs font-medium text-stone-600">Web (laptop) image</p>

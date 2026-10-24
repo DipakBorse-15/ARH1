@@ -64,9 +64,17 @@ export default function CategoryPage() {
   return (
     <div>
       <SEO
-        title={category.name}
-        description={category.description || `Shop ${category.name} at ${siteConfig.name}.`}
+        title={category.seo_title?.trim() || category.name}
+        description={category.seo_description?.trim() || category.description || `Shop ${category.name} at ${siteConfig.name}.`}
         canonicalPath={`/category/${category.slug}`}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
+            { "@type": "ListItem", position: 2, name: category.name },
+          ],
+        }}
       />
 
       {/* The page's one real heading for Google (the banner text is not it). Not visible. */}

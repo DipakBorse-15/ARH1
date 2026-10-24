@@ -20,6 +20,11 @@ export const siteConfig = {
   grievanceOfficer: "Grievance Officer, Aaraah Fashion",
   // WhatsApp Business number for "Direct Purchase" (country code + number, digits only).
   whatsappNumber: "919898352989",
+  // Public profiles (footer links + "sameAs" in the Organization data Google reads).
+  social: {
+    instagram: "https://www.instagram.com/a.aaraah/",
+    facebook: "https://www.facebook.com/profile.php?id=61579910732665",
+  },
   // Manual UPI collection: customer scans this on the confirmation page,
   // admin marks the order "paid" by hand once the payment is seen. Set the
   // real values via VITE_UPI_ID / VITE_UPI_PAYEE_NAME before going live.

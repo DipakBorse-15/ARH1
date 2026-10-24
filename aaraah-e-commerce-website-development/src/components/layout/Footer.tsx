@@ -12,6 +12,17 @@ export function Footer() {
         <div className="col-span-2 md:col-span-1">
           <p className="font-serif text-2xl font-bold text-rose-900">{siteConfig.name}</p>
           <p className="mt-2 text-sm text-stone-500">{siteConfig.tagline}</p>
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-stone-600">
+            <a href={siteConfig.social.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-rose-900">
+              Instagram
+            </a>
+            <a href={siteConfig.social.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-rose-900">
+              Facebook
+            </a>
+            <a href={`https://wa.me/${siteConfig.whatsappNumber}`} target="_blank" rel="noopener noreferrer" className="hover:text-rose-900">
+              WhatsApp
+            </a>
+          </div>
         </div>
         <div>
           <h4 className="mb-3 text-sm font-semibold text-stone-900">Shop</h4>

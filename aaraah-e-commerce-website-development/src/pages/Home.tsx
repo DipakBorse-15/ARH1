@@ -4,10 +4,12 @@ import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { StorefrontSections } from "@/components/home/StorefrontSections";
 import { siteConfig, isSupabaseConfigured } from "@/config/site";
 import { fetchActiveHeroSlides } from "@/services/heroSlides";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { HeroSlide } from "@/types";
 
 export default function Home() {
   const [slides, setSlides] = useState<HeroSlide[]>([]);
+  const { settings } = useSiteSettings();
 
   useEffect(() => {
     fetchActiveHeroSlides()
@@ -22,9 +24,38 @@ export default function Home() {
         description="Shop premium sarees, kurties, kurta sets, lehengas, dupattas and more. Elegant, modern Indian ethnic fashion delivered across India."
         jsonLd={{
           "@context": "https://schema.org",
-          "@type": "Organization",
-          name: siteConfig.name,
-          url: siteConfig.url,
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": `${siteConfig.url}/#organization`,
+              name: siteConfig.name,
+              url: siteConfig.url,
+              logo: settings?.logo_url || `${siteConfig.url}/icon-512.png`,
+              email: siteConfig.supportEmail,
+              telephone: siteConfig.supportPhone,
+              sameAs: [siteConfig.social.instagram, siteConfig.social.facebook],
+              address: { "@type": "PostalAddress", addressLocality: "Surat", addressRegion: "Gujarat", addressCountry: "IN" },
+              contactPoint: {
+                "@type": "ContactPoint",
+                telephone: siteConfig.supportPhone,
+                contactType: "customer service",
+                areaServed: "IN",
+                availableLanguage: ["English", "Hindi"],
+              },
+            },
+            {
+              "@type": "WebSite",
+              "@id": `${siteConfig.url}/#website`,
+              url: siteConfig.url,
+              name: siteConfig.name,
+              publisher: { "@id": `${siteConfig.url}/#organization` },
+              potentialAction: {
+                "@type": "SearchAction",
+                target: { "@type": "EntryPoint", urlTemplate: `${siteConfig.url}/search?q={search_term_string}` },
+                "query-input": "required name=search_term_string",
+              },
+            },
+          ],
         }}
       />
 

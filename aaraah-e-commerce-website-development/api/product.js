@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
   let product;
   try {
-    const select = "name,slug,brand,description,variants:product_variants(color,price,sale_price,stock_quantity,is_available,active,sort_order,images:product_images(url,sort_order))";
+    const select = "name,slug,brand,description,seo_title,seo_description,variants:product_variants(color,price,sale_price,stock_quantity,is_available,active,sort_order,images:product_images(url,sort_order))";
     const r = await fetch(
       `${base}/rest/v1/products?select=${encodeURIComponent(select)}&slug=eq.${encodeURIComponent(slug)}&active=eq.true&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
@@ -59,8 +59,10 @@ export default async function handler(req, res) {
   const price = v ? (v.sale_price != null && v.sale_price < v.price ? v.sale_price : v.price) : null;
   const inStock = !!v && v.is_available && v.stock_quantity > 0;
 
-  const title = `${product.name}${v && v.color ? ` - ${v.color}` : ""} | AARAAH`;
-  const plain = String(product.description || "").replace(/\s+/g, " ").trim();
+  const title = String(product.seo_title || "").trim()
+    ? (/aaraah/i.test(product.seo_title) ? String(product.seo_title).trim() : `${String(product.seo_title).trim()} | AARAAH`)
+    : `${product.name}${v && v.color ? ` - ${v.color}` : ""} | AARAAH`;
+  const plain = String(product.seo_description || product.description || "").replace(/\s+/g, " ").trim();
   const description = (plain || `${product.name} by ${product.brand || "AARAAH"}. Free shipping across India.`).slice(0, 200);
   const url = `${SITE}/products/${encodeURIComponent(product.slug)}${variantParam ? `?variant=${encodeURIComponent(variantParam)}` : ""}`;
 
