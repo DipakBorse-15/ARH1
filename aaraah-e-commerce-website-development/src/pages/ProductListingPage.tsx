@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { FilterPanel, SortDropdown } from "@/components/product/FilterSort";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { fetchCategoryBySlug } from "@/services/categories";
-import { fetchCollectionBySlug } from "@/services/collections";
+import { fetchCollectionBySlug, fetchSlugForOldCollectionSlug } from "@/services/collections";
 import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { categoryHref } from "@/lib/categoryLinks";
@@ -26,6 +26,7 @@ const LEGACY_CATEGORY_SLUGS: Record<string, string> = {
 export function ProductListingPage({ mode }: { mode: Mode }) {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const query = searchParams.get("q") || "";
   // "More Products" from a category page opens the collection narrowed to that category.
   const categoryParam = searchParams.get("category") || undefined;
@@ -78,6 +79,15 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
       } else if (mode === "collection" && slug) {
         const col = await fetchCollectionBySlug(slug);
         if (stale()) return;
+        if (!col) {
+          // Old web address of a collection whose slug was corrected: send the visitor to the new one.
+          const newSlug = await fetchSlugForOldCollectionSlug(slug).catch(() => null);
+          if (stale()) return;
+          if (newSlug && newSlug !== slug) {
+            navigate(`/collection/${newSlug}${window.location.search}`, { replace: true });
+            return;
+          }
+        }
         setTaxonomy(col);
         if (!col) {
           setProducts([]);

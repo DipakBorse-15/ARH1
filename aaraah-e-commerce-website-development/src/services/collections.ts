@@ -11,6 +11,13 @@ export async function fetchCollections(): Promise<Collection[]> {
   return data as Collection[];
 }
 
+/** The current slug of a collection that used to have `oldSlug` as its web address (or null). */
+export async function fetchSlugForOldCollectionSlug(oldSlug: string): Promise<string | null> {
+  const { data, error } = await supabase.from("collections").select("slug").contains("old_slugs", [oldSlug]).eq("active", true).limit(1).maybeSingle();
+  if (error) throw error;
+  return data?.slug ?? null;
+}
+
 export async function fetchCollectionBySlug(slug: string): Promise<Collection | null> {
   const { data, error } = await supabase
     .from("collections")

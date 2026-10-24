@@ -35,6 +35,8 @@ export interface Collection {
   image: string | null;
   /** Optional image used on phones (< 640px) instead of `image`. */
   mobile_image?: string | null;
+  /** Earlier web addresses; they redirect to the current slug. */
+  old_slugs?: string[] | null;
   /** Position on the website: 1 = first. Set from Admin → Collections (▲ ▼). */
   sort_order?: number;
   active: boolean;
