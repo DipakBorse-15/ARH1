@@ -12,17 +12,15 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
-import { fetchProductBySlug, fetchSimilarVariants, type SimilarItem } from "@/services/products";
+import { fetchProductBySlug, fetchSimilarVariants, fetchSlugForOldSlug, type SimilarItem } from "@/services/products";
+import { colorSlug } from "@/lib/slugs";
+import { variantSeoDescription, variantSeoTitle } from "@/lib/seoText";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
 import { deliveryWindowText } from "@/lib/delivery";
 import { categoryHref } from "@/lib/categoryLinks";
 import { ReviewsSection, Stars, useReviews } from "@/components/product/ReviewsSection";
 import type { ProductVariant, ProductWithVariants } from "@/types";
-
-function colorSlug(color: string | null) {
-  return (color || "").toLowerCase().trim().replace(/\s+/g, "-");
-}
 
 function CartIcon() {
   return (
@@ -72,6 +70,12 @@ export default function ProductPage() {
     try {
       const data = await fetchProductBySlug(slug);
       if (!data) {
+        // An older web address of a product whose address was shortened: send the visitor to the new one.
+        const newSlug = await fetchSlugForOldSlug(slug).catch(() => null);
+        if (newSlug && newSlug !== slug) {
+          navigate(`/products/${newSlug}${window.location.search}`, { replace: true });
+          return;
+        }
         setProduct(null);
         return;
       }
@@ -212,14 +216,17 @@ export default function ProductPage() {
     });
   }
 
+  // Every colour has its own address (and canonical): /products/<slug>?variant=<colour>
+  const variantPath = `/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`;
+
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-8 sm:px-6">
       <SEO
-        title={product.seo_title?.trim() || `${product.name}${selectedVariant.color ? ` — ${selectedVariant.color}` : ""}`}
-        description={product.seo_description?.trim() || activeDescription || `${product.name} by ${product.brand}, available at ${siteConfig.name}.`}
+        title={variantSeoTitle(product, selectedVariant)}
+        description={variantSeoDescription(product, selectedVariant)}
         ogType="product"
         image={selectedVariant.images?.[0]?.url}
-        canonicalPath={`/products/${product.slug}`}
+        canonicalPath={variantPath}
         jsonLd={{
           "@context": "https://schema.org",
           "@graph": [
@@ -231,7 +238,7 @@ export default function ProductPage() {
               color: selectedVariant.color || undefined,
               description: activeDescription || undefined,
               image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
-              url: `${siteConfig.url}/products/${product.slug}`,
+              url: `${siteConfig.url}${variantPath}`,
               ...(rv.count > 0
                 ? {
                     aggregateRating: { "@type": "AggregateRating", ratingValue: Number(rv.average.toFixed(1)), reviewCount: rv.count },
@@ -248,7 +255,7 @@ export default function ProductPage() {
                 "@type": "Offer",
                 priceCurrency: "INR",
                 price: sellingPrice,
-                url: `${siteConfig.url}/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`,
+                url: `${siteConfig.url}${variantPath}`,
                 availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
                 itemCondition: "https://schema.org/NewCondition",
                 seller: { "@type": "Organization", name: siteConfig.name },

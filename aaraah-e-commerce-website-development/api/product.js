@@ -1,6 +1,8 @@
 // Vercel serverless function: serves a tiny HTML page with the right title, image and
 // price for ONE product, only to link-preview bots (WhatsApp, Facebook, Telegram...).
 // vercel.json routes those bots here; normal visitors and Google get the regular site.
+import { colorSlug, variantSeoDescription, variantSeoTitle } from "./_lib/seoText.js";
+
 const SITE = "https://aaraah.in";
 
 const esc = (s) =>
@@ -10,8 +12,6 @@ const esc = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-
-const colorSlug = (c) => String(c || "").toLowerCase().trim().replace(/\s+/g, "-");
 
 function html(res, status, body, cache) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
   let product;
   try {
-    const select = "name,slug,brand,description,seo_title,seo_description,variants:product_variants(color,price,sale_price,stock_quantity,is_available,active,sort_order,images:product_images(url,sort_order))";
+    const select = "name,slug,brand,description,category:categories(name),variants:product_variants(color,fabric_type,work_type,work_pattern,best_for,included_components,price,sale_price,stock_quantity,is_available,active,sort_order,images:product_images(url,sort_order))";
     const r = await fetch(
       `${base}/rest/v1/products?select=${encodeURIComponent(select)}&slug=eq.${encodeURIComponent(slug)}&active=eq.true&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } }
@@ -45,6 +45,19 @@ export default async function handler(req, res) {
     if (!r.ok) return notFound();
     const rows = await r.json();
     product = rows && rows[0];
+    if (!product) {
+      // Older web address of a product whose address was shortened -> permanent redirect to the new one.
+      const o = await fetch(
+        `${base}/rest/v1/products?select=slug&old_slugs=cs.${encodeURIComponent(`{${slug}}`)}&active=eq.true&limit=1`,
+        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+      );
+      const found = o.ok ? await o.json() : [];
+      if (found && found[0] && found[0].slug) {
+        res.setHeader("Location", `/products/${encodeURIComponent(found[0].slug)}${variantParam ? `?variant=${encodeURIComponent(variantParam)}` : ""}`);
+        res.setHeader("Cache-Control", "s-maxage=3600");
+        return res.status(301).send("");
+      }
+    }
   } catch {
     return notFound();
   }
@@ -59,12 +72,12 @@ export default async function handler(req, res) {
   const price = v ? (v.sale_price != null && v.sale_price < v.price ? v.sale_price : v.price) : null;
   const inStock = !!v && v.is_available && v.stock_quantity > 0;
 
-  const title = String(product.seo_title || "").trim()
-    ? (/aaraah/i.test(product.seo_title) ? String(product.seo_title).trim() : `${String(product.seo_title).trim()} | AARAAH`)
-    : `${product.name}${v && v.color ? ` - ${v.color}` : ""} | AARAAH`;
-  const plain = String(product.seo_description || product.description || "").replace(/\s+/g, " ").trim();
-  const description = (plain || `${product.name} by ${product.brand || "AARAAH"}. Free shipping across India.`).slice(0, 200);
-  const url = `${SITE}/products/${encodeURIComponent(product.slug)}${variantParam ? `?variant=${encodeURIComponent(variantParam)}` : ""}`;
+  // Same text the website itself shows (shared file api/_lib/seoText.js).
+  const seoVariant = v || {};
+  const core = variantSeoTitle(product, seoVariant);
+  const title = /aaraah/i.test(core) ? core : `${core} | AARAAH`;
+  const description = variantSeoDescription(product, seoVariant);
+  const url = `${SITE}/products/${encodeURIComponent(product.slug)}${v && v.color ? `?variant=${encodeURIComponent(colorSlug(v.color))}` : ""}`;
 
   const jsonLd = {
     "@context": "https://schema.org",

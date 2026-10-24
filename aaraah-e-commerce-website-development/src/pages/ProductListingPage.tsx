@@ -9,6 +9,7 @@ import { fetchCollectionBySlug } from "@/services/collections";
 import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { categoryHref } from "@/lib/categoryLinks";
+import { listingSeoDescription } from "@/lib/seoText";
 import type { Category, Collection, ProductWithVariants } from "@/types";
 
 type Mode = "category" | "collection" | "search";
@@ -126,7 +127,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <SEO title={taxonomy?.seo_title?.trim() || heading} description={taxonomy?.seo_description?.trim() || taxonomy?.description || `Shop ${heading} at AARAAH.`} canonicalPath={mode === "search" ? "/search" : `/${mode}/${slug || ""}${mode === "category" ? "/all" : ""}`} />
+      <SEO title={heading} description={listingSeoDescription(heading, taxonomy?.description)} canonicalPath={mode === "search" ? "/search" : `/${mode}/${slug || ""}${mode === "category" ? "/all" : ""}`} />
       <h1 className="mb-1 font-serif text-3xl font-semibold text-stone-900">{heading}</h1>
       {taxonomy?.description && <p className="mb-6 max-w-2xl text-sm text-stone-500">{taxonomy.description}</p>}
       {mode === "search" && !query && <p className="mb-6 text-sm text-stone-500">Type a search term to find products.</p>}

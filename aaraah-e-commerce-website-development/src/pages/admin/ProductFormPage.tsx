@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
-import { SeoFields } from "@/components/admin/SeoFields";
 import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchCategories } from "@/services/categories";
@@ -55,6 +54,8 @@ export default function ProductFormPage() {
   const [newVariant, setNewVariant] = useState(EMPTY_VARIANT);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  // The web address the product had when it was opened: if it is changed, the old one keeps redirecting.
+  const savedSlug = useRef<string | null>(null);
 
   useEffect(() => {
     fetchCategories().then(setCategories).catch(() => {});
@@ -71,6 +72,7 @@ export default function ProductFormPage() {
       const data = await fetchProductByIdAdmin(productId);
       if (data) {
         setProduct(data);
+        savedSlug.current = data.slug;
         setBulletsText((data.bullet_points || []).join("\n"));
         setVariants(data.variants);
       }
@@ -90,7 +92,11 @@ export default function ProductFormPage() {
         slug: product.slug || slugify(product.name || ""),
         bullet_points: bulletsText.split("\n").map((s) => s.trim()).filter(Boolean),
       };
+      if (savedSlug.current && payload.slug !== savedSlug.current) {
+        payload.old_slugs = Array.from(new Set([...(product.old_slugs || []), savedSlug.current]));
+      }
       const saved = await upsertProduct(payload);
+      savedSlug.current = saved.slug;
       show("Product saved", "success");
       if (isNew) {
         navigate(`/admin/products/${saved.id}`, { replace: true });
@@ -300,14 +306,6 @@ export default function ProductFormPage() {
           onChange={(e) => setProduct({ ...product, description: e.target.value })}
           className={`${inputClass} sm:col-span-2`}
           rows={3}
-        />
-        <SeoFields
-          title={product.seo_title ?? ""}
-          description={product.seo_description ?? ""}
-          onTitle={(v) => setProduct({ ...product, seo_title: v })}
-          onDescription={(v) => setProduct({ ...product, seo_description: v })}
-          fallbackTitle={product.name || ""}
-          fallbackDescription={product.description || ""}
         />
         <textarea
           placeholder="Bullet points — one per line (e.g. Pure silk fabric)"

@@ -256,7 +256,7 @@ export default function AdminProductsPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-2xl font-semibold text-stone-900">Products</h1>
         <Link to="/admin/products/new" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">
-          + New Product Design
+          + New listing
         </Link>
       </div>
 

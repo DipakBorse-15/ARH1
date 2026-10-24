@@ -35,6 +35,8 @@ const AddressesPage = lazy(() => import("@/pages/account/AddressesPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/admin/DashboardPage"));
 const AdminProductsPage = lazy(() => import("@/pages/admin/ProductsPage"));
 const AdminProductFormPage = lazy(() => import("@/pages/admin/ProductFormPage"));
+const AdminNewListingPage = lazy(() => import("@/pages/admin/NewListingPage"));
+const AdminSeoCheckPage = lazy(() => import("@/pages/admin/SeoCheckPage"));
 const AdminCategoriesPage = lazy(() => import("@/pages/admin/CategoriesPage"));
 const AdminCollectionsPage = lazy(() => import("@/pages/admin/CollectionsPage"));
 const AdminOrdersPage = lazy(() => import("@/pages/admin/OrdersPage"));
@@ -96,7 +98,8 @@ export default function App() {
                   <Route path="admin" element={<AdminLayout />}>
                     <Route index element={<AdminDashboardPage />} />
                     <Route path="products" element={<AdminProductsPage />} />
-                    <Route path="products/new" element={<AdminProductFormPage />} />
+                    <Route path="products/new" element={<AdminNewListingPage />} />
+                    <Route path="seo-check" element={<AdminSeoCheckPage />} />
                     <Route path="products/:id" element={<AdminProductFormPage />} />
                     <Route path="import" element={<AdminImportPage />} />
                     <Route path="home-editor" element={<AdminHomeEditorPage />} />

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { resizeImage } from "@/lib/imageResize";
+import { shortSlug } from "@/lib/slugs";
 import type { Collection, Product, ProductVariant, ProductWithVariants } from "@/types";
 
 const PRODUCT_SELECT = `
@@ -229,6 +230,72 @@ export async function fetchProductBySlug(slug: string): Promise<ProductWithVaria
   return sortVariantImages(data as ProductWithVariants);
 }
 
+export interface ParentOption {
+  id: string;
+  name: string;
+  parent_sku: string | null;
+  category_id: string | null;
+  collection_id: string | null;
+  slug: string;
+  variants: Pick<ProductVariant, "id" | "color" | "sku">[];
+}
+
+/** All parents (groups) for the "which parent?" picker in Admin -> New listing. */
+export async function fetchParentOptions(): Promise<ParentOption[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id,name,parent_sku,category_id,collection_id,slug,variants:product_variants(id,color,sku)")
+    .order("name")
+    .limit(2000);
+  if (error) throw error;
+  return (data || []) as ParentOption[];
+}
+
+/** Creates a parent (group only: no photos, no price). Short web address from name + parent SKU. */
+export async function createParent(input: {
+  name: string;
+  parent_sku: string;
+  category_id: string | null;
+  collection_id: string | null;
+  brand: string;
+}): Promise<Product> {
+  const base = shortSlug(input.name, input.parent_sku) || "product";
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const slug = attempt === 1 ? base : `${base}-${attempt}`;
+    const { data, error } = await supabase
+      .from("products")
+      .insert({ ...input, slug, bullet_points: [], active: true })
+      .select()
+      .single();
+    if (!error) return data as Product;
+    lastError = error;
+    // 23505 = unique violation; only the slug is worth retrying (parent SKU clash must be reported).
+    if ((error as { code?: string }).code !== "23505" || !/slug/i.test(error.message || "")) break;
+  }
+  throw lastError;
+}
+
+/** The newest colour of a parent, used to pre-fill "Aur ek colour jodo". */
+export async function fetchLastVariantOf(productId: string): Promise<ProductVariant | null> {
+  const { data, error } = await supabase
+    .from("product_variants")
+    .select("*")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ProductVariant) || null;
+}
+
+/** The current slug of a product that used to have `oldSlug` as its web address (or null). */
+export async function fetchSlugForOldSlug(oldSlug: string): Promise<string | null> {
+  const { data, error } = await supabase.from("products").select("slug").contains("old_slugs", [oldSlug]).eq("active", true).limit(1).maybeSingle();
+  if (error) throw error;
+  return data?.slug ?? null;
+}
+
 export interface SimilarItem {
   product: ProductWithVariants;
   variant: ProductVariant;
@@ -365,6 +432,18 @@ export async function fetchProductByIdAdmin(id: string): Promise<ProductWithVari
   if (error) throw error;
   if (!data) return null;
   return sortVariantImages(data as ProductWithVariants);
+}
+
+/** Every parent with all its colours, read in pages of 500 (the database returns at most 1000 rows per request). */
+export async function fetchAllProductsPaged(): Promise<ProductWithVariants[]> {
+  const out: ProductWithVariants[] = [];
+  for (let from = 0; from < 20000; from += 500) {
+    const { data, error } = await supabase.from("products").select(PRODUCT_SELECT).order("created_at", { ascending: false }).order("id").range(from, from + 499);
+    if (error) throw error;
+    out.push(...(((data || []) as ProductWithVariants[]).map(sortVariantImages)));
+    if (!data || data.length < 500) break;
+  }
+  return out;
 }
 
 export async function fetchAllProductsAdmin(): Promise<ProductWithVariants[]> {

@@ -8,6 +8,7 @@ import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchActiveHeroSlides } from "@/services/heroSlides";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
+import { categorySeoTitle, listingSeoDescription } from "@/lib/seoText";
 import type { Category, HeroSlide } from "@/types";
 
 // Old category URLs (before the 6-category restructure) keep working.
@@ -64,8 +65,8 @@ export default function CategoryPage() {
   return (
     <div>
       <SEO
-        title={category.seo_title?.trim() || category.name}
-        description={category.seo_description?.trim() || category.description || `Shop ${category.name} at ${siteConfig.name}.`}
+        title={categorySeoTitle(category.name)}
+        description={listingSeoDescription(category.name, category.description)}
         canonicalPath={`/category/${category.slug}`}
         jsonLd={{
           "@context": "https://schema.org",

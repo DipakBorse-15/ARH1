@@ -6,6 +6,7 @@ const links = [
   { to: "/admin/products", label: "Products" },
   { to: "/admin/home-editor", label: "Home Page" },
   { to: "/admin/import", label: "Import" },
+  { to: "/admin/seo-check", label: "SEO Check" },
   { to: "/admin/categories", label: "Categories" },
   { to: "/admin/collections", label: "Collections" },
   { to: "/admin/orders", label: "Orders" },

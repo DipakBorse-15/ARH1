@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { useToast } from "@/contexts/ToastContext";
+import { shortSlug } from "@/lib/slugs";
 
 /**
  * Bulk import from the AARAAH "Uploader.xlsx" template (see its Details sheet
@@ -290,7 +291,7 @@ export default function ImportPage() {
               brand: "AARAAH",
               parent_sku: p.parentSku,
               name: p.name,
-              slug: `${slugify(p.name)}-${slugify(p.parentSku)}`,
+              slug: shortSlug(p.name, p.parentSku),
               category_id: categoryId,
               active: true,
             })
