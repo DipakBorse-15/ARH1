@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Backup only. The live sitemap (always up to date) is at https://aaraah.in/api/sitemap -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://aaraah.in/</loc><priority>1.0</priority></url>
-  <url><loc>https://aaraah.in/category/sarees</loc><priority>0.8</priority></url>
-  <url><loc>https://aaraah.in/about</loc><priority>0.3</priority></url>
-  <url><loc>https://aaraah.in/contact</loc><priority>0.3</priority></url>
-  <url><loc>https://aaraah.in/faq</loc><priority>0.3</priority></url>
-</urlset>
