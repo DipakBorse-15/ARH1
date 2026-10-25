@@ -49,7 +49,7 @@ src/
 
 supabase/
   migrations/       SQL schema, RLS policies, storage policies, seed taxonomy
-  functions/        Edge Functions: create-order, create-payment, verify-payment
+  functions/        Edge Functions: create-order, cancel-order, send-payment-confirmed-email, send-shipped-email, send-expired-emails
 
 .github/workflows/deploy.yml   GitHub Actions → GitHub Pages
 public/                        robots.txt, sitemap.xml (static hosting SEO)
@@ -151,14 +151,15 @@ In the Supabase SQL editor (or via `supabase db push` with the CLI), run the fil
 
 ```bash
 supabase functions deploy create-order
-supabase functions deploy create-payment
-supabase functions deploy verify-payment
+supabase functions deploy cancel-order
+supabase functions deploy send-payment-confirmed-email
+supabase functions deploy send-shipped-email
+supabase functions deploy send-expired-emails --no-verify-jwt
 ```
 
 `create-order` re-validates price/stock/availability server-side before creating an order and
 decrementing variant-specific inventory — the browser is never trusted with money.
-`create-payment` / `verify-payment` are ready-to-extend stubs for a real Indian payment gateway
-(see §7).
+Payments are manual UPI for now (see §7); there is no online payment gateway function.
 
 ---
 
@@ -195,15 +196,16 @@ Supabase Edge Function secrets (set with `supabase secrets set`, never in GitHub
 
 ## 7. Payment Architecture
 
-Checkout currently supports **Cash on Delivery** end-to-end (real order creation, real stock
-decrement, real order records). Online payment is architected but intentionally **not faked**:
+Checkout currently supports **manual UPI** only (Cash on Delivery is switched off):
 
-- `create-payment` and `verify-payment` Edge Functions are stubs that return a clear
-  "gateway not configured" response instead of pretending payment succeeded.
-- To go live with Razorpay/Cashfree/PhonePe: implement the gateway order-creation call in
-  `create-payment` using a server-side secret, verify the signature in `verify-payment`, and only
-  then mark `orders.payment_status = 'paid'`. No frontend changes are required beyond calling
-  the existing `supabase.functions.invoke(...)` pattern already used in `src/services/orders.ts`.
+- The customer sees a UPI QR after placing the order and enters the UTR / transaction number.
+- The admin checks the money in their own UPI app / bank and confirms the payment in
+  Admin -> Orders (this marks the order paid and emails the customer).
+- Unpaid UPI orders with no UTR are cancelled automatically after 3 hours (database job
+  `expire_unpaid_orders`), the stock is put back, and the customer is emailed by `send-expired-emails`.
+- There is deliberately no gateway function in the repo. If a gateway (Razorpay/Cashfree/PhonePe) is
+  added later, create-order/verify functions must verify the gateway's signature with a server-side
+  secret BEFORE marking an order paid.
 
 ---
 
