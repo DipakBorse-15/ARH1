@@ -283,8 +283,9 @@ Deno.serve(async (req) => {
     // Clear purchased items from the cart.
     await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
 
-    // "Order received" email — best effort, never blocks or fails the order.
-    await sendOrderReceivedEmail(order, orderItems, total, discount, appliedCode).catch((e) => console.error("order email failed", e));
+    // No email at placement on purpose: the customer gets the "Payment received" email (send-payment-confirmed-email)
+    // once the payment is confirmed, or the "Order cancelled" email if it is not paid within 3 hours.
+    // (sendOrderReceivedEmail below is kept but no longer called.)
 
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {

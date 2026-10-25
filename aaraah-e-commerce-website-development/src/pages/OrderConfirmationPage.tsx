@@ -24,17 +24,43 @@ export default function OrderConfirmationPage() {
     );
   }, [orderForTracking]);
 
-  if (loading) return <LoadingState label="Confirming your order…" />;
+  if (loading) return <LoadingState label="Loading your order…" />;
   if (error) return <ErrorState message={error} />;
+
+  const shownNumber = order?.order_number || orderNumber;
+  const isCancelled = order?.status === "cancelled";
+  // Paid UPI orders (or cash-on-delivery, which is confirmed at once) get the thank-you; an unpaid UPI order waits.
+  const isPaid = !!order && (order.payment_status === "paid" || order.payment_method === "cod");
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6">
-      <SEO title="Order Confirmed" canonicalPath="/order-confirmation" />
-      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-3xl">✓</div>
-      <h1 className="font-serif text-3xl font-semibold text-stone-900">Thank you for your order!</h1>
-      <p className="mt-2 text-stone-500">
-        Order <span className="font-semibold text-stone-800">{order?.order_number || orderNumber}</span> has been placed successfully.
-      </p>
+      <SEO title="Your Order" canonicalPath="/order-confirmation" />
+      {isCancelled ? (
+        <>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-stone-100 text-3xl text-stone-600">✕</div>
+          <h1 className="font-serif text-3xl font-semibold text-stone-900">Order cancelled</h1>
+          <p className="mt-2 text-stone-500">
+            Order <span className="font-semibold text-stone-800">{shownNumber}</span> has been cancelled. If you had already paid, we will contact you about the refund.
+          </p>
+        </>
+      ) : isPaid ? (
+        <>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-3xl">✓</div>
+          <h1 className="font-serif text-3xl font-semibold text-stone-900">Thank you for your order!</h1>
+          <p className="mt-2 text-stone-500">
+            Order <span className="font-semibold text-stone-800">{shownNumber}</span> is confirmed.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-3xl">⏳</div>
+          <h1 className="font-serif text-3xl font-semibold text-stone-900">Order placed</h1>
+          <p className="mt-2 text-stone-500">
+            Order <span className="font-semibold text-stone-800">{shownNumber}</span> is waiting for payment confirmation.
+          </p>
+          <p className="mt-2 text-sm font-semibold text-amber-800">Please do not refresh or close this page. It updates by itself once your payment is confirmed.</p>
+        </>
+      )}
 
       {order && (
         <div className="mt-8 rounded-2xl border border-stone-200 p-5 text-left">

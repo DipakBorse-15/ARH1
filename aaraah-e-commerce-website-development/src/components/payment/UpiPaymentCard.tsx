@@ -110,6 +110,18 @@ export function UpiPaymentCard({ order, onSubmitted }: { order: Order; onSubmitt
               {sending ? "Sending…" : "Submit"}
             </button>
           </div>
+          <p className="mt-3 rounded-lg bg-white/70 p-2.5 text-[11px] text-stone-700">
+            <span className="font-semibold">Can't find or send the UTR number?</span> No problem. Send a screenshot of your payment on WhatsApp{" "}
+            <a
+              href={`https://wa.me/${siteConfig.whatsappNumber}?text=${encodeURIComponent(`Hi, I have paid for order ${order.order_number}. Payment screenshot attached.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-rose-900 underline"
+            >
+              {siteConfig.supportPhone}
+            </a>{" "}
+            (or email {siteConfig.supportEmail}) with your order number {order.order_number}.
+          </p>
           <p className={`mt-3 text-[11px] ${timeOver ? "font-medium text-rose-700" : "text-stone-500"}`}>
             {timeOver
               ? `The ${UNPAID_HOURS}-hour payment time is over. If you have already paid, enter your number above right away; otherwise this order may be cancelled.`

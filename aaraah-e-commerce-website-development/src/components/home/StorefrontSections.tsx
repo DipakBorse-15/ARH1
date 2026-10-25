@@ -166,7 +166,10 @@ function CollectionTiles({ collections, categorySlug, comingSoonIds }: { collect
         return (
           <div
             key={gi}
-            className={`grid grid-rows-2 gap-3 ${MOBILE_BLOCK_HEIGHT} sm:mx-auto sm:h-auto sm:w-[95%] sm:grid-rows-[repeat(2,188px)] sm:gap-4 lg:grid-rows-[repeat(2,269px)] ${layout.grid}`}
+            className={
+              layout.wrap ||
+              `grid grid-rows-2 gap-3 ${MOBILE_BLOCK_HEIGHT} sm:mx-auto sm:h-auto sm:w-[95%] sm:grid-rows-[repeat(2,188px)] sm:gap-4 lg:grid-rows-[repeat(2,269px)] ${layout.grid}`
+            }
           >
             {group.map((c, i) => (
               <CollectionTile
@@ -174,6 +177,7 @@ function CollectionTiles({ collections, categorySlug, comingSoonIds }: { collect
                 collection={c}
                 href={collectionHref(c.slug, categorySlug)}
                 cell={layout.cells[i]}
+                compact={group.length === 3}
                 comingSoon={comingSoonIds?.has(c.id)}
                 delay={Math.min(gi * 4 + i, 9) * 90}
               />
@@ -215,7 +219,10 @@ function CornerLeaf({ className = "" }: { className?: string }) {
 
 // Phone: plain 2-column grid (2 rows). sm and up: the bento from the diagram above.
 // Static class strings (not built dynamically) so Tailwind keeps every one of them.
-const BENTO: Record<number, { grid: string; cells: string[] }> = {
+// Width : height of a tile in the 3- and 2-collection layouts (5 : 7). Close to a normal portrait photo.
+const TILE_ASPECT = "aspect-[5/7]";
+
+const BENTO: Record<number, { grid: string; cells: string[]; wrap?: string }> = {
   4: {
     grid: "grid-cols-2 sm:grid-cols-[1fr_1.2fr_1fr]",
     cells: [
@@ -225,17 +232,19 @@ const BENTO: Record<number, { grid: string; cells: string[] }> = {
       "sm:col-start-3 sm:row-start-1 sm:row-span-2",
     ],
   },
+  // 3 and 2 collections stay in COLUMNS on every screen (phone too). Each tile keeps one fixed
+  // portrait shape (TILE_ASPECT) instead of a fixed height, so a narrow phone column gets a
+  // proportionally shorter tile and the photo is hardly ever cropped.
   3: {
-    grid: "grid-cols-2 sm:grid-cols-[1fr_1.2fr]",
-    cells: [
-      "sm:col-start-1 sm:row-start-1 sm:row-span-2",
-      "sm:col-start-2 sm:row-start-1",
-      "col-span-2 sm:col-span-1 sm:col-start-2 sm:row-start-2",
-    ],
+    grid: "",
+    wrap: "grid grid-cols-3 gap-2 sm:mx-auto sm:w-[95%] sm:gap-4",
+    cells: [TILE_ASPECT, TILE_ASPECT, TILE_ASPECT],
   },
+  // Two tiles are exactly as wide as two of the three-column tiles, centred.
   2: {
-    grid: "grid-cols-2 sm:grid-cols-2",
-    cells: ["row-span-2 sm:col-start-1 sm:row-start-1", "row-span-2 sm:col-start-2 sm:row-start-1"],
+    grid: "",
+    wrap: "grid grid-cols-2 gap-3 sm:mx-auto sm:w-[calc((190%_-_1rem)/3)] sm:gap-4",
+    cells: [TILE_ASPECT, TILE_ASPECT],
   },
   1: {
     grid: "grid-cols-2 sm:grid-cols-1 sm:max-w-md",
@@ -243,7 +252,7 @@ const BENTO: Record<number, { grid: string; cells: string[] }> = {
   },
 };
 
-function CollectionTile({ collection: c, href, cell, delay, comingSoon }: { collection: Collection; href: string; cell: string; delay: number; comingSoon?: boolean }) {
+function CollectionTile({ collection: c, href, cell, delay, comingSoon, compact }: { collection: Collection; href: string; cell: string; delay: number; comingSoon?: boolean; compact?: boolean }) {
   return (
     <div className={`${cell} animate-fade-rise-in min-h-0`} style={{ animationDelay: `${delay}ms` }}>
       <Link
@@ -272,7 +281,7 @@ function CollectionTile({ collection: c, href, cell, delay, comingSoon }: { coll
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent transition-opacity duration-500 group-hover:from-rose-950/80" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 px-1.5 pb-3 text-center transition-transform duration-500 ease-out group-hover:-translate-y-1.5 sm:gap-1.5 sm:px-3 sm:pb-5">
-          <span className="line-clamp-2 font-serif text-sm font-semibold leading-tight text-white drop-shadow-md sm:text-xl lg:text-2xl">
+          <span className={`line-clamp-2 font-serif font-semibold leading-tight text-white drop-shadow-md sm:text-xl lg:text-2xl ${compact ? "text-xs" : "text-sm"}`}>
             {c.name}
           </span>
           <span className="h-0.5 w-0 rounded-full bg-white/90 transition-all duration-500 group-hover:w-10 sm:group-hover:w-16" />
