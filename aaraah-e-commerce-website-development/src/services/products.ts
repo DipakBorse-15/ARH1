@@ -108,49 +108,6 @@ export function collectSizes(products: ProductWithVariants[]): string[] {
   return Array.from(set).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, undefined, { numeric: true }));
 }
 
-/**
- * Every colour and size that exists in a category / collection / search result, ignoring the
- * colour, size, price and page the visitor has already picked. The filter list is built from this,
- * so it never shrinks after one option is chosen and never depends on which page of 12 is open.
- */
-export async function fetchFilterOptions(scope: { categorySlug?: string; collectionSlug?: string; search?: string }): Promise<{ colors: string[]; sizes: string[] }> {
-  let categoryId: string | null = null;
-  if (scope.categorySlug) {
-    const { data: cat } = await supabase.from("categories").select("id").eq("slug", scope.categorySlug).maybeSingle();
-    if (!cat) return { colors: [], sizes: [] };
-    categoryId = cat.id;
-  }
-  let collectionId: string | null = null;
-  if (scope.collectionSlug) {
-    const { data: col } = await supabase.from("collections").select("id").eq("slug", scope.collectionSlug).maybeSingle();
-    if (!col) return { colors: [], sizes: [] };
-    collectionId = col.id;
-  }
-  const safeSearch = (scope.search || "").replace(/[,()%*\\"':;]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
-
-  const colors = new Set<string>();
-  const sizes: ProductWithVariants[] = [];
-  for (let offset = 0; offset < 20000; offset += 1000) {
-    let q = supabase
-      .from("product_variants")
-      .select("color,attributes,active,collection_id,products!inner(collection_id,category_id,active)")
-      .eq("active", true)
-      .eq("products.active", true);
-    if (categoryId) q = q.eq("products.category_id", categoryId);
-    if (safeSearch) q = q.or(`name.ilike.%${safeSearch}%,brand.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`, { foreignTable: "products" });
-    const { data, error } = await q.order("id").range(offset, offset + 999);
-    if (error) throw error;
-    const rows = (data || []) as unknown as Array<ProductVariant & { products: Product }>;
-    for (const v of rows) {
-      if (collectionId && variantCollectionId(v.products, v) !== collectionId) continue;
-      if (v.color) colors.add(v.color);
-      sizes.push({ variants: [v] } as unknown as ProductWithVariants);
-    }
-    if (rows.length < 1000) break;
-  }
-  return { colors: Array.from(colors).sort((a, b) => a.localeCompare(b)), sizes: collectSizes(sizes) };
-}
-
 export function productMinPrice(product: ProductWithVariants): number {
   const active = product.variants.filter((v) => v.active);
   if (!active.length) return 0;

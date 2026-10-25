@@ -14,6 +14,9 @@ interface Row {
 }
 
 const BUCKET = "product-images";
+// Shrinking (which replaces and deletes old photos) is switched off on purpose until the measured sizes
+// have been reviewed. The page only measures, which downloads nothing.
+const ENABLE_SHRINK = false;
 const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
 const kb = (n: number) => `${Math.round(n / 1024)} KB`;
 
@@ -136,7 +139,7 @@ export default function PhotoOptimizerPage() {
       <SEO title="Photo Optimizer" canonicalPath="/admin/photo-optimizer" />
       <h1 className="mb-1 font-serif text-2xl font-semibold text-stone-900">Photo Optimizer</h1>
       <p className="mb-4 max-w-2xl text-sm text-stone-600">
-        Purani badi product photos ko chhota karta hai (1600 px WebP, naye upload jaisa). Pehle sirf size naapta hai (koi download nahi), phir tum bataoge to badi photos chhoti karega.
+        Purani badi product photos ko chhota karta hai (1600 px WebP, naye upload jaisa). Abhi ye sirf size naapta hai (koi download nahi, koi photo badalti ya delete nahi hoti).
         Total product photos: {rows.length}.
       </p>
 
@@ -163,7 +166,7 @@ export default function PhotoOptimizerPage() {
           <p className="mt-1">
             {limitKb >= 1000 ? `${limitKb / 1024} MB` : `${limitKb} KB`} se badi: <b>{big.length}</b> photos ({mb(bigTotal)}).
           </p>
-          {big.length > 0 && (
+          {ENABLE_SHRINK && big.length > 0 && (
             <button onClick={optimise} disabled={running || scanning} className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
               {running ? `Chhoti ho rahi hain… ${done}/${big.length}` : `Step 2: ${big.length} badi photos chhoti karo`}
             </button>

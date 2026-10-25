@@ -6,7 +6,7 @@ import { FilterPanel, SortDropdown } from "@/components/product/FilterSort";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchCollectionBySlug, fetchSlugForOldCollectionSlug } from "@/services/collections";
-import { collectSizes, fetchFilterOptions, fetchProducts, type ProductFilters } from "@/services/products";
+import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { categoryHref } from "@/lib/categoryLinks";
 import { listingSeoDescription } from "@/lib/seoText";
@@ -111,26 +111,8 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
     }
   }
 
-  // Colour / size options come from the WHOLE category / collection / search (not the 12 products
-  // on screen), fetched once per page, so choosing one never shrinks the list. The options seen
-  // on screen are merged in as a fallback in case that lookup fails.
-  const [scopeOptions, setScopeOptions] = useState<{ key: string; colors: string[]; sizes: string[] }>({ key: "", colors: [], sizes: [] });
-  useEffect(() => {
-    let cancelled = false;
-    const scope = {
-      categorySlug: mode === "category" ? slug : categoryParam,
-      collectionSlug: mode === "collection" ? slug : undefined,
-      search: mode === "search" ? query : undefined,
-    };
-    if (mode === "search" && !query) return;
-    fetchFilterOptions(scope)
-      .then((o) => !cancelled && setScopeOptions({ key: pageKey, ...o }))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [pageKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Colour / size options are remembered for the whole visit of this page, so picking one
+  // colour does not make the other colours disappear from the filter list.
   const [optionPool, setOptionPool] = useState<{ key: string; colors: string[]; sizes: string[] }>({ key: pageKey, colors: [], sizes: [] });
   useEffect(() => {
     setOptionPool((prev) => {
@@ -145,14 +127,8 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
       return { key: pageKey, colors: Array.from(colors), sizes: Array.from(sizes) };
     });
   }, [products, pageKey, filters.color, filters.size]);
-  const availableColors = useMemo(() => {
-    const set = new Set<string>([...(scopeOptions.key === pageKey ? scopeOptions.colors : []), ...(optionPool.key === pageKey ? optionPool.colors : [])]);
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [scopeOptions, optionPool, pageKey]);
-  const availableSizes = useMemo(() => {
-    const merged = new Set<string>([...(scopeOptions.key === pageKey ? scopeOptions.sizes : []), ...(optionPool.key === pageKey ? optionPool.sizes : [])]);
-    return collectSizes([{ variants: Array.from(merged).map((sz) => ({ active: true, attributes: { size: sz } })) }] as unknown as ProductWithVariants[]);
-  }, [scopeOptions, optionPool, pageKey]);
+  const availableColors = useMemo(() => (optionPool.key === pageKey ? optionPool.colors : []), [optionPool, pageKey]);
+  const availableSizes = useMemo(() => (optionPool.key === pageKey ? optionPool.sizes : []), [optionPool, pageKey]);
 
   const heading = mode === "search" ? `Search results for "${query}"` : taxonomy?.name || "Products";
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
