@@ -21,7 +21,7 @@ export default function Home() {
     <div>
       <SEO
         title={`${siteConfig.name} — Premium Indian Ethnic Wear`}
-        description="Shop premium sarees, kurties, kurta sets, lehengas, dupattas and more. Elegant, modern Indian ethnic fashion delivered across India."
+        description="Shop premium sarees, kurtis, kurta sets, lehengas, dupattas and more at AARAAH. Elegant, modern Indian ethnic wear with free shipping across India."
         jsonLd={{
           "@context": "https://schema.org",
           "@graph": [
