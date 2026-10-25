@@ -7,6 +7,7 @@ import { ToastProvider } from "@/contexts/ToastContext";
 import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { Analytics } from "@/components/layout/Analytics";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
 import { LoadingState } from "@/components/ui/States";
@@ -59,6 +60,7 @@ export default function App() {
           <CartProvider>
           <WishlistProvider>
             <ScrollToTop />
+            <Analytics />
             <Suspense fallback={<LoadingState label="Loading AARAAH…" />}>
               <Routes>
                 <Route element={<MainLayout />}>

@@ -11,6 +11,7 @@ import { placeOrder } from "@/services/orders";
 import { previewCoupon } from "@/services/coupons";
 import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
+import { trackBeginCheckout } from "@/lib/analytics";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
 
 /** Cash on Delivery is switched off for launch. Set to true (and in the create-order Edge Function
@@ -106,6 +107,14 @@ export default function CheckoutPage() {
         image: i.variant?.images?.[0]?.url,
       }));
   }, [directItem, cartItems]);
+
+  // Analytics: "checkout started" once, when the page first has items.
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (checkoutTracked.current || lines.length === 0 || lines.some((l) => !l.sku)) return;
+    checkoutTracked.current = true;
+    trackBeginCheckout(lines.map((l) => ({ id: l.sku, name: l.name, variant: l.color, price: l.price, quantity: l.quantity })));
+  }, [lines]);
 
   const subtotal = directItem ? effectivePrice(directItem.variant) * directItem.quantity : cartSubtotal;
   // Must match SHIPPING_FEE in the create-order Edge Function exactly — this

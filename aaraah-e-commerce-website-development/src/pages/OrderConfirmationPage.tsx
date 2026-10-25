@@ -1,15 +1,28 @@
+import { useEffect } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
 import { useLiveOrder } from "@/hooks/useLiveOrder";
+import { trackPurchase } from "@/lib/analytics";
 
 export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
   const orderNumber = (location.state as { orderNumber?: string } | null)?.orderNumber;
   const { order, loading, error, refetch } = useLiveOrder(orderId);
+
+  // Analytics: once per order, as soon as the order has loaded.
+  const orderForTracking = order;
+  useEffect(() => {
+    if (!orderForTracking || orderForTracking.status === "cancelled") return;
+    trackPurchase(
+      orderForTracking.order_number,
+      orderForTracking.total,
+      (orderForTracking.items || []).map((i) => ({ id: i.sku, name: i.product_name, variant: i.color, price: i.unit_price, quantity: i.quantity }))
+    );
+  }, [orderForTracking]);
 
   if (loading) return <LoadingState label="Confirming your order…" />;
   if (error) return <ErrorState message={error} />;

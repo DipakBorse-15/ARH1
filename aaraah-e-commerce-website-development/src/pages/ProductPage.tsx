@@ -14,6 +14,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchProductBySlug, fetchSimilarVariants, fetchSlugForOldSlug, type SimilarItem } from "@/services/products";
 import { colorSlug } from "@/lib/slugs";
+import { trackAddToCart, trackViewItem } from "@/lib/analytics";
 import { variantSeoDescription, variantSeoTitle } from "@/lib/seoText";
 import { friendlyError } from "@/lib/supabase";
 import { siteConfig } from "@/config/site";
@@ -111,6 +112,12 @@ export default function ProductPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantParam, product]);
 
+  // Analytics: one "view item" each time a colour is shown.
+  useEffect(() => {
+    if (product && selectedVariant) trackViewItem(trackItem(selectedVariant, 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, selectedVariant?.id]);
+
   function selectVariant(v: ProductVariant) {
     setSelectedVariant(v);
     setQuantity(1);
@@ -177,6 +184,17 @@ export default function ProductPage() {
     .join("\n");
   const waHref = `https://wa.me/${siteConfig.whatsappNumber}?text=${encodeURIComponent(waMessage)}`;
 
+  function trackItem(v: ProductVariant, qty: number) {
+    return {
+      id: v.sku,
+      name: product?.name || "",
+      variant: v.color,
+      price: v.sale_price != null && v.sale_price < v.price ? v.sale_price : v.price,
+      quantity: qty,
+      category: product?.category?.name,
+    };
+  }
+
   async function handleAddToCart() {
     if (!selectedVariant) return;
     if (!inStock) {
@@ -184,8 +202,9 @@ export default function ProductPage() {
       return;
     }
     setBusy(true);
-    await addItem(selectedVariant.id, quantity);
+    const added = await addItem(selectedVariant.id, quantity);
     setBusy(false);
+    if (added !== false) trackAddToCart(trackItem(selectedVariant, quantity));
   }
 
   function handleBuyNow() {
