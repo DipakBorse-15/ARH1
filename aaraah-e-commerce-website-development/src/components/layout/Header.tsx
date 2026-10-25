@@ -59,7 +59,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-1.5 sm:px-6 md:py-0.5">
-        <button className="min-[1340px]:hidden" aria-label="Open menu" onClick={() => setMobileOpen((o) => !o)}>
+        <button className="min-[1120px]:hidden" aria-label="Open menu" onClick={() => setMobileOpen((o) => !o)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
           </svg>
@@ -77,7 +77,7 @@ export function Header() {
 
         {/* Centered nav — categories (newest launch first), collections tucked into a dropdown
             so six long category names still fit on one line. */}
-        <nav style={MENU_FONT} className="hidden flex-1 items-center justify-center gap-2 text-sm font-medium text-stone-700 min-[1340px]:flex min-[1340px]:gap-5">
+        <nav style={MENU_FONT} className="hidden flex-1 items-center justify-center gap-2 text-sm font-medium text-stone-700 min-[1120px]:flex min-[1340px]:gap-5">
           {categoryLinks.map((link) => (
             <Link key={link.to} to={link.to} className={NAV_LINK}>
               {link.label}
@@ -110,7 +110,7 @@ export function Header() {
           </div>
         </nav>
 
-        <div className="ml-auto flex items-center gap-4 min-[1340px]:ml-0">
+        <div className="ml-auto flex items-center gap-4 min-[1120px]:ml-0">
           <button
             type="button"
             aria-label="Search"
@@ -162,7 +162,7 @@ export function Header() {
       )}
 
       {mobileOpen && (
-        <div className="border-t border-stone-200 bg-white px-4 py-4 min-[1340px]:hidden">
+        <div className="border-t border-stone-200 bg-white px-4 py-4 min-[1120px]:hidden">
           <form onSubmit={submitSearch} className="mb-4 flex">
             <input
               type="search"

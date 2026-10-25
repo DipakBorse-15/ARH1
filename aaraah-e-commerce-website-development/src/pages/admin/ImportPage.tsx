@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { useToast } from "@/contexts/ToastContext";
@@ -58,10 +58,6 @@ const COLOR_HEX: Record<string, string> = {
 
 function hexFor(color: string): string {
   return COLOR_HEX[color.trim().toLowerCase()] || "#999999";
-}
-
-function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
 }
 
 function num(v: string | undefined): number | null {
@@ -215,24 +211,32 @@ const PRODUCT_TYPE_TO_CATEGORY_SLUG: Record<string, string> = {
   blouses: "blouses",
 };
 
-/** Find or create a category matching the sheet's "Product Type" (e.g. "SAREE"). */
-async function resolveCategoryId(productType: string): Promise<string | null> {
-  const label = productType.trim();
+interface CategoryRow {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+const norm = (x: string) => x.toLowerCase().replace(/[_&-]+/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Match the sheet's "Product Type" (e.g. "SAREE") to a category that ALREADY exists.
+ * Import never creates categories: a type that matches nothing returns null and the
+ * product is skipped with a clear message (add the category in admin first).
+ */
+function matchCategory(productType: string, categories: CategoryRow[]): CategoryRow | null {
+  const label = norm(productType);
   if (!label) return null;
-  const niceName = label.charAt(0) + label.slice(1).toLowerCase(); // "SAREE" -> "Saree"
-  const mappedSlug = PRODUCT_TYPE_TO_CATEGORY_SLUG[label.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ")];
-  const slug = mappedSlug || slugify(niceName);
-
-  const { data: existing } = await supabase.from("categories").select("id").eq("slug", slug).maybeSingle();
-  if (existing) return existing.id;
-
-  const { data: created, error } = await supabase
-    .from("categories")
-    .insert({ name: niceName, slug, active: true })
-    .select()
-    .single();
-  if (error) throw error;
-  return created.id;
+  const mappedSlug = PRODUCT_TYPE_TO_CATEGORY_SLUG[label];
+  if (mappedSlug) {
+    const hit = categories.find((c) => c.slug === mappedSlug);
+    if (hit) return hit;
+  }
+  const direct = categories.find((c) => norm(c.name) === label || norm(c.slug) === label);
+  if (direct) return direct;
+  // plain plural / singular ("dress material" vs "dress materials")
+  const alt = label.endsWith("s") ? label.slice(0, -1) : `${label}s`;
+  return categories.find((c) => norm(c.name) === alt || norm(c.slug) === alt) || null;
 }
 
 export default function ImportPage() {
@@ -241,6 +245,14 @@ export default function ImportPage() {
   const [fileName, setFileName] = useState("");
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("id, name, slug")
+      .then(({ data }) => setCategories((data || []) as CategoryRow[]));
+  }, []);
 
   function addLog(line: string) {
     setLog((prev) => [...prev, line]);
@@ -271,7 +283,7 @@ export default function ImportPage() {
 
     for (const p of parsed) {
       try {
-        const categoryId = await resolveCategoryId(p.productType);
+        const categoryId = matchCategory(p.productType, categories)?.id ?? null;
 
         const { data: existing, error: findErr } = await supabase
           .from("products")
@@ -285,6 +297,11 @@ export default function ImportPage() {
           productId = existing.id;
           addLog(`↳ ${existing.name} — existing group found (${p.parentSku})`);
         } else {
+          if (!categoryId) {
+            throw new Error(
+              `Product Type "${p.productType || "(khali)"}" kisi category se match nahi hua — pehle Admin → Categories me category banao, phir import karo. Ye product skip hua.`,
+            );
+          }
           const { data: created, error: pErr } = await supabase
             .from("products")
             .insert({
@@ -420,6 +437,16 @@ export default function ImportPage() {
                 <p className="text-xs text-stone-400">
                   Parent SKU: {p.parentSku} · Type: {p.productType || "—"}
                 </p>
+                {(() => {
+                  const c = matchCategory(p.productType, categories);
+                  return c ? (
+                    <p className="text-xs text-emerald-700">Category: {c.name}</p>
+                  ) : (
+                    <p className="text-xs font-semibold text-red-600">
+                      Category nahi mili — pehle Admin → Categories me banao, warna ye product import nahi hoga.
+                    </p>
+                  );
+                })()}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {p.variants.map((v) => (
                     <div key={v.sku} className="w-24 rounded border border-stone-200 p-1">
