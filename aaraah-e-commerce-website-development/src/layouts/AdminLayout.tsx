@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdminPwa } from "@/lib/adminPwa";
 
 const links = [
   { to: "/admin", label: "Dashboard", end: true },
@@ -17,6 +18,7 @@ const links = [
 
 export function AdminLayout() {
   const { profile, signOut } = useAuth();
+  useAdminPwa();
 
   return (
     <div className="flex min-h-screen bg-stone-100">

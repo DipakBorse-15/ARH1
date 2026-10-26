@@ -16,6 +16,7 @@ export function AdminRoute() {
   const location = useLocation();
 
   if (loading) return <LoadingState label="Checking permissions…" />;
-  if (!user || !isAdmin) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  // Admin pages have their own sign-in page (inside /admin), so the phone app never leaves its own area.
+  if (!user || !isAdmin) return <Navigate to="/admin/login" state={{ from: location.pathname }} replace />;
   return <Outlet />;
 }

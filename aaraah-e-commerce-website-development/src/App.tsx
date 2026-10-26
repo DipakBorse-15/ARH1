@@ -33,6 +33,7 @@ const OrdersPage = lazy(() => import("@/pages/account/OrdersPage"));
 const OrderDetailPage = lazy(() => import("@/pages/account/OrderDetailPage"));
 const AddressesPage = lazy(() => import("@/pages/account/AddressesPage"));
 
+const AdminLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/admin/DashboardPage"));
 const AdminProductsPage = lazy(() => import("@/pages/admin/ProductsPage"));
 const AdminProductFormPage = lazy(() => import("@/pages/admin/ProductFormPage"));
@@ -96,6 +97,8 @@ export default function App() {
 
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>
+
+                <Route path="admin/login" element={<AdminLoginPage />} />
 
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminLayout />}>
