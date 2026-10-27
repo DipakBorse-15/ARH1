@@ -10,6 +10,7 @@ import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { Analytics } from "@/components/layout/Analytics";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
+import { AdminIndexRoute, AdminOrdersRoute, AdminOrderDetailRoute } from "@/routes/AdminResponsive";
 import { LoadingState } from "@/components/ui/States";
 import { siteConfig } from "@/config/site";
 import { ProductListingPage } from "@/pages/ProductListingPage";
@@ -42,13 +43,12 @@ const AdminSeoCheckPage = lazy(() => import("@/pages/admin/SeoCheckPage"));
 const AdminPhotoOptimizerPage = lazy(() => import("@/pages/admin/PhotoOptimizerPage"));
 const AdminCategoriesPage = lazy(() => import("@/pages/admin/CategoriesPage"));
 const AdminCollectionsPage = lazy(() => import("@/pages/admin/CollectionsPage"));
-const AdminOrdersPage = lazy(() => import("@/pages/admin/OrdersPage"));
+const AdminMorePage = lazy(() => import("@/pages/admin/AdminMorePage"));
 const AdminImportPage = lazy(() => import("@/pages/admin/ImportPage"));
 const AdminHomeEditorPage = lazy(() => import("@/pages/admin/HomeEditorPage"));
 const WishlistPage = lazy(() => import("@/pages/account/WishlistPage"));
 const AdminCouponsPage = lazy(() => import("@/pages/admin/CouponsPage"));
 const AdminReviewsPage = lazy(() => import("@/pages/admin/ReviewsPage"));
-const AdminOrderDetailPage = lazy(() => import("@/pages/admin/OrderDetailPage"));
 
 // Normalize basename: BrowserRouter expects no trailing slash (except root "/").
 const basename = siteConfig.basePath === "/" ? "/" : siteConfig.basePath.replace(/\/$/, "");
@@ -102,7 +102,9 @@ export default function App() {
 
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminLayout />}>
-                    <Route index element={<AdminDashboardPage />} />
+                    <Route index element={<AdminIndexRoute />} />
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
+                    <Route path="more" element={<AdminMorePage />} />
                     <Route path="products" element={<AdminProductsPage />} />
                     <Route path="products/new" element={<AdminNewListingPage />} />
                     <Route path="seo-check" element={<AdminSeoCheckPage />} />
@@ -113,10 +115,10 @@ export default function App() {
                     <Route path="hero-slides" element={<Navigate to="/admin/home-editor" replace />} />
                     <Route path="categories" element={<AdminCategoriesPage />} />
                     <Route path="collections" element={<AdminCollectionsPage />} />
-                    <Route path="orders" element={<AdminOrdersPage />} />
+                    <Route path="orders" element={<AdminOrdersRoute />} />
                     <Route path="coupons" element={<AdminCouponsPage />} />
                     <Route path="reviews" element={<AdminReviewsPage />} />
-                    <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
+                    <Route path="orders/:orderId" element={<AdminOrderDetailRoute />} />
                   </Route>
                 </Route>
               </Routes>

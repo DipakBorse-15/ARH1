@@ -99,6 +99,13 @@ body {
   }
 }
 
+/* Admin on a phone: keep toast messages above the bottom tab bar. */
+@media (max-width: 767px) {
+  body.admin-shell .toast-region {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
