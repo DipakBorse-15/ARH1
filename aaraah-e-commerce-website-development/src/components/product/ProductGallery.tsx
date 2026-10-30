@@ -1,3 +1,4 @@
+import { thumbUrl } from "@/lib/thumb";
 import { useEffect, useState } from "react";
 import type { ProductImage } from "@/types";
 
@@ -24,7 +25,7 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
               idx === active ? "border-rose-900" : "border-transparent"
             }`}
           >
-            <img src={img.url} alt={img.alt_text || alt} className="h-full w-full object-cover" loading="lazy" />
+            <img src={thumbUrl(img)} alt={img.alt_text || alt} className="h-full w-full object-cover" loading="lazy" />
           </button>
         ))}
       </div>

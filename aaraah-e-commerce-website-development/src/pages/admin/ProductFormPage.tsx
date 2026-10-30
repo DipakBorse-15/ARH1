@@ -188,8 +188,8 @@ export default function ProductFormPage() {
       // every upload competes for "first" and the order becomes arbitrary.
       let nextOrder = (variant?.images || []).length;
       for (const file of Array.from(files)) {
-        const { path, url } = await uploadProductImage(file, variantId);
-        await addVariantImage({ variant_id: variantId, storage_path: path, url, alt_text: product.name, sort_order: nextOrder });
+        const { path, url, thumb_path, thumb_url } = await uploadProductImage(file, variantId);
+        await addVariantImage({ variant_id: variantId, storage_path: path, url, thumb_path, thumb_url, alt_text: product.name, sort_order: nextOrder });
         nextOrder += 1;
       }
       show("Image(s) uploaded", "success");

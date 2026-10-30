@@ -39,7 +39,7 @@ export default function AdminCollectionsPage() {
   async function handleUpload(file: File, field: "image" | "mobile_image") {
     setUploading(field);
     try {
-      file = await resizeImage(file, 1600);
+      file = await resizeImage(file, 1200);
       const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("collection-images").upload(path, file, { upsert: true });
       if (error) throw error;

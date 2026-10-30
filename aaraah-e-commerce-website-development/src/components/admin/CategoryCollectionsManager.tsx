@@ -93,7 +93,7 @@ export function CategoryCollectionsManager({ categoryId }: { categoryId: string;
   async function upload(row: CategoryCollection, field: "image" | "mobile_image", file: File) {
     setBusy(`${row.id}:${field}`);
     try {
-      file = await resizeImage(file, 1600);
+      file = await resizeImage(file, 1200);
       const path = `cat-${categoryId.slice(0, 8)}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("collection-images").upload(path, file, { upsert: true });
       if (error) throw error;

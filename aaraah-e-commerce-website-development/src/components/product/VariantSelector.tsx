@@ -1,3 +1,4 @@
+import { thumbUrl } from "@/lib/thumb";
 import type { ProductVariant } from "@/types";
 
 export function VariantSelector({
@@ -24,7 +25,7 @@ export function VariantSelector({
         {visible.map((v) => {
           const isSelected = v.id === selectedId;
           const outOfStock = !v.is_available || v.stock_quantity <= 0;
-          const thumb = v.images?.[0]?.url;
+          const thumb = thumbUrl(v.images?.[0]);
 
           return (
             <button

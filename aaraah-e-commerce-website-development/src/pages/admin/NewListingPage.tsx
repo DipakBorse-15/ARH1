@@ -260,8 +260,8 @@ export default function NewListingPage() {
       });
       let uploaded = 0;
       for (const file of files) {
-        const { path, url } = await uploadProductImage(file, saved.id);
-        await addVariantImage({ variant_id: saved.id, storage_path: path, url, alt_text: parent.name, sort_order: uploaded });
+        const { path, url, thumb_path, thumb_url } = await uploadProductImage(file, saved.id);
+        await addVariantImage({ variant_id: saved.id, storage_path: path, url, thumb_path, thumb_url, alt_text: parent.name, sort_order: uploaded });
         uploaded += 1;
       }
       show(`${child.color} save ho gaya${uploaded ? ` (${uploaded} photo)` : ""}`, "success");

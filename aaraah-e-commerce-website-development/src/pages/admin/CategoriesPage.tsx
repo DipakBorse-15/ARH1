@@ -40,7 +40,7 @@ export default function AdminCategoriesPage() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
-      file = await resizeImage(file, 1600);
+      file = await resizeImage(file, 1200);
       const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "-")}`;
       const { error } = await supabase.storage.from("category-images").upload(path, file, { upsert: true });
       if (error) throw error;

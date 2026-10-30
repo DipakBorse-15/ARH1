@@ -364,7 +364,7 @@ function BannersTab() {
   async function handleUpload(file: File, field: "image" | "mobile_image") {
     setUploading(field);
     try {
-      file = await resizeImage(file, 2400);
+      file = await resizeImage(file, 1920);
       const path = `${Date.now()}-${safeFileName(file.name)}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;

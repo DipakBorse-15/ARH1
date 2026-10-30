@@ -43,7 +43,7 @@ export default function AdminHeroSlidesPage() {
   async function handleUpload(file: File) {
     setUploading(true);
     try {
-      file = await resizeImage(file, 2400);
+      file = await resizeImage(file, 1920);
       const path = `${Date.now()}-${file.name}`;
       const { error } = await supabase.storage.from("hero-images").upload(path, file, { upsert: true });
       if (error) throw error;

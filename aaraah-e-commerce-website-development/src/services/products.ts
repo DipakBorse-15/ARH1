@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { resizeImage } from "@/lib/imageResize";
+import { THUMB_SIDE, THUMB_QUALITY } from "@/lib/thumb";
 import { shortSlug } from "@/lib/slugs";
 import type { Collection, Product, ProductVariant, ProductWithVariants } from "@/types";
 
@@ -481,11 +482,14 @@ export async function deleteProduct(id: string) {
     const { data: vars } = await supabase.from("product_variants").select("id").eq("product_id", id);
     const ids = (vars || []).map((v: { id: string }) => v.id);
     if (ids.length) {
-      const { data: imgs } = await supabase.from("product_images").select("url").in("variant_id", ids);
+      const { data: imgs } = await supabase.from("product_images").select("url, thumb_path").in("variant_id", ids);
       filePaths = (imgs || [])
         .map((i: { url: string }) => i.url.split("/product-images/")[1])
         .filter(Boolean)
         .map((p: string) => decodeURIComponent(p.split("?")[0]));
+      (imgs || []).forEach((i: { thumb_path?: string | null }) => {
+        if (i.thumb_path) filePaths.push(i.thumb_path);
+      });
     }
   } catch {
     /* cleanup is best-effort; never block the delete */
@@ -543,15 +547,33 @@ export async function deleteVariant(id: string) {
   if (error) throw error;
 }
 
-export async function addVariantImage(image: { variant_id: string; storage_path: string; url: string; alt_text?: string; sort_order?: number }) {
+export async function addVariantImage(image: {
+  variant_id: string;
+  storage_path: string;
+  url: string;
+  thumb_path?: string | null;
+  thumb_url?: string | null;
+  alt_text?: string;
+  sort_order?: number;
+}) {
   const { data, error } = await supabase.from("product_images").insert(image).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function deleteVariantImage(id: string) {
+  // The thumbnail is used only by the storefront, so it can go with the row. The full photo is left as it was
+  // (old orders may still show it).
+  let thumbPath: string | null = null;
+  try {
+    const { data } = await supabase.from("product_images").select("thumb_path").eq("id", id).maybeSingle();
+    thumbPath = (data as { thumb_path?: string | null } | null)?.thumb_path || null;
+  } catch {
+    /* best effort */
+  }
   const { error } = await supabase.from("product_images").delete().eq("id", id);
   if (error) throw error;
+  if (thumbPath) await supabase.storage.from("product-images").remove([thumbPath]).catch(() => {});
 }
 
 /** Persist a new left-to-right order for a variant's photos. The first id in
@@ -565,12 +587,32 @@ export async function reorderVariantImages(orderedImageIds: string[]): Promise<v
   if (failed) throw new Error("Could not save the new image order");
 }
 
-export async function uploadProductImage(original: File, variantId: string): Promise<{ path: string; url: string }> {
+export async function uploadProductImage(
+  original: File,
+  variantId: string
+): Promise<{ path: string; url: string; thumb_path: string | null; thumb_url: string | null }> {
   const file = await resizeImage(original, 1600);
   const ext = file.name.split(".").pop();
   const path = `${variantId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("product-images").upload(path, file, { upsert: false, cacheControl: "31536000" });
   if (error) throw error;
   const { data } = supabase.storage.from("product-images").getPublicUrl(path);
-  return { path, url: data.publicUrl };
+
+  // Small copy for cards/cart. Best effort: if it fails the full photo is simply used everywhere (nothing breaks).
+  let thumb_path: string | null = null;
+  let thumb_url: string | null = null;
+  try {
+    const small = await resizeImage(original, THUMB_SIDE, THUMB_QUALITY);
+    if (small !== original && small.type === "image/webp") {
+      const tPath = `${variantId}/thumb-${crypto.randomUUID()}.webp`;
+      const up = await supabase.storage.from("product-images").upload(tPath, small, { upsert: false, cacheControl: "31536000" });
+      if (!up.error) {
+        thumb_path = tPath;
+        thumb_url = supabase.storage.from("product-images").getPublicUrl(tPath).data.publicUrl;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return { path, url: data.publicUrl, thumb_path, thumb_url };
 }

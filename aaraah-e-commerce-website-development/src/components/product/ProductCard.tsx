@@ -1,3 +1,4 @@
+import { thumbUrl } from "@/lib/thumb";
 import { WishlistButton } from "@/components/product/WishlistButton";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -35,7 +36,7 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
           <>
             {!loaded && <div className="absolute inset-0 animate-shimmer" />}
             <img
-              src={image.url}
+              src={thumbUrl(image)}
               alt={image.alt_text || product.name}
               loading="lazy"
               onLoad={() => setLoaded(true)}

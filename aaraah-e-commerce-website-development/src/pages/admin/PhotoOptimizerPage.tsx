@@ -4,12 +4,14 @@ import { LoadingState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { resizeImage } from "@/lib/imageResize";
+import { THUMB_SIDE, THUMB_QUALITY } from "@/lib/thumb";
 
 interface Row {
   id: string;
   variant_id: string;
   storage_path: string;
   url: string;
+  thumb_url?: string | null;
   bytes?: number;
 }
 
@@ -49,13 +51,16 @@ export default function PhotoOptimizerPage() {
   const [done, setDone] = useState(0);
   const [failed, setFailed] = useState<string[]>([]);
   const [saved, setSaved] = useState(0);
+  const [thumbRunning, setThumbRunning] = useState(false);
+  const [thumbDone, setThumbDone] = useState(0);
+  const [thumbFailed, setThumbFailed] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const all: Row[] = [];
         for (let from = 0; ; from += 1000) {
-          const { data, error } = await supabase.from("product_images").select("id, variant_id, storage_path, url").order("id").range(from, from + 999);
+          const { data, error } = await supabase.from("product_images").select("id, variant_id, storage_path, url, thumb_url").order("id").range(from, from + 999);
           if (error) throw error;
           all.push(...((data || []) as Row[]));
           if (!data || data.length < 1000) break;
@@ -132,6 +137,43 @@ export default function PhotoOptimizerPage() {
     show("Photo optimise ho gayi", "success");
   }
 
+  // Photos that live in our own storage and have no small copy yet.
+  const needThumb = (rows || []).filter((r) => !r.thumb_url && r.url.includes(`/${BUCKET}/`));
+
+  async function makeThumbs() {
+    if (!needThumb.length) return;
+    setThumbRunning(true);
+    setThumbDone(0);
+    setThumbFailed([]);
+    await pool([...needThumb], 3, async (r) => {
+      try {
+        const res = await fetch(r.url);
+        if (!res.ok) throw new Error(`photo download failed (${res.status})`);
+        const blob = await res.blob();
+        const original = new File([blob], "photo", { type: blob.type || "image/jpeg" });
+        const small = await resizeImage(original, THUMB_SIDE, THUMB_QUALITY);
+        if (small === original || small.type !== "image/webp") throw new Error("thumbnail nahi ban saka, full photo hi chalegi");
+        if (small.size >= original.size) throw new Error("thumbnail chhota nahi bana, full photo hi chalegi");
+        const path = `${r.variant_id}/thumb-${crypto.randomUUID()}.webp`;
+        const up = await supabase.storage.from(BUCKET).upload(path, small, { upsert: false, cacheControl: "31536000" });
+        if (up.error) throw up.error;
+        const turl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+        const upd = await supabase.from("product_images").update({ thumb_path: path, thumb_url: turl }).eq("id", r.id);
+        if (upd.error) {
+          await supabase.storage.from(BUCKET).remove([path]);
+          throw upd.error;
+        }
+        setRows((prev) => (prev || []).map((x) => (x.id === r.id ? { ...x, thumb_url: turl } : x)));
+      } catch (err) {
+        setThumbFailed((f) => [...f, `${r.storage_path}: ${err instanceof Error ? err.message : friendlyError(err)}`]);
+      } finally {
+        setThumbDone((n) => n + 1);
+      }
+    });
+    setThumbRunning(false);
+    show("Thumbnails ban gaye", "success");
+  }
+
   if (!rows) return <LoadingState />;
 
   return (
@@ -142,6 +184,23 @@ export default function PhotoOptimizerPage() {
         Purani badi product photos ko chhota karta hai (1600 px WebP, naye upload jaisa). Abhi ye sirf size naapta hai (koi download nahi, koi photo badalti ya delete nahi hoti).
         Total product photos: {rows.length}.
       </p>
+
+      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-700">
+        <p>
+          Thumbnails (chhoti copy, ~640 px) baaki: <b>{needThumb.length}</b> / {rows.length} photos. Badi photo aur uske links jaise ke taise rehte hain, kuch delete nahi hota.
+        </p>
+        <button onClick={makeThumbs} disabled={thumbRunning || scanning || running || needThumb.length === 0} className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {thumbRunning ? `Thumbnails ban rahe hain… ${thumbDone}/${needThumb.length + thumbDone}` : `Step 2: ${needThumb.length} thumbnails banao`}
+        </button>
+        <p className="mt-2 text-xs text-stone-500">Ye page khula rakho jab tak chale. Beech me ruk jaye to dobara dabao, jo ban chuke wo chhod kar aage badhega. Ek baar ~{mb(needThumb.length * 360 * 1024)} download hota hai.</p>
+        {thumbFailed.length > 0 && (
+          <ul className="mt-2 list-disc pl-5 text-xs text-amber-900">
+            {thumbFailed.slice(0, 30).map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button onClick={scan} disabled={scanning || running || rows.length === 0} className="rounded-lg bg-rose-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
@@ -168,7 +227,7 @@ export default function PhotoOptimizerPage() {
           </p>
           {ENABLE_SHRINK && big.length > 0 && (
             <button onClick={optimise} disabled={running || scanning} className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-              {running ? `Chhoti ho rahi hain… ${done}/${big.length}` : `Step 2: ${big.length} badi photos chhoti karo`}
+              {running ? `Chhoti ho rahi hain… ${done}/${big.length}` : `Step 3: ${big.length} badi photos chhoti karo`}
             </button>
           )}
           {(running || done > 0) && (

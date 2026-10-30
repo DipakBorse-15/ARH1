@@ -1,3 +1,4 @@
+import { thumbUrl } from "@/lib/thumb";
 import { Link } from "react-router-dom";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { formatINR } from "@/components/product/PriceDisplay";
@@ -17,7 +18,7 @@ export function CartItemRow({ item }: { item: CartItem }) {
   return (
     <div className="flex gap-4 border-b border-stone-200 py-4">
       <Link to={product ? `/products/${product.slug}` : "#"} className="h-24 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-stone-100">
-        {image ? <img src={image.url} alt={image.alt_text || ""} className="h-full w-full object-cover" /> : null}
+        {image ? <img src={thumbUrl(image)} alt={image.alt_text || ""} className="h-full w-full object-cover" /> : null}
       </Link>
       <div className="flex flex-1 flex-col justify-between">
         <div>

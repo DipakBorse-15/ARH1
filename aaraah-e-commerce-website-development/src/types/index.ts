@@ -126,6 +126,9 @@ export interface ProductImage {
   variant_id: string;
   storage_path: string;
   url: string;
+  /** Small copy (~640 px) for cards/swatches/cart. Null = not made yet, fall back to `url`. */
+  thumb_url?: string | null;
+  thumb_path?: string | null;
   alt_text: string | null;
   sort_order: number;
   created_at: string;
