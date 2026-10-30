@@ -19,7 +19,10 @@ export const adminLinks: AdminLink[] = [
   { to: "/admin/reviews", label: "Reviews" },
 ];
 
-/** Pages listed on the phone "More" page (Orders and Products have their own tabs). */
+/**
+ * Pages listed on the phone "More" page (Orders and Products have their own tabs).
+ * Import, SEO Check and Photo Optimizer are laptop work, so they are not offered on the phone.
+ */
 export const moreLinks: AdminLink[] = [
   { to: "/admin/dashboard", label: "Dashboard" },
   { to: "/admin/home-editor", label: "Home Page" },
@@ -27,7 +30,4 @@ export const moreLinks: AdminLink[] = [
   { to: "/admin/collections", label: "Collections" },
   { to: "/admin/coupons", label: "Coupons" },
   { to: "/admin/reviews", label: "Reviews" },
-  { to: "/admin/import", label: "Import" },
-  { to: "/admin/seo-check", label: "SEO Check" },
-  { to: "/admin/photo-optimizer", label: "Photo Optimizer" },
 ];

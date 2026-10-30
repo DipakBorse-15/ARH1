@@ -10,7 +10,7 @@ import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { Analytics } from "@/components/layout/Analytics";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ProtectedRoute, AdminRoute } from "@/routes/ProtectedRoute";
-import { AdminIndexRoute, AdminOrdersRoute, AdminOrderDetailRoute } from "@/routes/AdminResponsive";
+import { AdminIndexRoute, AdminOrdersRoute, AdminOrderDetailRoute, AdminProductsRoute, LaptopOnly } from "@/routes/AdminResponsive";
 import { LoadingState } from "@/components/ui/States";
 import { siteConfig } from "@/config/site";
 import { ProductListingPage } from "@/pages/ProductListingPage";
@@ -36,7 +36,6 @@ const AddressesPage = lazy(() => import("@/pages/account/AddressesPage"));
 
 const AdminLoginPage = lazy(() => import("@/pages/admin/AdminLoginPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/admin/DashboardPage"));
-const AdminProductsPage = lazy(() => import("@/pages/admin/ProductsPage"));
 const AdminProductFormPage = lazy(() => import("@/pages/admin/ProductFormPage"));
 const AdminNewListingPage = lazy(() => import("@/pages/admin/NewListingPage"));
 const AdminSeoCheckPage = lazy(() => import("@/pages/admin/SeoCheckPage"));
@@ -105,12 +104,12 @@ export default function App() {
                     <Route index element={<AdminIndexRoute />} />
                     <Route path="dashboard" element={<AdminDashboardPage />} />
                     <Route path="more" element={<AdminMorePage />} />
-                    <Route path="products" element={<AdminProductsPage />} />
-                    <Route path="products/new" element={<AdminNewListingPage />} />
+                    <Route path="products" element={<AdminProductsRoute />} />
+                    <Route path="products/new" element={<LaptopOnly><AdminNewListingPage /></LaptopOnly>} />
                     <Route path="seo-check" element={<AdminSeoCheckPage />} />
                     <Route path="photo-optimizer" element={<AdminPhotoOptimizerPage />} />
-                    <Route path="products/:id" element={<AdminProductFormPage />} />
-                    <Route path="import" element={<AdminImportPage />} />
+                    <Route path="products/:id" element={<LaptopOnly><AdminProductFormPage /></LaptopOnly>} />
+                    <Route path="import" element={<LaptopOnly><AdminImportPage /></LaptopOnly>} />
                     <Route path="home-editor" element={<AdminHomeEditorPage />} />
                     <Route path="hero-slides" element={<Navigate to="/admin/home-editor" replace />} />
                     <Route path="categories" element={<AdminCategoriesPage />} />
