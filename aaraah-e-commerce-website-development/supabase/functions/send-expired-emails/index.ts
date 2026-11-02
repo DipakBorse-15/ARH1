@@ -49,7 +49,7 @@ Deno.serve(async () => {
       const html = `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
           <h2 style="color:#7a1730">Order cancelled — Order ${esc(order.order_number)}</h2>
-          <p>Hi ${esc(order.full_name)}, we did not receive the UPI payment for your order within 3 hours, so it has been cancelled and the items are available for others again.</p>
+          <p>Hi ${esc(order.full_name)}, we did not receive the UPI payment for your order in the payment time given on your order page, so it has been cancelled and the items are available for others again.</p>
           <table style="width:100%;border-collapse:collapse;margin:16px 0">${itemRows}</table>
           <p style="font-weight:bold">Order total: ₹${order.total}</p>
           <p>If you have already paid, please contact us on WhatsApp +91 98983 52989 with your UTR / transaction number and we will sort it out. Otherwise you are welcome to place the order again on aaraah.in.</p>

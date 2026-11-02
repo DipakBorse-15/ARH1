@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/contexts/ToastContext";
-import { UNPAID_HOURS, submitPaymentReference } from "@/services/orders";
+import { submitPaymentReference, unpaidExpiryAt } from "@/services/orders";
 import QRCode from "qrcode";
 import { siteConfig } from "@/config/site";
 import { formatINR } from "@/components/product/PriceDisplay";
@@ -35,7 +35,7 @@ export function UpiPaymentCard({ order, onSubmitted }: { order: Order; onSubmitt
 
   if (order.payment_method !== "upi" || order.payment_status === "paid" || order.status === "cancelled") return null;
 
-  const deadline = new Date(new Date(order.created_at).getTime() + UNPAID_HOURS * 3600 * 1000);
+  const deadline = unpaidExpiryAt(order.created_at);
   const deadlineText = deadline.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   const timeOver = Date.now() > deadline.getTime();
 
@@ -124,8 +124,8 @@ export function UpiPaymentCard({ order, onSubmitted }: { order: Order; onSubmitt
           </p>
           <p className={`mt-3 text-[11px] ${timeOver ? "font-medium text-rose-700" : "text-stone-500"}`}>
             {timeOver
-              ? `The ${UNPAID_HOURS}-hour payment time is over. If you have already paid, enter your number above right away; otherwise this order may be cancelled.`
-              : `Please pay by ${deadlineText}. Orders without payment are cancelled automatically after ${UNPAID_HOURS} hours so the stock can go to other customers.`}
+              ? `The payment time is over. If you have already paid, enter your number above right away; otherwise this order may be cancelled.`
+              : `Please pay by ${deadlineText}. Orders without payment are cancelled automatically after this time so the stock can go to other customers.`}
           </p>
         </form>
       )}

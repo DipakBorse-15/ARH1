@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { deleteOrderAdmin, expireUnpaidOrdersAdmin, fetchAllOrdersAdmin, isExpiredUnpaid, resetOrdersAdmin, UNPAID_HOURS } from "@/services/orders";
+import { deleteOrderAdmin, expireUnpaidOrdersAdmin, fetchAllOrdersAdmin, isExpiredUnpaid, resetOrdersAdmin } from "@/services/orders";
 import { useAuth } from "@/contexts/AuthContext";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
@@ -78,7 +78,7 @@ export default function AdminOrdersPage() {
   }
 
   async function expireUnpaid() {
-    if (!confirm(`Cancel all unpaid UPI orders older than ${UNPAID_HOURS} hours (where the customer has not sent a UTR)? Their stock goes back.`)) return;
+    if (!confirm(`Cancel all unpaid UPI orders whose payment time is over (where the customer has not sent a UTR)? Their stock goes back.`)) return;
     setBusy(true);
     try {
       const n = await expireUnpaidOrdersAdmin();

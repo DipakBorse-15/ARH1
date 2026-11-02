@@ -283,9 +283,19 @@ Deno.serve(async (req) => {
     // Clear purchased items from the cart.
     await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
 
-    // No email at placement on purpose: the customer gets the "Payment received" email (send-payment-confirmed-email)
-    // once the payment is confirmed, or the "Order cancelled" email if it is not paid within 3 hours.
+    // No email to the CUSTOMER at placement on purpose: they get the "Payment received" email (send-payment-confirmed-email)
+    // once the payment is confirmed, or the "Order cancelled" email if it is not paid in time.
     // (sendOrderReceivedEmail below is kept but no longer called.)
+    // The shop owner gets a short "new order" email so night orders are not missed. Never blocks or fails the order.
+    try {
+      await sendAdminNewOrderEmail(
+        { id: order.id, order_number: order.order_number, full_name: payload.full_name, mobile: payload.mobile, city: payload.city, state: payload.state },
+        orderItems as Record<string, unknown>[],
+        total
+      );
+    } catch (e) {
+      console.error("admin new-order email failed", e);
+    }
 
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {
@@ -296,6 +306,35 @@ Deno.serve(async (req) => {
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+// Short "new order" email to the shop owner. Needs RESEND_API_KEY; optional secret ADMIN_NOTIFY_EMAIL (default: blackpur.com@gmail.com).
+async function sendAdminNewOrderEmail(
+  order: { id: string; order_number: string; full_name: string; mobile: string; city: string; state: string },
+  items: Record<string, unknown>[],
+  total: number
+) {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return;
+  const to = Deno.env.get("ADMIN_NOTIFY_EMAIL") || "blackpur.com@gmail.com";
+  const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
+  const lines = items
+    .map((i) => `<li>${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</li>`)
+    .join("");
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#7a1730">New order — ${esc(order.order_number)}</h2>
+      <p><b>₹${esc(total)}</b> · ${esc(order.full_name)} · ${esc(order.mobile)} · ${esc(order.city)}, ${esc(order.state)}</p>
+      <ul>${lines}</ul>
+      <p>Payment abhi pending hai (UPI). UTR aane ya paisa aane par admin me <b>Confirm</b> karo.</p>
+      <p><a href="https://aaraah.in/admin/orders/${esc(order.id)}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open order</a></p>
+    </div>`;
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [to], subject: `New order ${order.order_number} — ₹${total}`, html }),
+    signal: AbortSignal.timeout(5000),
+  });
+}
 
 // Needs RESEND_API_KEY (and RESEND_FROM). Without the key this quietly does nothing.
 async function sendOrderReceivedEmail(
@@ -323,7 +362,7 @@ async function sendOrderReceivedEmail(
       ${discount > 0 ? `<p style="color:#047857;margin:0">Coupon ${esc(couponCode)}: −₹${esc(discount)}</p>` : ""}
       <p style="font-weight:bold">Total: ₹${esc(total)}</p>
       <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
-      Orders without payment are cancelled automatically after 3 hours so the stock can go to other customers.</p>
+      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>
       <p><a href="${link}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open my order</a></p>
       <p style="color:#78716c;font-size:13px">Questions? Reply to this email or WhatsApp us.</p>
     </div>`;

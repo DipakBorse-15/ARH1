@@ -134,22 +134,39 @@ export async function submitPaymentReference(orderId: string, reference: string)
   if (error) throw new Error(rpcMessage(error));
 }
 
-/** Admin: cancel unpaid UPI orders older than 3 hours (stock goes back). Returns how many were cancelled. */
+/** Admin: cancel unpaid UPI orders whose payment time is over (stock goes back). Returns how many were cancelled. */
 export async function expireUnpaidOrdersAdmin(): Promise<number> {
   const { data, error } = await supabase.rpc("admin_expire_unpaid_orders");
   if (error) throw new Error(rpcMessage(error));
   return Number(data) || 0;
 }
 
-/** Unpaid UPI order older than 3 hours with no UTR sent — will be (or can be) cancelled. */
+/** Daytime orders wait this many hours for payment. */
 export const UNPAID_HOURS = 3;
+
+/**
+ * When an unpaid UPI order (no UTR) is cancelled automatically — same rule as the database (migration 0036), India time:
+ * - ordered 7:00 AM – 6:00 PM  -> 3 hours after ordering
+ * - ordered 6:00 PM – 7:00 AM  -> 10:00 AM the next morning (or the same morning if ordered after midnight)
+ */
+export function unpaidExpiryAt(createdAt: string | Date): Date {
+  const created = new Date(createdAt);
+  const IST = 5.5 * 3600 * 1000;
+  const local = new Date(created.getTime() + IST); // read with getUTC* = India clock
+  const h = local.getUTCHours();
+  if (h >= 7 && h < 18) return new Date(created.getTime() + UNPAID_HOURS * 3600 * 1000);
+  const day = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + (h >= 18 ? 1 : 0), 10, 0, 0);
+  return new Date(day - IST);
+}
+
+/** Unpaid UPI order with no UTR sent whose cancel time has passed — will be (or can be) cancelled. */
 export function isExpiredUnpaid(o: { payment_method: string; payment_status: string; status: string; payment_reference?: string | null; created_at: string }): boolean {
   return (
     o.payment_method === "upi" &&
     o.payment_status === "pending" &&
     o.status === "pending" &&
     !o.payment_reference &&
-    Date.now() - new Date(o.created_at).getTime() > UNPAID_HOURS * 3600 * 1000
+    Date.now() > unpaidExpiryAt(o.created_at).getTime()
   );
 }
 

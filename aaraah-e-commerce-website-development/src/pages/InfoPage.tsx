@@ -21,7 +21,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What happens if I do not pay?",
-    a: "An order is held for 3 hours. If no payment is received in that time, it is cancelled automatically so the stock can go to other customers. You can place the order again any time.",
+    a: "An order placed between 7:00 AM and 6:00 PM is held for 3 hours. An order placed between 6:00 PM and 7:00 AM is held until 10:00 AM the next morning. If no payment is received by then, it is cancelled automatically so the stock can go to other customers. You can place the order again any time.",
   },
   {
     q: "Is there a shipping charge?",
