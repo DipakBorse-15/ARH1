@@ -6,7 +6,7 @@
 //      Results are remembered for a few minutes, so bots cannot make Supabase work (and send data) again and again.
 //   3. /img/<bucket>/<file>  -> the photo from Supabase Storage, kept on THIS server's disk after the first visit.
 //      Each photo leaves Supabase only once, so Supabase "egress" stops growing with traffic.
-//   4. www.aaraah.in -> aaraah.in redirect (and http -> https when Hostinger tells us the visit was http).
+//   4. (www / https redirects are left to Hostinger.)
 //
 // Start command on Hostinger:  node hostinger/server.js      (Build command: npm run build)
 import http from "node:http";
@@ -397,8 +397,6 @@ const server = http.createServer(async (req, res) => {
     }
     const url = new URL(req.url || "/", "http://localhost");
     const pathname = url.pathname;
-    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").toLowerCase().split(":")[0];
-    const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim().toLowerCase();
 
     if (pathname === "/healthz") {
       res.writeHead(200, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
@@ -406,12 +404,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // One address for Google: https://aaraah.in
-    if (host === "www.aaraah.in" || (host === "aaraah.in" && proto === "http")) {
-      res.writeHead(301, { Location: `https://aaraah.in${url.pathname}${url.search}`, "Cache-Control": "public, max-age=3600" });
-      res.end();
-      return;
-    }
+    // www / http redirects are handled by Hostinger itself (our own redirect fought with it and caused a loop).
+    // Google still sees https://aaraah.in as the address, because every page carries that canonical link.
 
     if (pathname.startsWith("/img/")) {
       await serveImage(req, res, pathname);
