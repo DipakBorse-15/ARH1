@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useNavCategories, useNavCollections } from "@/hooks/useNavCategories";
 import { categoryHref } from "@/lib/categoryLinks";
+import { imgSrc } from "@/lib/imgProxy";
 
 // Web menu look: Cinzel capitals; on hover the item fills with deep maroon, the text turns
 // white and a gold line draws in under it (with a clear gap between the text and the line).
@@ -67,7 +68,7 @@ export function Header() {
 
         <Link to="/" className="mr-1 flex shrink-0 items-center gap-2">
           {settings?.logo_url ? (
-            <img src={settings.logo_url} alt={settings.site_name || siteConfig.name} className="h-[54px] w-auto object-contain md:h-[72px]" />
+            <img src={imgSrc(settings.logo_url)} alt={settings.site_name || siteConfig.name} className="h-[54px] w-auto object-contain md:h-[72px]" />
           ) : (
             <span className="font-serif text-2xl font-bold tracking-wide text-rose-900">
               {settings?.site_name || siteConfig.name}

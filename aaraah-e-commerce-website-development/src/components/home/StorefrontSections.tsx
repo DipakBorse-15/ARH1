@@ -7,6 +7,7 @@ import { fetchCategoryCollections } from "@/services/categoryCollections";
 import { fetchHomeFeed, type HomeCollectionRow, type HomeFeed, type SimilarItem } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import type { Collection, CategoryCollection } from "@/types";
+import { imgSrc } from "@/lib/imgProxy";
 
 export const LATEST_COUNT = 12; // 3 rows of 4
 export const PER_COLLECTION = 8; // 2 rows of 4
@@ -261,9 +262,9 @@ function CollectionTile({ collection: c, href, cell, delay, comingSoon, compact 
       >
         {c.image || c.mobile_image ? (
           <picture className="block h-full w-full">
-            {c.mobile_image && <source media="(max-width: 639px)" srcSet={c.mobile_image} />}
+            {c.mobile_image && <source media="(max-width: 639px)" srcSet={imgSrc(c.mobile_image)} />}
             <img
-              src={c.image || c.mobile_image || ""}
+              src={imgSrc(c.image || c.mobile_image || "")}
               alt={c.name}
               loading="lazy"
               className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"

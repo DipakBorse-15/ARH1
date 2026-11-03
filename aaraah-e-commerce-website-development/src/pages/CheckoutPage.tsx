@@ -13,6 +13,7 @@ import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
 import { trackBeginCheckout } from "@/lib/analytics";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
+import { imgSrc } from "@/lib/imgProxy";
 
 /** Cash on Delivery is switched off for launch. Set to true (and in the create-order Edge Function
  *  ENABLED_PAYMENT_METHODS) to turn it back on. */
@@ -338,7 +339,7 @@ export default function CheckoutPage() {
               {lines.map((l) => (
                 <div key={l.variant_id} className="flex gap-3 text-sm">
                   <div className="h-14 w-12 flex-shrink-0 overflow-hidden rounded bg-stone-100">
-                    {l.image && <img src={l.image} className="h-full w-full object-cover" alt="" />}
+                    {l.image && <img src={imgSrc(l.image)} className="h-full w-full object-cover" alt="" />}
                   </div>
                   <div className="flex-1">
                     <p className="line-clamp-1 text-stone-800">{l.name}</p>

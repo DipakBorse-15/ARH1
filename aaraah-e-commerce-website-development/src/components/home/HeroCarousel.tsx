@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { HeroSlide } from "@/types";
 import { categoryHref } from "@/lib/categoryLinks";
+import { imgSrc } from "@/lib/imgProxy";
 
 const SLIDE_MS = 700;
 
@@ -106,7 +107,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   className="flex h-[27cqw] w-[27cqw] sm:h-[clamp(200px,22vw,420px)] sm:w-[clamp(200px,22vw,420px)] items-center justify-center rounded-full bg-amber-50 shadow-2xl shadow-black/30"
                 >
                   <img
-                    src={logo}
+                    src={imgSrc(logo)}
                     alt={settings?.site_name || "AARAAH"}
                     className="max-h-[86%] max-w-[86%] object-contain"
                   />
@@ -129,7 +130,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             >
               {isShown && (
                 <>
-                  <img src={slide.image} alt={slide.title || "AARAAH banner"} className="absolute inset-0 h-full w-full object-cover" />
+                  <img src={imgSrc(slide.image)} alt={slide.title || "AARAAH banner"} className="absolute inset-0 h-full w-full object-cover" />
                   {(slide.title || slide.subtitle || (slide.cta_text && slide.cta_link)) && (
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   )}

@@ -1,6 +1,7 @@
 import { thumbUrl } from "@/lib/thumb";
 import { useEffect, useState } from "react";
 import type { ProductImage } from "@/types";
+import { imgSrc } from "@/lib/imgProxy";
 
 export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: string }) {
   const [active, setActive] = useState(0);
@@ -34,7 +35,7 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
             the crossfade — a soft swap instead of a hard cut. */}
         <img
           key={current.id}
-          src={current.url}
+          src={imgSrc(current.url)}
           alt={current.alt_text || alt}
           className="aspect-[3/4] w-full animate-fade-in object-cover"
         />

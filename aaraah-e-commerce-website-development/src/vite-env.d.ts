@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_UPI_PAYEE_NAME?: string;
   readonly VITE_GA_ID?: string;
   readonly VITE_META_PIXEL_ID?: string;
+  readonly VITE_IMG_PROXY?: string;
 }
 
 interface ImportMeta {

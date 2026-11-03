@@ -9,6 +9,7 @@ import { useLiveOrder } from "@/hooks/useLiveOrder";
 import { useToast } from "@/contexts/ToastContext";
 import { CancelOrderError, cancelOrder } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
+import { imgSrc } from "@/lib/imgProxy";
 
 // Customers can cancel only until the order ships.
 const CUSTOMER_CANCELLABLE = ["pending", "confirmed", "processing"];
@@ -88,7 +89,7 @@ export default function OrderDetailPage() {
           {order.items?.map((item) => (
             <div key={item.id} className="flex gap-3 text-sm">
               <div className="h-16 w-14 flex-shrink-0 overflow-hidden rounded bg-stone-100">
-                {item.image_url && <img src={item.image_url} className="h-full w-full object-cover" alt="" />}
+                {item.image_url && <img src={imgSrc(item.image_url)} className="h-full w-full object-cover" alt="" />}
               </div>
               <div className="flex-1">
                 <p className="text-stone-800">{item.product_name}</p>
