@@ -36,6 +36,53 @@ const CARD_SELECT_ACTIVE = `
   )
 `;
 
+// Lean select for the many small product cards (home page, "similar" strip): only what a card shows.
+// No descriptions, bullet points, SEO text, or any other long text. KEEP IN SYNC with FEED_SELECT in hostinger/server.js.
+const CARD_LITE_SELECT =
+  "id,brand,parent_sku,name,slug,category_id,collection_id,active,created_at," +
+  "collection:collections(id,name,slug)," +
+  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at," +
+  "images:product_images(id,variant_id,url,thumb_url,alt_text,sort_order))";
+
+// The card list is remembered for 2 minutes inside the open page, so moving between Home, categories and
+// product pages does not download it again. On Hostinger (VITE_IMG_PROXY=1) it comes from our own server,
+// which asks Supabase at most once every 2 minutes for ALL visitors together; if that server answer is
+// missing for any reason, the browser asks Supabase directly (exactly like before).
+const FEED_TTL_MS = 2 * 60_000;
+let feedCache: { at: number; data: ProductWithVariants[] } | null = null;
+let feedInflight: Promise<ProductWithVariants[]> | null = null;
+
+async function fetchFeedFromOwnServer(): Promise<ProductWithVariants[] | null> {
+  if (import.meta.env.VITE_IMG_PROXY !== "1") return null;
+  try {
+    const res = await fetch("/data/products-feed", { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return Array.isArray(json) ? (json as ProductWithVariants[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadCardFeed(): Promise<ProductWithVariants[]> {
+  if (feedCache && Date.now() - feedCache.at < FEED_TTL_MS) return feedCache.data;
+  if (!feedInflight) {
+    feedInflight = (async () => {
+      let data = await fetchFeedFromOwnServer();
+      if (!data) {
+        const { data: rows, error } = await supabase.from("products").select(CARD_LITE_SELECT).eq("active", true);
+        if (error) throw error;
+        data = (rows || []) as unknown as ProductWithVariants[];
+      }
+      feedCache = { at: Date.now(), data };
+      return data;
+    })().finally(() => {
+      feedInflight = null;
+    });
+  }
+  return feedInflight;
+}
+
 function sortVariantImages(product: ProductWithVariants): ProductWithVariants {
   return {
     ...product,
@@ -332,11 +379,10 @@ export async function fetchHomeFeed(
 ): Promise<HomeFeed> {
   const { latestCount = 12, perCollection = 8, categoryId } = opts;
 
-  const { data, error } = await supabase.from("products").select(CARD_SELECT).eq("active", true);
-  if (error) throw error;
+  const data = await loadCardFeed();
 
   const pool: SimilarItem[] = [];
-  ((data || []) as ProductWithVariants[]).map(sortVariantImages).forEach((product) => {
+  data.map(sortVariantImages).forEach((product) => {
     if (categoryId && product.category_id !== categoryId) return; // category page: only this category
     product.variants.filter((v) => v.active).forEach((variant) => pool.push({ product, variant }));
   });
@@ -392,15 +438,12 @@ export async function fetchSimilarVariants(currentVariantId: string, limit = 8):
   // "Similar" is per-SKU, not per-product: sibling colours of the SAME design
   // count too, since each SKU is its own listing. We only ever exclude the
   // one variant the customer is currently looking at.
-  const { data, error } = await supabase
-    .from("products")
-    .select(CARD_SELECT)
-    .eq("active", true)
-    .order("created_at", { ascending: false })
-    .limit(24);
-  if (error) throw error;
-
-  const products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+  const all = await loadCardFeed();
+  const products = all
+    .slice()
+    .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())
+    .slice(0, 24)
+    .map(sortVariantImages);
   const pool: SimilarItem[] = [];
   products.forEach((product) => {
     product.variants

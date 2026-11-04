@@ -4,6 +4,8 @@
 //   1. Serves the built website from ../dist and gives every other page the index.html (so refresh never 404s).
 //   2. /sitemap.xml, /feed.xml and link-preview bots on /products/:slug -> the existing ../api/*.js code, unchanged.
 //      Results are remembered for a few minutes, so bots cannot make Supabase work (and send data) again and again.
+//   2b. /data/products-feed -> the product cards for Home / category / "similar" strips. Supabase is asked at most once
+//      every 2 minutes for ALL visitors together (not once per visitor), so traffic growth cannot grow Supabase egress.
 //   3. /img/<bucket>/<file>  -> the photo from Supabase Storage, kept on THIS server's disk after the first visit.
 //      Each photo leaves Supabase only once, so Supabase "egress" stops growing with traffic.
 //   4. (www / https redirects are left to Hostinger.)
@@ -129,6 +131,76 @@ async function runApi(name, key, query, ttlMs, req, res) {
   if (headers["Cache-Control"]) headers["Cache-Control"] = String(headers["Cache-Control"]).replace(/s-maxage=/g, "max-age=");
   res.writeHead(out.status, headers);
   res.end(req.method === "HEAD" ? undefined : out.body);
+}
+
+/* ------------------------------------------------------------------ */
+/* 1b. /data/products-feed : product cards, asked from Supabase once   */
+/*     per 2 minutes for everybody                                     */
+/* ------------------------------------------------------------------ */
+// KEEP IN SYNC with CARD_LITE_SELECT in src/services/products.ts
+const FEED_SELECT =
+  "id,brand,parent_sku,name,slug,category_id,collection_id,active,created_at," +
+  "collection:collections(id,name,slug)," +
+  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at," +
+  "images:product_images(id,variant_id,url,thumb_url,alt_text,sort_order))";
+const FEED_TTL_MS = 2 * 60_000;
+let feedState = null; // { at, br, gz, raw }
+let feedInflight = null;
+
+async function buildFeed() {
+  const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !key) throw new Error("Supabase not configured");
+  const out = [];
+  for (let offset = 0; offset < 20000; offset += 1000) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/products?select=${encodeURIComponent(FEED_SELECT)}&active=eq.true&order=id.asc&limit=1000&offset=${offset}`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) }
+    );
+    if (!res.ok) throw new Error(`products ${res.status}`);
+    const page = await res.json();
+    out.push(...page);
+    if (page.length < 1000) break;
+  }
+  const raw = Buffer.from(JSON.stringify(out));
+  return {
+    at: Date.now(),
+    raw,
+    br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }),
+    gz: zlib.gzipSync(raw),
+  };
+}
+
+async function serveFeed(req, res) {
+  let st = feedState;
+  if (!st || Date.now() - st.at >= FEED_TTL_MS) {
+    try {
+      if (!feedInflight) feedInflight = buildFeed().finally(() => (feedInflight = null));
+      st = await feedInflight;
+      feedState = st;
+    } catch (err) {
+      log("products-feed error:", err && err.message);
+      // keep showing the last good copy if there is one; otherwise the browser falls back to asking Supabase itself
+      if (!st) {
+        res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+        res.end("Temporarily unavailable");
+        return;
+      }
+    }
+  }
+  const accept = String(req.headers["accept-encoding"] || "");
+  const useBr = /\bbr\b/.test(accept);
+  const useGz = !useBr && /\bgzip\b/.test(accept);
+  const body = useBr ? st.br : useGz ? st.gz : st.raw;
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "public, max-age=60",
+    Vary: "Accept-Encoding",
+    "Content-Length": body.length,
+  };
+  if (useBr) headers["Content-Encoding"] = "br";
+  else if (useGz) headers["Content-Encoding"] = "gzip";
+  res.writeHead(200, headers);
+  res.end(req.method === "HEAD" ? undefined : body);
 }
 
 /* ------------------------------------------------------------------ */
@@ -406,6 +478,11 @@ const server = http.createServer(async (req, res) => {
 
     // www / http redirects are handled by Hostinger itself (our own redirect fought with it and caused a loop).
     // Google still sees https://aaraah.in as the address, because every page carries that canonical link.
+
+    if (pathname === "/data/products-feed") {
+      await serveFeed(req, res);
+      return;
+    }
 
     if (pathname.startsWith("/img/")) {
       await serveImage(req, res, pathname);
