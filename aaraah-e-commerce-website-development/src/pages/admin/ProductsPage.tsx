@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { LoadingState, EmptyState } from "@/components/ui/States";
 import { useToast } from "@/contexts/ToastContext";
+import { downloadListingSample } from "@/lib/listingSample";
 import {
   fetchAllProductsAdmin,
   deleteProduct,
@@ -255,9 +256,21 @@ export default function AdminProductsPage() {
       <SEO title="Manage Products" canonicalPath="/admin/products" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-2xl font-semibold text-stone-900">Products</h1>
-        <Link to="/admin/products/new" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">
-          + New listing
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={downloadListingSample}
+            className="rounded-full border border-rose-900 px-4 py-2.5 text-sm font-semibold text-rose-900 hover:bg-rose-50"
+          >
+            Sample Excel download
+          </button>
+          <Link to="/admin/import" className="rounded-full border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+            Import Excel
+          </Link>
+          <Link to="/admin/products/new" className="rounded-full bg-rose-900 px-5 py-2.5 text-sm font-semibold text-white">
+            + New listing
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">

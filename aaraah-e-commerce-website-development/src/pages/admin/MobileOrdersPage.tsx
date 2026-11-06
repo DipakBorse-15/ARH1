@@ -9,8 +9,9 @@ import { isExpiredUnpaid } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { OrderStatus } from "@/types";
 
-const FILTERS: { value: OrderStatus | "all"; label: string }[] = [
+const FILTERS: { value: OrderStatus | "all" | "utr"; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "utr", label: "UTR bheja" },
   { value: "pending", label: "Pending" },
   { value: "confirmed", label: "Confirmed" },
   { value: "processing", label: "Processing" },
@@ -26,7 +27,7 @@ const AUTO_REFRESH_MS = 30_000;
 export default function MobileOrdersPage() {
   const [rows, setRows] = useState<OrderListRow[]>([]);
   const [hasMore, setHasMore] = useState(false);
-  const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [status, setStatus] = useState<OrderStatus | "all" | "utr">("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -167,7 +168,9 @@ export default function MobileOrdersPage() {
                     <StatusBadge status={o.status} />
                     <PaymentBadge status={o.payment_status} method={o.payment_method} />
                     {o.payment_status !== "paid" && o.payment_reference && (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">UTR sent</span>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                        {o.status === "pending" ? "UTR bheja · confirm baaki" : "UTR sent"}
+                      </span>
                     )}
                     {isExpiredUnpaid(o) && (
                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">Expired</span>

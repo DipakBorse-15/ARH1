@@ -28,7 +28,8 @@ export interface OrdersPage {
 
 /** Newest first. `before` = created_at of the last row already shown (loads the next page). */
 export async function fetchOrdersPageAdmin(opts: {
-  status: OrderStatus | "all";
+  /** "utr" = customer sent a UTR but the payment is not confirmed yet (still waiting for the admin to check). */
+  status: OrderStatus | "all" | "utr";
   search: string;
   before?: string | null;
 }): Promise<OrdersPage> {
@@ -38,7 +39,11 @@ export async function fetchOrdersPageAdmin(opts: {
     .order("created_at", { ascending: false })
     .limit(ORDERS_PAGE_SIZE + 1);
 
-  if (opts.status !== "all") q = q.eq("status", opts.status);
+  if (opts.status === "utr") {
+    q = q.eq("status", "pending").eq("payment_status", "pending").eq("payment_method", "upi").not("payment_reference", "is", null);
+  } else if (opts.status !== "all") {
+    q = q.eq("status", opts.status);
+  }
   if (opts.before) q = q.lt("created_at", opts.before);
 
   // Letters, digits and spaces only, so nothing typed can break the filter.

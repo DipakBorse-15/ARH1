@@ -156,6 +156,18 @@ export async function expireUnpaidOrdersAdmin(): Promise<number> {
   return Number(data) || 0;
 }
 
+/**
+ * Admin: open a cancelled order again (-> confirmed + paid, stock is taken again).
+ * Fails with a readable message if the stock was sold meanwhile, or the order was shipped / refunded.
+ */
+export async function reopenOrderAdmin(orderId: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_reopen_order", { p_order_id: orderId });
+  if (error) {
+    const msg = rpcMessage(error);
+    throw new Error(/not enough stock/i.test(msg) ? "Not enough stock to re-open this order. Pehle Products me stock badhao." : msg);
+  }
+}
+
 /** Daytime orders wait this many hours for payment. */
 export const UNPAID_HOURS = 3;
 

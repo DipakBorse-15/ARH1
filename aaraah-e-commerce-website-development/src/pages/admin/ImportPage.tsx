@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { useToast } from "@/contexts/ToastContext";
 import { shortSlug } from "@/lib/slugs";
+import { EXAMPLE_SKU_PREFIX, downloadListingSample } from "@/lib/listingSample";
 
 /**
  * Bulk import from the AARAAH "Uploader.xlsx" template (see its Details sheet
@@ -29,7 +30,7 @@ interface ParsedVariant {
   salePrice: number | null; // Selling Price
   discountPercent: number | null;
   discountAmount: number | null;
-  stock: number;
+  stock: number | null; // null = the Stock cell was empty
   workType: string;
   workPattern: string;
   bestFor: string;
@@ -105,6 +106,7 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
   for (const arr of dataRows) {
     const sku = firstValue(arr, colIndex, "SKU");
     if (!sku) continue;
+    if (sku.toUpperCase().startsWith(EXAMPLE_SKU_PREFIX)) continue; // the sample file's example rows
     const level = firstValue(arr, colIndex, "Parentage Level").toLowerCase();
     const parentSku = firstValue(arr, colIndex, "Parent SKU");
     const itemName = firstValue(arr, colIndex, "Item Name");
@@ -149,7 +151,7 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
         salePrice: sellingPrice,
         discountPercent: num(firstValue(arr, colIndex, "Discount %")),
         discountAmount: num(firstValue(arr, colIndex, "Discount Amount")),
-        stock: num(firstValue(arr, colIndex, "Stock")) ?? 0,
+        stock: num(firstValue(arr, colIndex, "Stock")),
         workType: firstValue(arr, colIndex, "Work Type"),
         workPattern: firstValue(arr, colIndex, "Work Pattern"),
         bestFor: firstValue(arr, colIndex, "Best For"),
@@ -285,6 +287,11 @@ export default function ImportPage() {
       try {
         const categoryId = matchCategory(p.productType, categories)?.id ?? null;
 
+        // A colour without a real MRP (empty / 0) is never imported: it could be ordered for free.
+        const goodVariants = p.variants.filter((v) => v.price > 0);
+        for (const v of p.variants) if (!(v.price > 0)) addLog(`⚠️ ${v.sku}: MRP khali ya 0 hai, ye colour skip hua`);
+        if (goodVariants.length === 0) throw new Error("Kisi colour me MRP nahi hai, ye product skip hua.");
+
         const { data: existing, error: findErr } = await supabase
           .from("products")
           .select("id, name")
@@ -327,7 +334,7 @@ export default function ImportPage() {
         let added = 0;
         let updated = 0;
 
-        for (const [i, v] of p.variants.entries()) {
+        for (const [i, v] of goodVariants.entries()) {
           const { data: priorVariant } = await supabase
             .from("product_variants")
             .select("id")
@@ -348,7 +355,13 @@ export default function ImportPage() {
                 sale_price: v.salePrice,
                 discount_percent: v.discountPercent,
                 discount_amount: v.discountAmount,
-                stock_quantity: v.stock,
+                // Stock cell filled: set it and keep "available" in step with it. Empty: an existing SKU keeps its
+                // stock; a brand-new SKU starts at 0 (not available).
+                ...(v.stock !== null
+                  ? { stock_quantity: v.stock, is_available: v.stock > 0 }
+                  : priorVariant
+                    ? {}
+                    : { stock_quantity: 0, is_available: false }),
                 description: v.description,
                 bullet_points: v.bullets,
                 work_type: v.workType,
@@ -393,6 +406,7 @@ export default function ImportPage() {
     show("Import finished. Check the log below.", "success");
   }
 
+  const badPrice = parsed.reduce((n, p) => n + p.variants.filter((v) => !(v.price > 0)).length, 0);
   const totalVariants = parsed.reduce((n, p) => n + p.variants.length, 0);
   const totalImages = parsed.reduce((n, p) => n + p.variants.reduce((m, v) => m + v.images.length, 0), 0);
 
@@ -404,7 +418,18 @@ export default function ImportPage() {
         rows become variants with their own images, price, description and bullet points.
       </p>
 
-      <div className="mt-6 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6">
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={downloadListingSample}
+          className="rounded-full border border-rose-900 px-4 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-50"
+        >
+          Sample Excel download (saare columns)
+        </button>
+        <p className="mt-1 text-xs text-stone-500">Isse download karke bharo aur niche upload karo. Sheet &quot;Details&quot; me har column samjhaya hai.</p>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6">
         <input
           type="file"
           accept=".xlsx,.xlsm,.xls,.csv"
@@ -429,6 +454,12 @@ export default function ImportPage() {
               {busy ? "Importing…" : "Import to store"}
             </button>
           </div>
+
+          {badPrice > 0 && (
+            <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
+              {badPrice} colour me MRP khali ya 0 hai. Wo import me skip honge (laal ₹ dikh raha hai). Excel me MRP bharke dobara upload kar sakte ho.
+            </p>
+          )}
 
           <div className="mt-6 space-y-4">
             {parsed.map((p) => (
@@ -456,9 +487,14 @@ export default function ImportPage() {
                         <div className="aspect-[3/4] w-full rounded" style={{ backgroundColor: hexFor(v.color) }} />
                       )}
                       <p className="mt-1 truncate text-[10px] text-stone-600">{v.color}</p>
-                      <p className="text-[10px] font-semibold text-stone-900">
-                        ₹{v.salePrice ?? v.price} · {v.images.length} img
-                      </p>
+                      {v.price > 0 ? (
+                        <p className="text-[10px] font-semibold text-stone-900">
+                          ₹{v.salePrice ?? v.price} · {v.images.length} img
+                        </p>
+                      ) : (
+                        <p className="text-[10px] font-semibold text-red-600">MRP nahi · skip</p>
+                      )}
+                      {v.stock === null && <p className="text-[10px] text-amber-700">Stock khali</p>}
                     </div>
                   ))}
                 </div>

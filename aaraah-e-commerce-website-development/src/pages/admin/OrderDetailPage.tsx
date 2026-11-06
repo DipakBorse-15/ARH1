@@ -4,7 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
-import { CancelOrderError, cancelOrder, fetchOrderById, saveShippingDetails, sendShippedEmail, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
+import { CancelOrderError, cancelOrder, fetchOrderById, reopenOrderAdmin, saveShippingDetails, sendShippedEmail, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
@@ -123,6 +123,15 @@ export default function AdminOrderDetailPage() {
   async function runCommand(e: React.FormEvent) {
     e.preventDefault();
     const word = command.trim().toLowerCase();
+    if (word === "reopen") {
+      setCommand("");
+      await handleReopen();
+      return;
+    }
+    if (order?.status === "cancelled") {
+      show('Ye order cancelled hai. Sirf "reopen" type kar sakte ho (paisa aaya ho tabhi).', "error");
+      return;
+    }
     if (word === "shipped") {
       show("To ship an order, fill the courier details below and press \"Mark shipped & email customer\".", "error");
       return;
@@ -134,6 +143,31 @@ export default function AdminOrderDetailPage() {
     }
     setCommand("");
     await handleStatusChange(target);
+  }
+
+  // Cancelled -> confirmed + paid again (e.g. the customer paid after the auto-cancel). Stock is taken again.
+  async function handleReopen() {
+    if (!order) return;
+    if (order.status !== "cancelled") {
+      show('"reopen" sirf cancelled order par chalta hai.', "error");
+      return;
+    }
+    if (order.payment_status === "refunded" || order.shipped_at) {
+      show("Refunded ya shipped order dobara open nahi ho sakta.", "error");
+      return;
+    }
+    if (!confirm(`Kya ₹${order.total} tumhare UPI app / bank me aa chuka hai?\n\nOK dabane par order dobara Confirmed + Paid ho jayega, stock wapas lagega aur customer ko "Payment received" email jayegi.`)) return;
+    setUpdating(true);
+    try {
+      await reopenOrderAdmin(order.id);
+      show("Order dobara khul gaya: Confirmed + Paid", "success");
+      sendPaymentConfirmedEmail(order.id);
+      await load(order.id);
+    } catch (err) {
+      show((err as Error).message || friendlyError(err), "error");
+    } finally {
+      setUpdating(false);
+    }
   }
 
   // Courier + tracking. "Ship" also moves the order to shipped and emails the customer.
@@ -206,8 +240,8 @@ export default function AdminOrderDetailPage() {
           ))}
           <li className={`rounded-full px-3 py-1.5 font-medium ${order.status === "cancelled" ? "bg-rose-700 text-white" : "border border-rose-200 text-rose-400"}`}>Cancelled</li>
         </ol>
-        {order.status === "delivered" || order.status === "cancelled" ? (
-          <p className="text-xs text-stone-500">This order is {order.status}. No more changes are possible.</p>
+        {order.status === "delivered" ? (
+          <p className="text-xs text-stone-500">This order is delivered. No more changes are possible.</p>
         ) : (
           <form onSubmit={runCommand} className="flex flex-wrap items-center gap-2">
             <input
@@ -223,7 +257,15 @@ export default function AdminOrderDetailPage() {
               Go
             </button>
             <p className="w-full text-xs text-stone-500">
-              <b>confirm</b> = confirmed{order.payment_method === "upi" && order.payment_status !== "paid" ? " (also marks the UPI payment received)" : ""} · <b>process</b> = processing · <b>delivered</b> = delivered · <b>cancel</b> = cancelled. Shipping: use the box below. Status can only move forward.
+              {order.status === "cancelled" ? (
+                <>
+                  <b>reopen</b> = order dobara Confirmed + Paid (stock wapas lagega, customer ko &quot;Payment received&quot; email). Pehle apna UPI app check karo, paisa aaya ho tabhi.
+                </>
+              ) : (
+                <>
+                  <b>confirm</b> = confirmed{order.payment_method === "upi" && order.payment_status !== "paid" ? " (also marks the UPI payment received)" : ""} · <b>process</b> = processing · <b>delivered</b> = delivered · <b>cancel</b> = cancelled. Shipping: use the box below. Status can only move forward.
+                </>
+              )}
             </p>
           </form>
         )}

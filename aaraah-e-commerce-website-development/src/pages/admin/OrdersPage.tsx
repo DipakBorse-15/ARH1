@@ -106,7 +106,15 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const filtered = statusFilter === "all" ? orders : orders.filter((o) => o.status === statusFilter);
+  // Customer sent a UTR, payment not confirmed yet: these hold stock until the admin checks the UPI app.
+  const isUtrWaiting = (o: Order) => o.status === "pending" && o.payment_status === "pending" && o.payment_method === "upi" && !!o.payment_reference;
+  const utrWaiting = orders.filter(isUtrWaiting);
+  const filtered =
+    statusFilter === "all"
+      ? orders
+      : statusFilter === "utr"
+        ? utrWaiting.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)) // oldest first
+        : orders.filter((o) => o.status === statusFilter);
 
   return (
     <div>
@@ -116,6 +124,7 @@ export default function AdminOrdersPage() {
         <div className="flex flex-wrap items-center gap-3">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-full border border-stone-300 px-3 py-2 text-sm">
             <option value="all">All statuses</option>
+            <option value="utr">UTR bheja, confirm baaki ({utrWaiting.length})</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -167,7 +176,9 @@ export default function AdminOrdersPage() {
                   <td className="p-3 capitalize text-stone-500">
                     {o.payment_status}
                     {o.payment_status !== "paid" && o.payment_reference && (
-                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium normal-case text-emerald-700">UTR sent</span>
+                      <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium normal-case text-emerald-700">
+                        {isUtrWaiting(o) ? "UTR bheja · confirm baaki" : "UTR sent"}
+                      </span>
                     )}
                     {isExpiredUnpaid(o) && (
                       <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium normal-case text-amber-700">Expired</span>

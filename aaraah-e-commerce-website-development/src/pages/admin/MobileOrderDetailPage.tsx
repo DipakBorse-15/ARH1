@@ -5,7 +5,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { PaymentBadge, StatusBadge, formatWhen, telHref, whatsappHref } from "@/components/admin/orderUi";
 import { useToast } from "@/contexts/ToastContext";
-import { CancelOrderError, cancelOrder, fetchOrderById, sendShippedEmail, type ShippingInput } from "@/services/orders";
+import { CancelOrderError, cancelOrder, fetchOrderById, reopenOrderAdmin, sendShippedEmail, type ShippingInput } from "@/services/orders";
 import {
   confirmOrderGuarded,
   markDeliveredGuarded,
@@ -199,6 +199,25 @@ export default function MobileOrderDetailPage() {
     });
   }
 
+  /** Cancelled -> confirmed + paid again (customer paid after the auto-cancel). Stock is taken again. */
+  function reopenOrder() {
+    void run("reopen", async () => {
+      if (!confirm(`Kya ₹${o.total} tumhare UPI app / bank me aa chuka hai?\n\nTabhi OK dabao. Order dobara Confirmed + Paid hoga, stock wapas lagega aur customer ko "Payment received" email jayegi.`)) return;
+      try {
+        await reopenOrderAdmin(o.id);
+      } catch (err) {
+        show((err as Error).message || friendlyError(err), "error");
+        await load(true);
+        return;
+      }
+      show("Order dobara khul gaya: Confirmed + Paid", "success");
+      const sent = await sendPaymentConfirmedEmail(o.id);
+      if (!sent) show("Order khul gaya, par customer ko email nahi ja paya.", "error");
+      shipDirty.current = false;
+      await load(true);
+    });
+  }
+
   function markRefunded() {
     void run("refund", async () => {
       const extra =
@@ -226,6 +245,7 @@ export default function MobileOrderDetailPage() {
   const canShip = status === "confirmed" || status === "processing";
   const showShipCard = canShip || status === "shipped" || status === "delivered";
   const canCancel = status === "pending" || status === "confirmed" || status === "processing";
+  const canReopen = status === "cancelled" && o.payment_status !== "refunded" && !o.shipped_at;
   const canRefund = o.payment_status === "paid" && (status === "cancelled" || status === "shipped" || status === "delivered");
 
   return (
@@ -315,11 +335,22 @@ export default function MobileOrderDetailPage() {
 
       {(status === "delivered" || status === "cancelled") && (
         <p className="rounded-2xl bg-stone-100 px-4 py-3 text-xs text-stone-600">
-          Ye order {status} hai. Ab iska status nahi badal sakta.
+          Ye order {status} hai.{status === "delivered" || !canReopen ? " Ab iska status nahi badal sakta." : ""}
           {status === "cancelled" && o.payment_method === "upi" && o.payment_reference && o.payment_status !== "paid" && (
-            <b className="mt-1 block text-rose-700">Customer ne UTR {o.payment_reference} bheja tha. Apna UPI app check karo.</b>
+            <b className="mt-1 block text-rose-700">Customer ne UTR {o.payment_reference} bheja tha. Apna UPI app check karo; paisa aaya ho to niche "Re-open order" dabao.</b>
           )}
         </p>
+      )}
+      {canReopen && (
+        <div className={card}>
+          <h2 className="mb-1 text-sm font-semibold text-stone-900">Re-open order</h2>
+          <p className="mb-3 text-xs text-stone-500">
+            Customer ne cancel ke baad paisa bheja ho to order dobara Confirmed + Paid ho jayega. Stock wapas lagega; stock kam ho to error aayega.
+          </p>
+          <button type="button" disabled={!!busy} onClick={reopenOrder} className={primaryBtn}>
+            {busy === "reopen" ? "Opening…" : "Re-open order (paisa aa gaya)"}
+          </button>
+        </div>
       )}
 
       {/* ---------- Shipping / tracking ---------- */}
