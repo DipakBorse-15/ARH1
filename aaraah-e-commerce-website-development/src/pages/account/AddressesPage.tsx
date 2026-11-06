@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew, deleteAddress } from "@/services/addresses";
 import { friendlyError } from "@/lib/supabase";
+import { normalizeMobile } from "@/lib/validators";
 import type { Address } from "@/types";
 
 const EMPTY: Partial<Address> = { full_name: "", mobile: "", line1: "", line2: "", city: "", state: "", pincode: "" };
@@ -38,10 +39,15 @@ export default function AddressesPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    const cleanMobile = normalizeMobile(form.mobile);
+    if (!cleanMobile) {
+      show("Enter a valid 10-digit mobile number.", "error");
+      return;
+    }
     try {
       await saveAddressIfNew({
         full_name: form.full_name || "",
-        mobile: form.mobile || "",
+        mobile: cleanMobile,
         line1: form.line1 || "",
         line2: form.line2 || null,
         city: form.city || "",
@@ -103,7 +109,7 @@ export default function AddressesPage() {
           ) : (
             <form onSubmit={handleSave} className="grid gap-3 rounded-2xl border border-stone-200 p-5 sm:grid-cols-2">
               <input placeholder="Full name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={inputClass} />
-              <input placeholder="Mobile" required value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} className={inputClass} />
+              <input placeholder="Mobile (10 digits)" required type="tel" inputMode="tel" autoComplete="tel" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} className={inputClass} />
               <input placeholder="Address line 1" required value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} className={`${inputClass} sm:col-span-2`} />
               <input placeholder="Address line 2 (optional)" value={form.line2 ?? ""} onChange={(e) => setForm({ ...form, line2: e.target.value })} className={`${inputClass} sm:col-span-2`} />
               <input placeholder="City" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={inputClass} />

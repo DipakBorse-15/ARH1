@@ -1,7 +1,8 @@
 // Vercel serverless function: live sitemap built from the database, so new
 // categories, collections and products are picked up without re-uploading anything.
-// Served at /sitemap.xml (see vercel.json). Falls back to a small static list if the
-// database cannot be reached.
+// Served at /sitemap.xml (see vercel.json). If the database cannot be reached it answers 503
+// (never a thin "static pages only" sitemap): Google retries later, and hostinger/server.js keeps
+// serving its last good copy meanwhile.
 import { colorSlug } from "./_lib/seoText.js";
 
 const SITE = "https://aaraah.in";
@@ -60,7 +61,12 @@ export default async function handler(req, res) {
       }
     }
   } catch (e) {
-    // keep the static list
+    // Database trouble: a 200 with only the 8 static pages would be remembered (and shown to Google) as the real sitemap.
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Retry-After", "300");
+    res.status(503).send("Sitemap temporarily unavailable");
+    return;
   }
 
   const xml =

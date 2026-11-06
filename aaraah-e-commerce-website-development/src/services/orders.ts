@@ -13,6 +13,8 @@ export interface CheckoutPayload {
   pincode: string;
   payment_method: "cod" | "upi";
   coupon_code?: string;
+  /** true when the order is a "Buy Now" (not from the cart): the server must leave the cart alone. */
+  buy_now?: boolean;
 }
 
 export interface CreateOrderResponse {
@@ -21,25 +23,38 @@ export interface CreateOrderResponse {
   total: number;
 }
 
+/** The create-order function refused with a message written for the customer ("sold out", "coupon expired" ...). Show it as it is. */
+export class PlaceOrderError extends Error {}
+
 /**
  * Places an order via the `create-order` Edge Function so price, stock and
  * totals are always re-validated server-side (never trusted from the browser).
+ * A refusal (HTTP 4xx) carries a customer-safe reason -> PlaceOrderError. Anything else
+ * (server crash, 5xx, network, expired login) is thrown as it is and shown as a generic message.
  */
 export async function placeOrder(payload: CheckoutPayload): Promise<CreateOrderResponse> {
   const { data, error } = await supabase.functions.invoke("create-order", { body: payload });
   if (error) {
-    // The function replies with a readable reason (e.g. "items just sold out") — show that, not "non-2xx".
     let message = "";
+    let status = 0;
     try {
       const res = (error as { context?: Response }).context;
-      if (res) message = (await res.json())?.error ?? "";
+      if (res) {
+        status = res.status;
+        message = (await res.json())?.error ?? "";
+      }
     } catch {
       /* fall through to the generic error */
     }
-    if (message) throw new Error(message);
+    if (message) {
+      // 4xx = a refusal written for the customer. 401 / 5xx keep the old path: friendlyError() turns them into
+      // "Please sign in to continue." / a generic message (the technical text must not reach the customer).
+      if (status >= 400 && status < 500 && status !== 401) throw new PlaceOrderError(message);
+      throw new Error(message);
+    }
     throw error;
   }
-  if (data?.error) throw new Error(data.error);
+  if (data?.error) throw new PlaceOrderError(data.error);
   return data as CreateOrderResponse;
 }
 

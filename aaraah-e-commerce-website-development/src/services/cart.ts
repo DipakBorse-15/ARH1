@@ -6,14 +6,31 @@ const CART_SELECT = `
   variant:product_variants(
     *,
     images:product_images(*),
-    product:products(*)
+    product:products(*, category:categories(active))
   )
 `;
+
+/**
+ * Same rule as the create-order function: a colour can be bought only when the colour is active,
+ * its design (parent product) is active and its category is not switched off (no category = fine).
+ * Lines that fail it are not shown; they stay saved and come back if the item is switched on again.
+ */
+function isBuyableLine(item: CartItem): boolean {
+  type Parent = { active?: boolean; category_id?: string | null; category?: { active?: boolean } | null };
+  const v = item.variant as (CartItem["variant"] & { product?: Parent | null }) | undefined;
+  if (!v || v.active === false) return false;
+  const parent = v.product;
+  // The shop's read rules hide switched-off designs / categories from customers, so a missing parent,
+  // or a category that is set but not returned, means "switched off" too.
+  if (!parent || parent.active === false) return false;
+  if (parent.category_id && (!parent.category || parent.category.active === false)) return false;
+  return true;
+}
 
 export async function fetchCart(userId: string): Promise<CartItem[]> {
   const { data, error } = await supabase.from("cart_items").select(CART_SELECT).eq("user_id", userId).order("created_at");
   if (error) throw error;
-  return (data || []) as CartItem[];
+  return ((data || []) as CartItem[]).filter(isBuyableLine);
 }
 
 /** Most pieces of one item a customer can order at once (the order function enforces the same). */

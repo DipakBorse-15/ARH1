@@ -7,10 +7,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
-import { placeOrder } from "@/services/orders";
+import { PlaceOrderError, placeOrder } from "@/services/orders";
 import { previewCoupon } from "@/services/coupons";
 import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
+import { isValidMobile, normalizeMobile } from "@/lib/validators";
 import { trackBeginCheckout } from "@/lib/analytics";
 import type { Address, ProductVariant, ProductWithVariants } from "@/types";
 import { imgSrc } from "@/lib/imgProxy";
@@ -73,7 +74,7 @@ export default function CheckoutPage() {
       ...f,
       full_name: f.full_name || profile?.full_name || "",
       email: f.email || profile?.email || user?.email || "",
-      mobile: f.mobile || profile?.mobile || metaMobile,
+      mobile: f.mobile || tidyMobile(profile?.mobile || metaMobile),
     }));
   }, [user, profile]);
 
@@ -156,7 +157,7 @@ export default function CheckoutPage() {
     setForm((f) => ({
       ...f,
       full_name: a.full_name,
-      mobile: a.mobile,
+      mobile: tidyMobile(a.mobile),
       address_line1: a.line1,
       address_line2: a.line2 || "",
       city: a.city,
@@ -168,7 +169,7 @@ export default function CheckoutPage() {
   function validate(): boolean {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.full_name.trim()) next.full_name = "Full name is required";
-    if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) next.mobile = "Enter a valid 10-digit mobile number";
+    if (!isValidMobile(form.mobile)) next.mobile = "Enter a valid 10-digit mobile number";
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Enter a valid email address";
     if (!form.address_line1.trim()) next.address_line1 = "Address is required";
     if (!form.city.trim()) next.city = "City is required";
@@ -202,11 +203,12 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
+      const mobile = normalizeMobile(form.mobile) ?? form.mobile.trim(); // always 10 digits (no +91 / 0)
       // Best-effort and de-duplicated: never blocks the order, never saves the same address twice.
       await saveAddressIfNew({
         user_id: user.id,
         full_name: form.full_name,
-        mobile: form.mobile,
+        mobile,
         line1: form.address_line1,
         line2: form.address_line2 || null,
         city: form.city,
@@ -217,7 +219,7 @@ export default function CheckoutPage() {
       const result = await placeOrder({
         items: lines.map((l) => ({ variant_id: l.variant_id, quantity: l.quantity })),
         full_name: form.full_name,
-        mobile: form.mobile,
+        mobile,
         email: form.email,
         address_line1: form.address_line1,
         address_line2: form.address_line2,
@@ -226,12 +228,14 @@ export default function CheckoutPage() {
         pincode: form.pincode,
         payment_method: form.payment_method,
         coupon_code: coupon?.code,
+        buy_now: !!directItem,
       });
 
-      if (!directItem) await refresh();
+      await refresh(); // cart is re-read either way (never throws; Buy Now leaves the cart as it was)
       navigate(`/order-confirmation/${result.order_id}`, { state: { orderNumber: result.order_number } });
     } catch (err) {
-      show(friendlyError(err, "Could not place your order. Please try again."), "error");
+      // The server's own reason ("sold out", "coupon expired", "valid mobile number" ...) is meant for the customer.
+      show(err instanceof PlaceOrderError ? err.message : friendlyError(err, "Could not place your order. Please try again."), "error");
     } finally {
       submitLock.current = false;
       setSubmitting(false);
@@ -413,6 +417,11 @@ export default function CheckoutPage() {
       )}
     </div>
   );
+}
+
+/** Shows a stored number in the plain 10-digit form when it is a valid one; anything else is left for the customer to fix. */
+function tidyMobile(value: string | null | undefined): string {
+  return normalizeMobile(value) ?? String(value ?? "");
 }
 
 const inputClass = "w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-rose-900 focus:outline-none";

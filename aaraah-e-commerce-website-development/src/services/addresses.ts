@@ -1,11 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import type { Address } from "@/types";
+import { normalizeMobile } from "@/lib/validators";
 
 type AddressFields = Pick<Address, "full_name" | "mobile" | "line1" | "city" | "state" | "pincode"> & { line2?: string | null };
 
 /** Same address typed twice (case / spacing differences) is still ONE address. */
 function addressKey(a: AddressFields): string {
-  return [a.full_name, a.mobile, a.line1, a.line2 || "", a.city, a.state, a.pincode]
+  return [a.full_name, normalizeMobile(a.mobile) ?? a.mobile, a.line1, a.line2 || "", a.city, a.state, a.pincode]
     .map((v) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim())
     .join("|");
 }

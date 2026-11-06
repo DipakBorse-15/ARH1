@@ -29,6 +29,16 @@ interface Payload {
   pincode: string;
   payment_method: "cod" | "upi";
   coupon_code?: string;
+  /** "Buy Now" order (not from the cart): the customer's cart must be left untouched. */
+  buy_now?: boolean;
+}
+
+// Indian mobile rule — SAME as normalizeMobile() in src/lib/validators.ts (keep both in sync).
+// 10 digits starting 6-9, optional +91 / 91 / 0 in front. Returns the plain 10 digits or null.
+function normalizeMobile(value: unknown): string | null {
+  const compact = String(value ?? "").replace(/[\s\-().]/g, "");
+  const m = /^(?:\+?91|0)?([6-9]\d{9})$/.exec(compact);
+  return m ? m[1] : null;
 }
 
 const VALID_PAYMENT_METHODS = new Set(["cod", "upi"]);
@@ -107,60 +117,133 @@ Deno.serve(async (req) => {
     if (!payload.full_name || !payload.address_line1 || !payload.city || !payload.state) {
       return json({ error: "Missing required address fields" }, 400);
     }
-    if (!/^\+?[\d\s-]{10,16}$/.test(payload.mobile)) return json({ error: "Enter a valid mobile number" }, 400);
+    const cleanMobile = normalizeMobile(payload.mobile);
+    if (!cleanMobile) return json({ error: "Enter a valid 10-digit mobile number" }, 400);
+    payload.mobile = cleanMobile; // stored as plain 10 digits (no +91 / 0)
+    const buyNow = payload.buy_now === true;
     if (!/^\S+@\S+\.\S+$/.test(payload.email)) return json({ error: "Enter a valid email address" }, 400);
     if (!/^\d{6}$/.test(payload.pincode)) return json({ error: "Enter a valid 6-digit pincode" }, 400);
 
     // ---- Double-click / retry protection ---------------------------------------
     // If this same customer already placed an identical, still-pending order in the
     // last 2 minutes, hand that order back instead of creating (and charging stock for) a second one.
+    // If the delivery details are different this time (the customer saw a wrong address and
+    // came back to fix it), the same pending order is updated with the new details — the stock it
+    // already holds is reused, so a one-piece saree does not become "sold out" for its own buyer.
     const itemKey = (rows: { variant_id: string | null; quantity: number }[]) =>
       rows.map((r) => `${r.variant_id}:${r.quantity}`).sort().join("|");
+    const norm = (v: unknown) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    const detailsKey = (d: { full_name: unknown; mobile: unknown; email: unknown; address_line1: unknown; address_line2: unknown; city: unknown; state: unknown; pincode: unknown }) =>
+      [d.full_name, normalizeMobile(d.mobile) ?? d.mobile, d.email, d.address_line1, d.address_line2, d.city, d.state, d.pincode].map(norm).join("|");
     const wantedKey = itemKey(payload.items);
+    const wantedDetails = detailsKey({ ...payload, address_line2: payload.address_line2 ?? "" });
     const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: recentOrders } = await admin
       .from("orders")
-      .select("id, order_number, total, coupon_code, items:order_items(variant_id, quantity)")
+      .select("id, order_number, total, coupon_code, payment_reference, full_name, mobile, email, address_line1, address_line2, city, state, pincode, items:order_items(variant_id, quantity)")
       .eq("user_id", userId)
       .eq("status", "pending")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(5);
-    const duplicate = (recentOrders || []).find(
-      (o: { coupon_code: string | null; items: { variant_id: string | null; quantity: number }[] }) =>
-        itemKey(o.items || []) === wantedKey && (o.coupon_code || "") === couponCode
+    type RecentOrder = {
+      id: string;
+      order_number: string;
+      total: number;
+      coupon_code: string | null;
+      payment_reference: string | null;
+      full_name: string;
+      mobile: string;
+      email: string;
+      address_line1: string;
+      address_line2: string | null;
+      city: string;
+      state: string;
+      pincode: string;
+      items: { variant_id: string | null; quantity: number }[];
+    };
+    const duplicate = ((recentOrders || []) as RecentOrder[]).find(
+      (o) => itemKey(o.items || []) === wantedKey && (o.coupon_code || "") === couponCode
     );
     if (duplicate) {
-      return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
+      if (detailsKey(duplicate) === wantedDetails) {
+        return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
+      }
+      if (duplicate.payment_reference) {
+        return json(
+          { error: `Your order ${duplicate.order_number} is already waiting for payment verification, so the address cannot be changed here. Please contact us on WhatsApp.` },
+          409
+        );
+      }
+      const { data: updated, error: updateError } = await admin
+        .from("orders")
+        .update({
+          full_name: payload.full_name,
+          mobile: payload.mobile,
+          email: payload.email,
+          address_line1: payload.address_line1,
+          address_line2: payload.address_line2 || null,
+          city: payload.city,
+          state: payload.state,
+          pincode: payload.pincode,
+        })
+        .eq("id", duplicate.id)
+        .eq("status", "pending")
+        .is("payment_reference", null)
+        .select("id");
+      if (updateError) return json({ error: "Could not update your order. Please try again." }, 500);
+      if (updated && updated.length > 0) {
+        return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
+      }
+      // The order moved on (cancelled / paid) in the meantime: fall through and treat this as a fresh order.
     }
 
     const variantIds = payload.items.map((i) => i.variant_id);
     const { data: variants, error: variantError } = await admin
       .from("product_variants")
-      .select("id, sku, color, price, sale_price, stock_quantity, is_available, active, product_id, products(name, brand), product_images(url, sort_order)")
+      .select("id, sku, color, price, sale_price, stock_quantity, is_available, active, product_id, products(name, brand, active, category_id), product_images(url, sort_order)")
       .in("id", variantIds);
 
     if (variantError) return json({ error: "Could not verify products" }, 500);
+
+    // Which categories are switched off? (Separate small read — no nested join to go wrong.)
+    const productOf = (v: { products?: unknown }) =>
+      (Array.isArray(v.products) ? v.products[0] : v.products) as { name?: string; brand?: string; active?: boolean; category_id?: string | null } | undefined;
+    const categoryIds = [...new Set((variants || []).map((v: { products?: unknown }) => productOf(v)?.category_id).filter((x): x is string => !!x))];
+    const inactiveCategories = new Set<string>();
+    if (categoryIds.length) {
+      const { data: cats, error: catError } = await admin.from("categories").select("id, active").in("id", categoryIds);
+      if (catError) return json({ error: "Could not verify products" }, 500);
+      for (const c of (cats || []) as { id: string; active: boolean }[]) if (c.active === false) inactiveCategories.add(c.id);
+    }
 
     const orderItems: Record<string, unknown>[] = [];
     let subtotal = 0;
 
     for (const item of payload.items) {
       const variant = variants?.find((v: { id: string }) => v.id === item.variant_id);
-      if (!variant) return json({ error: `Product variant not found: ${item.variant_id}` }, 400);
-      if (!variant.active || !variant.is_available) {
-        return json({ error: `${variant.sku} is currently unavailable` }, 400);
+      if (!variant) return json({ error: "An item in your cart is no longer available. Please refresh your cart and try again." }, 400);
+
+      const product = productOf(variant);
+      const label = `${product?.name ?? variant.sku}${variant.color ? ` (${variant.color})` : ""}`;
+      // Sellable only when the colour, its design (parent product) AND its category are switched on.
+      // A design with no category at all is still sellable.
+      const parentOff = product?.active === false || (!!product?.category_id && inactiveCategories.has(product.category_id));
+      if (!variant.active || !variant.is_available || parentOff) {
+        return json({ error: `${label} is currently unavailable. Please remove it from your cart.` }, 400);
       }
       if (item.quantity < 1) return json({ error: "Invalid quantity" }, 400);
       if (variant.stock_quantity < item.quantity) {
-        return json({ error: `Insufficient stock for SKU ${variant.sku}` }, 409);
+        return json(
+          { error: `Not enough stock for ${label}${variant.stock_quantity > 0 ? ` — only ${variant.stock_quantity} left` : ""}. Please update your cart.` },
+          409
+        );
       }
 
       const unitPrice = Number(variant.sale_price ?? variant.price);
       const lineTotal = unitPrice * item.quantity;
       subtotal += lineTotal;
 
-      const product = Array.isArray(variant.products) ? variant.products[0] : variant.products;
       const images = (variant.product_images || []).sort(
         (a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order
       );
@@ -280,8 +363,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Clear purchased items from the cart.
-    await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
+    // Clear purchased items from the cart — but NOT for a "Buy Now" order: that item was never bought from the cart.
+    if (!buyNow) {
+      await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
+    }
 
     // No email to the CUSTOMER at placement on purpose: they get the "Payment received" email (send-payment-confirmed-email)
     // once the payment is confirmed, or the "Order cancelled" email if it is not paid in time.
