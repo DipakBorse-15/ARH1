@@ -15,16 +15,6 @@ const PRODUCT_SELECT = `
   )
 `;
 
-// Lighter select for storefront cards: no category/variant-collection embeds.
-const CARD_SELECT = `
-  *,
-  collection:collections(*),
-  variants:product_variants(
-    *,
-    images:product_images(*)
-  )
-`;
-
 // Lean select for the many small product cards (home page, "similar" strip): only what a card shows.
 // No descriptions, bullet points, SEO text, or any other long text. KEEP IN SYNC with FEED_SELECT in hostinger/server.js.
 const CARD_LITE_SELECT =
@@ -370,34 +360,6 @@ export async function fetchHomeFeed(
   });
 
   return { latest: pool.slice(0, latestCount), collectionRows };
-}
-
-export async function fetchBestsellers(limit = 8): Promise<SimilarItem[]> {
-  // No sales-count data yet, so "bestseller" = the biggest current discounts —
-  // a reasonable stand-in that also doubles as a "deals" section.
-  const { data, error } = await supabase
-    .from("products")
-    .select(CARD_SELECT)
-    .eq("active", true)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  if (error) throw error;
-
-  const products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
-  const pool: SimilarItem[] = [];
-  products.forEach((product) => {
-    product.variants
-      .filter((v) => v.active && v.sale_price != null && v.sale_price < v.price)
-      .forEach((variant) => pool.push({ product, variant }));
-  });
-
-  pool.sort((a, b) => {
-    const discA = a.variant.price > 0 ? (a.variant.price - (a.variant.sale_price ?? a.variant.price)) / a.variant.price : 0;
-    const discB = b.variant.price > 0 ? (b.variant.price - (b.variant.sale_price ?? b.variant.price)) / b.variant.price : 0;
-    return discB - discA;
-  });
-
-  return pool.slice(0, limit);
 }
 
 export async function fetchSimilarVariants(currentVariantId: string, limit = 8): Promise<SimilarItem[]> {

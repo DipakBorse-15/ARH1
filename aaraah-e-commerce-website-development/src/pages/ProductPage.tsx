@@ -152,7 +152,7 @@ export default function ProductPage() {
     return rows;
   }, [selectedVariant]);
 
-  const maxQty = useMemo(() => Math.min(10, selectedVariant?.stock_quantity ?? 0), [selectedVariant]);
+  const maxQty = useMemo(() => Math.min(20, selectedVariant?.stock_quantity ?? 0), [selectedVariant]);
   const inStock = !!selectedVariant && selectedVariant.is_available && selectedVariant.stock_quantity > 0;
 
   if (loading) return <LoadingState label="Loading product…" />;

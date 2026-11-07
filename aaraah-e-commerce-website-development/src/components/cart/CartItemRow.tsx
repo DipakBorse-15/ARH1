@@ -1,5 +1,6 @@
 import { thumbUrl } from "@/lib/thumb";
 import { Link } from "react-router-dom";
+import { colorSlug } from "@/lib/slugs";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { effectivePrice } from "@/services/products";
@@ -14,10 +15,14 @@ export function CartItemRow({ item }: { item: CartItem }) {
   const image = variant.images?.[0];
   const price = effectivePrice(variant);
   const product = variant.product;
+  const soldOut = !variant.is_available || variant.stock_quantity <= 0;
+  const productHref = product
+    ? `/products/${product.slug}${variant.color ? `?variant=${encodeURIComponent(colorSlug(variant.color))}` : ""}`
+    : "#";
 
   return (
     <div className="flex gap-4 border-b border-stone-200 py-4">
-      <Link to={product ? `/products/${product.slug}` : "#"} className="h-24 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-stone-100">
+      <Link to={productHref} className="h-24 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-stone-100">
         {image ? <img src={thumbUrl(image)} alt={image.alt_text || ""} className="h-full w-full object-cover" /> : null}
       </Link>
       <div className="flex flex-1 flex-col justify-between">
@@ -27,6 +32,11 @@ export function CartItemRow({ item }: { item: CartItem }) {
             Colour: {variant.color} · SKU: {variant.sku}
           </p>
           <p className="mt-1 text-sm font-semibold text-stone-900">{formatINR(price)}</p>
+          {soldOut ? (
+            <p className="mt-1 inline-block rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-800">
+              Out of stock — remove this item to checkout
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center justify-between">
           <QuantitySelector
