@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGrid } from "@/components/product/ProductGrid";
@@ -6,15 +6,15 @@ import { FilterPanel, SortDropdown } from "@/components/product/FilterSort";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { fetchCategoryBySlug } from "@/services/categories";
 import { fetchCollectionBySlug, fetchSlugForOldCollectionSlug } from "@/services/collections";
-import { collectSizes, fetchProducts, type ProductFilters } from "@/services/products";
+import { fetchProducts, type ListingCard, type ProductFilters } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
 import { categoryHref } from "@/lib/categoryLinks";
 import { listingSeoDescription } from "@/lib/seoText";
-import type { Category, Collection, ProductWithVariants } from "@/types";
+import type { Category, Collection } from "@/types";
 
 type Mode = "category" | "collection" | "search";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24; // colour cards per page (divides evenly into 2, 3 and 4 columns)
 
 // Old category URLs (before the 6-category restructure) keep working.
 const LEGACY_CATEGORY_SLUGS: Record<string, string> = {
@@ -32,7 +32,8 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
   const categoryParam = searchParams.get("category") || undefined;
 
   const [taxonomy, setTaxonomy] = useState<Category | Collection | null>(null);
-  const [products, setProducts] = useState<ProductWithVariants[]>([]);
+  const [cards, setCards] = useState<ListingCard[]>([]);
+  const [options, setOptions] = useState<{ key: string; colors: string[]; sizes: string[] }>({ key: "", colors: [], sizes: [] });
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,12 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageKey, filters]);
 
+  function applyResult(res: { cards: ListingCard[]; total: number; colors: string[]; sizes: string[] }) {
+    setCards(res.cards);
+    setTotal(res.total);
+    setOptions({ key: pageKey, colors: res.colors, sizes: res.sizes });
+  }
+
   async function load() {
     const myId = ++requestId.current;
     const stale = () => myId !== requestId.current;
@@ -68,14 +75,13 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
         if (stale()) return;
         setTaxonomy(cat);
         if (!cat) {
-          setProducts([]);
+          setCards([]);
           setTotal(0);
           return;
         }
         const res = await fetchProducts({ ...filters, categorySlug: slug });
         if (stale()) return;
-        setProducts(res.products);
-        setTotal(res.total);
+        applyResult(res);
       } else if (mode === "collection" && slug) {
         const col = await fetchCollectionBySlug(slug);
         if (stale()) return;
@@ -90,19 +96,17 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
         }
         setTaxonomy(col);
         if (!col) {
-          setProducts([]);
+          setCards([]);
           setTotal(0);
           return;
         }
         const res = await fetchProducts({ ...filters, collectionSlug: slug, categorySlug: categoryParam });
         if (stale()) return;
-        setProducts(res.products);
-        setTotal(res.total);
+        applyResult(res);
       } else {
         const res = await fetchProducts({ ...filters, search: query });
         if (stale()) return;
-        setProducts(res.products);
-        setTotal(res.total);
+        applyResult(res);
       }
     } catch (err) {
       if (!stale()) setError(friendlyError(err, "Could not load products."));
@@ -111,24 +115,11 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
     }
   }
 
-  // Colour / size options are remembered for the whole visit of this page, so picking one
-  // colour does not make the other colours disappear from the filter list.
-  const [optionPool, setOptionPool] = useState<{ key: string; colors: string[]; sizes: string[] }>({ key: pageKey, colors: [], sizes: [] });
-  useEffect(() => {
-    setOptionPool((prev) => {
-      const base = prev.key === pageKey ? prev : { key: pageKey, colors: [], sizes: [] };
-      const colors = new Set(base.colors);
-      products.forEach((p) => p.variants.forEach((v) => v.color && v.active && colors.add(v.color)));
-      const sizes = new Set(base.sizes);
-      collectSizes(products).forEach((sz) => sizes.add(sz));
-      if (filters.color) colors.add(filters.color);
-      if (filters.size) sizes.add(filters.size);
-      if (prev.key === pageKey && colors.size === prev.colors.length && sizes.size === prev.sizes.length) return prev;
-      return { key: pageKey, colors: Array.from(colors), sizes: Array.from(sizes) };
-    });
-  }, [products, pageKey, filters.color, filters.size]);
-  const availableColors = useMemo(() => (optionPool.key === pageKey ? optionPool.colors : []), [optionPool, pageKey]);
-  const availableSizes = useMemo(() => (optionPool.key === pageKey ? optionPool.sizes : []), [optionPool, pageKey]);
+  // Colour / size choices come with every result and cover the whole category / collection, so picking one colour
+  // does not make the other colours disappear from the list.
+  const availableColors = options.key === pageKey ? options.colors : [];
+  const availableSizes = options.key === pageKey ? options.sizes : [];
+  const filtersActive = !!(filters.color || filters.size || filters.inStockOnly || typeof filters.minPrice === "number" || typeof filters.maxPrice === "number");
 
   const heading = mode === "search" ? `Search results for "${query}"` : taxonomy?.name || "Products";
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -175,14 +166,14 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
 
           {loading && <LoadingState label="Loading products…" />}
           {error && <ErrorState message={error} onRetry={load} />}
-          {!loading && !error && mode === "collection" && total === 0 && (
+          {!loading && !error && mode === "collection" && total === 0 && !filtersActive && (
             <div className="rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
               <p className="text-xs font-semibold tracking-[0.3em] text-amber-800/80">{(taxonomy?.name || "").toUpperCase()}</p>
               <h2 className="mt-2 font-serif text-3xl font-bold text-stone-900">Coming Soon</h2>
               <p className="mt-2 text-sm text-stone-500">New styles are on their way. Please check back soon.</p>
             </div>
           )}
-          {!loading && !error && !(mode === "collection" && total === 0) && <ProductGrid products={products} byVariant />}
+          {!loading && !error && !(mode === "collection" && total === 0 && !filtersActive) && <ProductGrid items={cards} />}
 
           {!loading && !error && totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-2">

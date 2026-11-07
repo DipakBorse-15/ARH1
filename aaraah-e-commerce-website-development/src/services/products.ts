@@ -25,23 +25,12 @@ const CARD_SELECT = `
   )
 `;
 
-// Same, but only products that have at least one ACTIVE variant (inner join),
-// so the database can count and page them correctly.
-const CARD_SELECT_ACTIVE = `
-  *,
-  collection:collections(*),
-  variants:product_variants!inner(
-    *,
-    images:product_images(*)
-  )
-`;
-
 // Lean select for the many small product cards (home page, "similar" strip): only what a card shows.
 // No descriptions, bullet points, SEO text, or any other long text. KEEP IN SYNC with FEED_SELECT in hostinger/server.js.
 const CARD_LITE_SELECT =
   "id,brand,parent_sku,name,slug,category_id,collection_id,active,created_at," +
   "collection:collections(id,name,slug)," +
-  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at," +
+  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at,attributes," +
   "images:product_images(id,variant_id,url,thumb_url,alt_text,sort_order))";
 
 // The card list is remembered for 2 minutes inside the open page, so moving between Home, categories and
@@ -107,9 +96,20 @@ export interface ProductFilters {
   pageSize?: number;
 }
 
+/** One tile on a listing page = one colour (variant) of a design (product). */
+export interface ListingCard {
+  product: ProductWithVariants;
+  variant: ProductVariant;
+}
+
 export interface ProductFilterResult {
-  products: ProductWithVariants[];
+  /** The cards of the asked page (one per colour). */
+  cards: ListingCard[];
+  /** How many colour cards match all filters (all pages). */
   total: number;
+  /** Colour / size choices of the WHOLE category or collection (not narrowed by the colour/size/price/stock filters). */
+  colors: string[];
+  sizes: string[];
 }
 
 /** Effective (sale-aware) minimum price across a product's active variants. */
@@ -171,104 +171,70 @@ export function productColors(product: ProductWithVariants): { color: string; he
 }
 
 export async function fetchProducts(filters: ProductFilters = {}): Promise<ProductFilterResult> {
-  const { categorySlug, collectionSlug, search, page = 1, pageSize = 12 } = filters;
+  const { categorySlug, collectionSlug, search, page = 1, pageSize = 24 } = filters;
+  const empty: ProductFilterResult = { cards: [], total: 0, colors: [], sizes: [] };
 
-  // Plain browsing (category or search, newest first, no variant-level filter) is paged
-  // by the database, so only one page of products is ever downloaded.
-  const needsClientFilter =
-    !!filters.color || !!filters.size || !!filters.inStockOnly || typeof filters.minPrice === "number" || typeof filters.maxPrice === "number" ||
-    !!collectionSlug || filters.sort === "price-asc" || filters.sort === "price-desc";
-
-  let query = needsClientFilter
-    ? supabase.from("products").select(CARD_SELECT, { count: "exact" }).eq("active", true)
-    : supabase.from("products").select(CARD_SELECT_ACTIVE, { count: "exact" }).eq("active", true).eq("variants.active", true);
-
+  // Category / collection pages: ONE lean list of all cards (the same list Home uses: from our own server's
+  // 2-minute cache, never a per-visitor Supabase download) and every filter / sort / page is done here, per COLOUR.
+  // Search keeps asking the database (it also looks inside descriptions), with the same lean fields.
+  let categoryId: string | null = null;
   if (categorySlug) {
     const { data: cat } = await supabase.from("categories").select("id").eq("slug", categorySlug).maybeSingle();
-    if (!cat) return { products: [], total: 0 };
-    query = query.eq("category_id", cat.id);
+    if (!cat) return empty;
+    categoryId = cat.id;
   }
-
-  // Collection membership can be set per-variant now, so it can't be pushed
-  // down into the products-table query below — resolved and applied after
-  // fetching (see the `collectionId` block further down).
   let collectionId: string | null = null;
   if (collectionSlug) {
     const { data: col } = await supabase.from("collections").select("id").eq("slug", collectionSlug).maybeSingle();
-    if (!col) return { products: [], total: 0 };
+    if (!col) return empty;
     collectionId = col.id;
   }
 
   // Remove characters that have a special meaning inside the PostgREST filter string.
   const safeSearch = (search || "").replace(/[,()%*\\"':;]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+
+  let parents: ProductWithVariants[];
   if (safeSearch) {
-    query = query.or(`name.ilike.%${safeSearch}%,brand.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`);
-  }
-
-  query = query.order("created_at", { ascending: false });
-
-  if (!needsClientFilter) {
-    const from = (page - 1) * pageSize;
-    const { data, error, count } = await query.range(from, from + pageSize - 1);
+    const { data, error } = await supabase
+      .from("products")
+      .select(CARD_LITE_SELECT)
+      .eq("active", true)
+      .or(`name.ilike.%${safeSearch}%,brand.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`)
+      .order("created_at", { ascending: false })
+      .limit(1000);
     if (error) throw error;
-    const rows = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
-    return { products: rows, total: count ?? rows.length };
+    parents = (data || []) as unknown as ProductWithVariants[];
+  } else {
+    parents = (await loadCardFeed()).slice().sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
   }
+  if (categoryId) parents = parents.filter((p) => p.category_id === categoryId);
 
-  const { data, error, count } = await query;
-  if (error) throw error;
+  // Every active colour of every design = one card. Order: newest design first, colours in their own order.
+  let cards: ListingCard[] = parents.map(sortVariantImages).flatMap((p) =>
+    p.variants
+      .filter((v) => v.active && (!collectionId || variantCollectionId(p, v) === collectionId))
+      .map((variant) => ({ product: p, variant }))
+  );
 
-  let products = ((data || []) as ProductWithVariants[]).map(sortVariantImages);
+  // Choices shown in the filter panel come from the whole set, before the filters below narrow it.
+  const colors = Array.from(new Set(cards.map((c) => c.variant.color).filter((x): x is string => !!x)));
+  const sizes = collectSizes(cards.map((c) => ({ ...c.product, variants: [c.variant] })));
 
-  // Only keep products that still have at least one active variant.
-  products = products.filter((p) => p.variants.some((v) => v.active));
-
-  if (collectionId) {
-    products = products
-      .map((p) => ({
-        ...p,
-        variants: p.variants.filter((v) => variantCollectionId(p, v) === collectionId),
-      }))
-      .filter((p) => p.variants.some((v) => v.active));
-  }
-
-  if (filters.color) {
-    products = products.filter((p) => p.variants.some((v) => v.color === filters.color));
-  }
+  if (filters.color) cards = cards.filter((c) => c.variant.color === filters.color);
   if (filters.size) {
     const wanted = filters.size.toUpperCase();
-    products = products.filter((p) => p.variants.some((v) => v.active && variantSizes(v).includes(wanted)));
+    cards = cards.filter((c) => variantSizes(c.variant).includes(wanted));
   }
-  if (filters.inStockOnly) {
-    products = products.filter((p) => p.variants.some((v) => v.active && v.is_available && v.stock_quantity > 0));
-  }
-  if (typeof filters.minPrice === "number") {
-    products = products.filter((p) => productMinPrice(p) >= (filters.minPrice as number));
-  }
-  if (typeof filters.maxPrice === "number") {
-    products = products.filter((p) => productMinPrice(p) <= (filters.maxPrice as number));
-  }
+  if (filters.inStockOnly) cards = cards.filter((c) => c.variant.is_available && c.variant.stock_quantity > 0);
+  if (typeof filters.minPrice === "number") cards = cards.filter((c) => effectivePrice(c.variant) >= (filters.minPrice as number));
+  if (typeof filters.maxPrice === "number") cards = cards.filter((c) => effectivePrice(c.variant) <= (filters.maxPrice as number));
 
-  switch (filters.sort) {
-    case "price-asc":
-      products = products.sort((a, b) => productMinPrice(a) - productMinPrice(b));
-      break;
-    case "price-desc":
-      products = products.sort((a, b) => productMinPrice(b) - productMinPrice(a));
-      break;
-    default:
-      break; // newest / relevance already ordered by created_at
-  }
-
-  const total =
-    filters.color || filters.size || filters.inStockOnly || filters.minPrice || filters.maxPrice || collectionId
-      ? products.length
-      : count || products.length;
+  if (filters.sort === "price-asc") cards = cards.slice().sort((a, b) => effectivePrice(a.variant) - effectivePrice(b.variant));
+  else if (filters.sort === "price-desc") cards = cards.slice().sort((a, b) => effectivePrice(b.variant) - effectivePrice(a.variant));
+  // newest / relevance: already newest design first
 
   const start = (page - 1) * pageSize;
-  const paged = products.slice(start, start + pageSize);
-
-  return { products: paged, total };
+  return { cards: cards.slice(start, start + pageSize), total: cards.length, colors, sizes };
 }
 
 export async function fetchProductBySlug(slug: string): Promise<ProductWithVariants | null> {
@@ -520,22 +486,28 @@ export async function updateProductQuick(
 
 export async function deleteProduct(id: string) {
   // Collect this product's image files first so they don't stay in storage (and cost space) after it is gone.
+  // A big photo that an old order still shows (order_items.image_url) is NOT removed, otherwise My Orders and the
+  // admin order page would show a broken picture. If this cannot be checked, no big photo is removed at all.
   let filePaths: string[] = [];
   try {
     const { data: vars } = await supabase.from("product_variants").select("id").eq("product_id", id);
     const ids = (vars || []).map((v: { id: string }) => v.id);
     if (ids.length) {
-      const { data: imgs } = await supabase.from("product_images").select("url, thumb_path").in("variant_id", ids);
-      filePaths = (imgs || [])
-        .map((i: { url: string }) => i.url.split("/product-images/")[1])
-        .filter(Boolean)
-        .map((p: string) => decodeURIComponent(p.split("?")[0]));
-      (imgs || []).forEach((i: { thumb_path?: string | null }) => {
-        if (i.thumb_path) filePaths.push(i.thumb_path);
-      });
+      const { data: imgs, error: imgError } = await supabase.from("product_images").select("url, thumb_path").in("variant_id", ids);
+      if (imgError) throw imgError;
+      const { data: used, error: usedError } = await supabase.from("order_items").select("image_url").in("variant_id", ids);
+      const keepUrls = new Set((used || []).map((u: { image_url: string | null }) => u.image_url).filter(Boolean));
+      const canJudgeFull = !usedError;
+      for (const i of (imgs || []) as { url: string; thumb_path?: string | null }[]) {
+        if (i.thumb_path) filePaths.push(i.thumb_path); // thumbnails are only used by the storefront
+        if (canJudgeFull && !keepUrls.has(i.url)) {
+          const path = i.url.split("/product-images/")[1];
+          if (path) filePaths.push(decodeURIComponent(path.split("?")[0]));
+        }
+      }
     }
   } catch {
-    /* cleanup is best-effort; never block the delete */
+    filePaths = []; /* cleanup is best-effort; never block the delete */
   }
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
