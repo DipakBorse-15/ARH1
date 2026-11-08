@@ -22,7 +22,8 @@ const corsHeaders = {
 };
 
 const CUSTOMER_CANCELLABLE = ["pending", "confirmed", "processing"];
-const ALL_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered"];
+// Nobody can cancel an order once it is shipped or delivered (the database also refuses it: the goods have already left).
+const ADMIN_CANCELLABLE = ["pending", "confirmed", "processing"];
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -63,6 +64,13 @@ Deno.serve(async (req) => {
 
     if (order.status === "cancelled") return json({ cancelled: true, emailed: false, already: true });
 
+    if (order.status === "delivered") {
+      return json({ error: "A delivered order cannot be cancelled." }, 409);
+    }
+    if (order.status === "shipped") {
+      return json({ error: "This order has already been shipped, so it can no longer be cancelled." }, 409);
+    }
+
     if (!isAdmin && !CUSTOMER_CANCELLABLE.includes(order.status)) {
       return json({ error: "This order has already been shipped, so it can no longer be cancelled." }, 409);
     }
@@ -74,7 +82,7 @@ Deno.serve(async (req) => {
       .update({ status: "cancelled" })
       .eq("id", order.id)
       .eq("status", order.status)
-      .in("status", isAdmin ? ALL_STATUSES : CUSTOMER_CANCELLABLE)
+      .in("status", isAdmin ? ADMIN_CANCELLABLE : CUSTOMER_CANCELLABLE)
       .select("id");
     if (updateError) {
       console.error(updateError);
@@ -82,6 +90,15 @@ Deno.serve(async (req) => {
     }
     if (!updated || updated.length === 0) {
       return json({ error: "The order status just changed. Please refresh and try again." }, 409);
+    }
+
+    // ---- Tell the shop owner when a CUSTOMER cancels an order that was already PAID: money to refund (best effort) ----
+    if (!isAdmin && order.user_id === userId && order.payment_status === "paid") {
+      try {
+        await sendAdminRefundEmail(order);
+      } catch (e) {
+        console.error("admin refund email failed", e);
+      }
     }
 
     // ---- Email (best effort) -------------------------------------------------
@@ -122,6 +139,7 @@ Deno.serve(async (req) => {
         headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from,
+          reply_to: "aaraah.in@gmail.com",
           to: [order.email],
           subject: `Order cancelled — Order ${order.order_number}`,
           html,
@@ -142,6 +160,41 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected server error" }, 500);
   }
 });
+
+// Short mail to the shop owner: "customer cancelled a paid order - refund pending". Needs RESEND_API_KEY;
+// optional secret ADMIN_NOTIFY_EMAIL (default aaraah.in@gmail.com, same as the new-order mail).
+async function sendAdminRefundEmail(order: {
+  id: string;
+  order_number: string;
+  full_name: string;
+  mobile: string;
+  total: number;
+  payment_reference: string | null;
+  items?: { product_name: string; color: string | null; quantity: number }[];
+}) {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return;
+  const to = Deno.env.get("ADMIN_NOTIFY_EMAIL") || "aaraah.in@gmail.com";
+  const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
+  const lines = (order.items || [])
+    .map((i) => `<li>${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</li>`)
+    .join("");
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <h2 style="color:#7a1730">Paid order cancelled — refund karna hai</h2>
+      <p>Customer ne apna <b>paid</b> order <b>${esc(order.order_number)}</b> cancel kiya. Stock wapas aa gaya.</p>
+      <p><b>₹${esc(order.total)}</b> wapas dena hai · ${esc(order.full_name)} · ${esc(order.mobile)}${order.payment_reference ? ` · UTR ${esc(order.payment_reference)}` : ""}</p>
+      <ul>${lines}</ul>
+      <p>Paisa wapas karne ke baad order me <b>Refund mark</b> karo.</p>
+      <p><a href="https://aaraah.in/admin/orders/${esc(order.id)}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open order</a></p>
+    </div>`;
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [to], subject: `Refund needed — ${order.order_number} cancelled by customer (₹${order.total})`, html }),
+    signal: AbortSignal.timeout(5000),
+  });
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

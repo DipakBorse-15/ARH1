@@ -60,11 +60,19 @@ Deno.serve(async () => {
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from, to: [order.email], subject: `Order cancelled — Order ${order.order_number}`, html }),
+          body: JSON.stringify({ from, reply_to: "aaraah.in@gmail.com", to: [order.email], subject: `Order cancelled — Order ${order.order_number}`, html }),
         });
         if (!res.ok) {
-          console.error("Resend failed for", order.order_number, await res.text());
-          continue; // tried again at the next run
+          const errText = await res.text();
+          console.error("Resend failed for", order.order_number, res.status, errText);
+          if (res.status === 400 || res.status === 422) {
+            // This customer's address itself is rejected (bad email): retrying never helps and it would block
+            // the orders behind it, so mark it as handled and move on.
+            await admin.from("orders").update({ cancel_email_sent_at: new Date().toISOString() }).eq("id", order.id);
+            continue;
+          }
+          // Key / domain / rate-limit / Resend outage: nothing will work now, stop and try again at the next run.
+          break;
         }
         await admin.from("orders").update({ cancel_email_sent_at: new Date().toISOString() }).eq("id", order.id);
         sent += 1;

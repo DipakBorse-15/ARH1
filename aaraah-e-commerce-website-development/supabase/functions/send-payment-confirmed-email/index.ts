@@ -56,6 +56,12 @@ Deno.serve(async (req) => {
       .single();
     if (orderError || !order) return json({ error: "Order not found" }, 404);
 
+    // Never tell a customer "payment received" for a cancelled order, or for an online (UPI) order not marked paid.
+    if (order.status === "cancelled") return json({ error: "This order is cancelled, so no confirmation email was sent." }, 409);
+    if (order.payment_method !== "cod" && order.payment_status !== "paid") {
+      return json({ error: "Payment is not marked as paid yet, so no confirmation email was sent." }, 409);
+    }
+
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     if (!resendApiKey) return json({ error: "RESEND_API_KEY is not configured" }, 501);
     const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
@@ -88,6 +94,7 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from,
+        reply_to: "aaraah.in@gmail.com",
         to: [order.email],
         subject,
         html,

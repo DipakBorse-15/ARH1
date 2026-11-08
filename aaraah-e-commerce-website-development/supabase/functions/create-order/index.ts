@@ -241,6 +241,9 @@ Deno.serve(async (req) => {
       }
 
       const unitPrice = Number(variant.sale_price ?? variant.price);
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        return json({ error: `${label} is currently unavailable. Please remove it from your cart.` }, 400);
+      }
       const lineTotal = unitPrice * item.quantity;
       subtotal += lineTotal;
 
@@ -280,6 +283,10 @@ Deno.serve(async (req) => {
     }
 
     const total = subtotal - discount + SHIPPING_FEE;
+    // A UPI order of Rs 0 can never be paid (and would only be auto-cancelled), so such a coupon is not accepted.
+    if (total < 1) {
+      return json({ error: "This coupon would make the whole order free. Please add more items or use a smaller coupon." }, 400);
+    }
 
     const { data: orderNumberData } = await admin.rpc("generate_order_number");
     const orderNumber = orderNumberData as string;
@@ -329,6 +336,29 @@ Deno.serve(async (req) => {
         await admin.from("orders").delete().eq("id", order.id);
         return json({ error: "Could not apply the coupon. Please try again." }, 500);
       }
+
+      // Two customers can press "Place order" in the same second and both pass the limit check above.
+      // Count again now that this order's use is saved; if a limit is exceeded, drop this order (no stock is reserved yet).
+      const cid = couponId;
+      const { data: limits } = await admin.from("coupons").select("usage_limit, per_user_limit").eq("id", cid).maybeSingle();
+      const countUses = async (onlyThisUser: boolean): Promise<number | null> => {
+        let q = admin
+          .from("coupon_redemptions")
+          .select("id, orders!inner(status)", { count: "exact", head: true })
+          .eq("coupon_id", cid)
+          .neq("orders.status", "cancelled");
+        if (onlyThisUser) q = q.eq("user_id", userId);
+        const { count, error: countError } = await q;
+        return countError ? null : count ?? 0;
+      };
+      const totalUses = limits?.usage_limit != null ? await countUses(false) : null;
+      const userUses = limits?.per_user_limit != null ? await countUses(true) : null;
+      const overTotal = totalUses !== null && limits?.usage_limit != null && totalUses > limits.usage_limit;
+      const overUser = userUses !== null && limits?.per_user_limit != null && userUses > limits.per_user_limit;
+      if (overTotal || overUser) {
+        await admin.from("orders").delete().eq("id", order.id);
+        return json({ error: "This coupon has just been used up. Please place your order again without it." }, 409);
+      }
     }
 
     // Decrement stock atomically per-variant (never touches other colors).
@@ -368,19 +398,30 @@ Deno.serve(async (req) => {
       await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
     }
 
-    // No email to the CUSTOMER at placement on purpose: they get the "Payment received" email (send-payment-confirmed-email)
-    // once the payment is confirmed, or the "Order cancelled" email if it is not paid in time.
-    // (sendOrderReceivedEmail below is kept but no longer called.)
-    // The shop owner gets a short "new order" email so night orders are not missed. Never blocks or fails the order.
-    try {
-      await sendAdminNewOrderEmail(
-        { id: order.id, order_number: order.order_number, full_name: payload.full_name, mobile: payload.mobile, city: payload.city, state: payload.state },
-        orderItems as Record<string, unknown>[],
-        total
-      );
-    } catch (e) {
-      console.error("admin new-order email failed", e);
-    }
+    // Emails never slow down or fail the order: they are sent in the background (Supabase keeps the function
+    // alive until they finish). Customer: "Order received" now, then "Payment received" once confirmed
+    // (send-payment-confirmed-email), or "Order cancelled" if not paid in time. Replies go to aaraah.in@gmail.com.
+    // The shop owner also gets a short "new order" email so night orders are not missed.
+    const sendMails = async () => {
+      await Promise.allSettled([
+        sendOrderReceivedEmail(
+          { id: order.id, order_number: order.order_number, full_name: payload.full_name, email: payload.email, payment_method: payload.payment_method },
+          orderItems as Record<string, unknown>[],
+          total,
+          discount,
+          appliedCode
+        ).catch((e) => console.error("order-received email failed", e)),
+        sendAdminNewOrderEmail(
+          { id: order.id, order_number: order.order_number, full_name: payload.full_name, mobile: payload.mobile, city: payload.city, state: payload.state },
+          orderItems as Record<string, unknown>[],
+          total
+        ).catch((e) => console.error("admin new-order email failed", e)),
+      ]);
+    };
+    // deno-lint-ignore no-explicit-any
+    const runtime = (globalThis as any).EdgeRuntime;
+    if (runtime && typeof runtime.waitUntil === "function") runtime.waitUntil(sendMails());
+    else await sendMails();
 
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {
@@ -392,7 +433,7 @@ Deno.serve(async (req) => {
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
-// Short "new order" email to the shop owner. Needs RESEND_API_KEY; optional secret ADMIN_NOTIFY_EMAIL (default: blackpur.com@gmail.com).
+// Short "new order" email to the shop owner. Needs RESEND_API_KEY; optional secret ADMIN_NOTIFY_EMAIL (default: aaraah.in@gmail.com).
 async function sendAdminNewOrderEmail(
   order: { id: string; order_number: string; full_name: string; mobile: string; city: string; state: string },
   items: Record<string, unknown>[],
@@ -400,7 +441,7 @@ async function sendAdminNewOrderEmail(
 ) {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return;
-  const to = Deno.env.get("ADMIN_NOTIFY_EMAIL") || "blackpur.com@gmail.com";
+  const to = Deno.env.get("ADMIN_NOTIFY_EMAIL") || "aaraah.in@gmail.com";
   const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
   const lines = items
     .map((i) => `<li>${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</li>`)
@@ -423,7 +464,7 @@ async function sendAdminNewOrderEmail(
 
 // Needs RESEND_API_KEY (and RESEND_FROM). Without the key this quietly does nothing.
 async function sendOrderReceivedEmail(
-  order: { id: string; order_number: string; full_name: string; email: string },
+  order: { id: string; order_number: string; full_name: string; email: string; payment_method: string },
   items: Record<string, unknown>[],
   total: number,
   discount = 0,
@@ -446,15 +487,19 @@ async function sendOrderReceivedEmail(
       <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
       ${discount > 0 ? `<p style="color:#047857;margin:0">Coupon ${esc(couponCode)}: −₹${esc(discount)}</p>` : ""}
       <p style="font-weight:bold">Total: ₹${esc(total)}</p>
-      <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
-      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>
+      ${
+        order.payment_method === "cod"
+          ? `<p><b>Payment:</b> Cash on delivery — pay ₹${esc(total)} when your order arrives. We will email you when it is confirmed and shipped.</p>`
+          : `<p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
+      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>`
+      }
       <p><a href="${link}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open my order</a></p>
       <p style="color:#78716c;font-size:13px">Questions? Reply to this email or WhatsApp us.</p>
     </div>`;
   await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [order.email], subject: `Order received — ${order.order_number}`, html }),
+    body: JSON.stringify({ from, reply_to: "aaraah.in@gmail.com", to: [order.email], subject: `Order received — ${order.order_number}`, html }),
     signal: AbortSignal.timeout(5000),
   });
 }

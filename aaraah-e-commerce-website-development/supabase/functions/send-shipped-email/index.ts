@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to: [order.email], subject: `Delivered — how was your order ${order.order_number}?`, html: deliveredHtml }),
+        body: JSON.stringify({ from, reply_to: "aaraah.in@gmail.com", to: [order.email], subject: `Delivered — how was your order ${order.order_number}?`, html: deliveredHtml }),
       });
       if (!r.ok) return json({ error: `Resend failed: ${await r.text()}` }, 502);
       return json({ sent: true });
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [order.email], subject: `Your order is on the way — ${order.order_number}`, html }),
+      body: JSON.stringify({ from, reply_to: "aaraah.in@gmail.com", to: [order.email], subject: `Your order is on the way — ${order.order_number}`, html }),
     });
     if (!resendRes.ok) return json({ error: `Resend failed: ${await resendRes.text()}` }, 502);
 
