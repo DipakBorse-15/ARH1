@@ -199,7 +199,7 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
   }
   if (categoryId) parents = parents.filter((p) => p.category_id === categoryId);
 
-  // Every active colour of every design = one card. Order: newest design first, colours in their own order.
+  // Every active colour of every design = one card. Order: newest colour first (see the sort below).
   let cards: ListingCard[] = parents.map(sortVariantImages).flatMap((p) =>
     p.variants
       .filter((v) => v.active && (!collectionId || variantCollectionId(p, v) === collectionId))
@@ -221,7 +221,12 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
 
   if (filters.sort === "price-asc") cards = cards.slice().sort((a, b) => effectivePrice(a.variant) - effectivePrice(b.variant));
   else if (filters.sort === "price-desc") cards = cards.slice().sort((a, b) => effectivePrice(b.variant) - effectivePrice(a.variant));
-  // newest / relevance: already newest design first
+  else {
+    // newest / relevance: newest COLOUR first (same as the home page), so a new colour added to an old design shows at the top.
+    // Colours with the same time keep their order (the sort is stable).
+    const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
+    cards = cards.slice().sort((a, b) => t(b) - t(a));
+  }
 
   const start = (page - 1) * pageSize;
   return { cards: cards.slice(start, start + pageSize), total: cards.length, colors, sizes };

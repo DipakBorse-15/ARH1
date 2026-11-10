@@ -1,3 +1,5 @@
+-- !! OLD FILE - DO NOT RUN AGAIN. Migration 0036 (night rule) replaced the expiry function made here; running this file
+-- !! again would put the old plain "3 hours" rule back. It was only needed once. Kept for history.
 -- 0031: customers get an email when an unpaid UPI order is auto-cancelled (after 3 hours).
 -- Run in Supabase SQL Editor. Safe to run more than once.
 -- Deploy the Edge Function `send-expired-emails` too (see its file for the steps).
