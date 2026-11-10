@@ -1,0 +1,41 @@
+# Build check: runs on every upload (push) to main and shows a green tick or a red cross in the Actions tab.
+# It only CHECKS the code (type-check + build). It does NOT deploy anything: Hostinger builds and publishes the site by itself.
+name: Build check
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aaraah-e-commerce-website-development
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: aaraah-e-commerce-website-development/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit -p .
+
+      - name: Build
+        env:
+          # Dummy values only for this check (no real keys are used or needed here).
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: check-only
+        run: npm run build
