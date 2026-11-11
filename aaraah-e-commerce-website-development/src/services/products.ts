@@ -31,6 +31,24 @@ const FEED_TTL_MS = 2 * 60_000;
 let feedCache: { at: number; data: ProductWithVariants[] } | null = null;
 let feedInflight: Promise<ProductWithVariants[]> | null = null;
 
+// Average rating per design (product), for the "Top Rated" sort. One tiny row per reviewed product
+// (see migration 0040), remembered for 2 minutes. If it cannot be loaded, the sort simply falls back to Newest.
+let ratingCache: { at: number; data: Map<string, number> } | null = null;
+async function loadRatings(): Promise<Map<string, number>> {
+  if (ratingCache && Date.now() - ratingCache.at < FEED_TTL_MS) return ratingCache.data;
+  const map = new Map<string, number>();
+  try {
+    const { data, error } = await supabase.rpc("product_rating_summary");
+    if (!error && Array.isArray(data)) {
+      for (const r of data as { product_id: string; avg_rating: number | string }[]) map.set(r.product_id, Number(r.avg_rating));
+    }
+  } catch {
+    /* ignore: fall back to Newest order */
+  }
+  ratingCache = { at: Date.now(), data: map };
+  return map;
+}
+
 async function fetchFeedFromOwnServer(): Promise<ProductWithVariants[] | null> {
   if (import.meta.env.VITE_IMG_PROXY !== "1") return null;
   try {
@@ -81,7 +99,7 @@ export interface ProductFilters {
   minPrice?: number;
   maxPrice?: number;
   inStockOnly?: boolean;
-  sort?: "newest" | "price-asc" | "price-desc" | "relevance";
+  sort?: "newest" | "price-asc" | "price-desc" | "rating" | "relevance";
   page?: number;
   pageSize?: number;
 }
@@ -221,7 +239,15 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
 
   if (filters.sort === "price-asc") cards = cards.slice().sort((a, b) => effectivePrice(a.variant) - effectivePrice(b.variant));
   else if (filters.sort === "price-desc") cards = cards.slice().sort((a, b) => effectivePrice(b.variant) - effectivePrice(a.variant));
-  else {
+  else if (filters.sort === "rating") {
+    // Top Rated: highest average rating of the design first (every colour of a design shares its rating).
+    // Designs without any review go to the bottom, and everything with the same rating (or no rating)
+    // keeps the default "newest colour first" order (the sort is stable).
+    const ratings = await loadRatings();
+    const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
+    const r = (c: ListingCard) => ratings.get(c.product.id) ?? -1;
+    cards = cards.slice().sort((a, b) => t(b) - t(a)).sort((a, b) => r(b) - r(a));
+  } else {
     // newest / relevance: newest COLOUR first (same as the home page), so a new colour added to an old design shows at the top.
     // Colours with the same time keep their order (the sort is stable).
     const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
