@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
-import { canReview, fetchReviews, submitReview, type Review } from "@/services/reviews";
+import { canReview, fetchReviewableVariants, fetchReviews, submitReview, type Review } from "@/services/reviews";
 import { friendlyError } from "@/lib/supabase";
 
 export function Stars({ value, size = 16 }: { value: number; size?: number }) {
@@ -38,11 +38,14 @@ export function useReviews(productId: string | undefined) {
 
 export function ReviewsSection({
   productId,
+  variants = [],
   reviews,
   average,
   onChanged,
 }: {
   productId: string;
+  /** The colours of this design (to show which colour a review is for). */
+  variants?: { id: string; color: string | null }[];
   reviews: Review[];
   average: number;
   onChanged: () => void;
@@ -50,17 +53,40 @@ export function ReviewsSection({
   const { user } = useAuth();
   const { show } = useToast();
   const [allowed, setAllowed] = useState(false);
+  const [choices, setChoices] = useState<{ variant_id: string; color: string | null }[]>([]);
+  const [variantId, setVariantId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const mine = reviews.find((r) => r.user_id && user && r.user_id === user.id);
+  // A review is for ONE colour. "mine" = my review of the colour chosen below (or my older review of the whole design).
+  const mine = user
+    ? reviews.find((r) => r.user_id === user.id && !!variantId && r.variant_id === variantId) ??
+      reviews.find((r) => r.user_id === user.id && !r.variant_id)
+    : undefined;
 
   useEffect(() => {
     setAllowed(false);
+    setChoices([]);
+    setVariantId(null);
     if (!user) return;
-    canReview(productId).then(setAllowed);
+    let cancelled = false;
+    fetchReviewableVariants(productId).then(async (list) => {
+      if (cancelled) return;
+      if (list === null) {
+        // could not read the colours: fall back to the plain "has this customer received it" check
+        const ok = await canReview(productId);
+        if (!cancelled) setAllowed(ok);
+        return;
+      }
+      setChoices(list);
+      setVariantId(list[0]?.variant_id ?? null);
+      setAllowed(list.length > 0);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user, productId]);
 
   useEffect(() => {
@@ -68,8 +94,12 @@ export function ReviewsSection({
       setRating(mine.rating);
       setTitle(mine.title || "");
       setBody(mine.body);
+    } else {
+      setRating(0);
+      setTitle("");
+      setBody("");
     }
-  }, [mine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mine?.id, variantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,7 +107,7 @@ export function ReviewsSection({
     if (!body.trim()) return show("Please write a few words about the product.", "error");
     setSaving(true);
     try {
-      await submitReview(productId, rating, title, body);
+      await submitReview(productId, rating, title, body, variantId);
       show(mine ? "Your review is updated." : "Thank you! Your review is published.", "success");
       onChanged();
     } catch (err) {
@@ -112,7 +142,8 @@ export function ReviewsSection({
               </div>
               <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-stone-700">{r.body}</p>
               <p className="mt-1 text-xs text-stone-400">
-                {r.reviewer_name} · Verified buyer · {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                {r.reviewer_name} · Verified buyer
+                {r.variant_id && variants.find((v) => v.id === r.variant_id)?.color ? ` · Colour: ${variants.find((v) => v.id === r.variant_id)?.color}` : ""} · {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </p>
             </li>
           ))}
@@ -131,6 +162,22 @@ export function ReviewsSection({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               <h3 className="text-sm font-semibold text-stone-900">{mine ? "Edit your review" : "Write a review"}</h3>
+              {choices.length > 1 && (
+                <label className="block text-xs text-stone-600">
+                  Which colour are you reviewing?
+                  <select
+                    value={variantId ?? ""}
+                    onChange={(e) => setVariantId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-rose-900 focus:outline-none"
+                  >
+                    {choices.map((c) => (
+                      <option key={c.variant_id} value={c.variant_id}>
+                        {c.color || "Colour"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div className="flex gap-1" role="radiogroup" aria-label="Rating">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} onClick={() => setRating(n)}>

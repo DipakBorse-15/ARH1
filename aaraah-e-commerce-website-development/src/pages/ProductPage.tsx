@@ -446,7 +446,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <ReviewsSection productId={product.id} reviews={rv.reviews} average={rv.average} onChanged={rv.reload} />
+      <ReviewsSection productId={product.id} variants={product.variants.map((v) => ({ id: v.id, color: v.color }))} reviews={rv.reviews} average={rv.average} onChanged={rv.reload} />
 
       {similar.length > 0 && (
         <section className="mt-16">

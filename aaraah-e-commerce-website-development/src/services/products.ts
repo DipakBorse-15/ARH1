@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { resizeImage } from "@/lib/imageResize";
 import { THUMB_SIDE, THUMB_QUALITY } from "@/lib/thumb";
 import { shortSlug } from "@/lib/slugs";
+import { mainColorKey, mainColorLabel } from "@/lib/mainColor";
+import { loadRatingSummary, ratingFor } from "@/services/ratings";
 import type { Collection, Product, ProductVariant, ProductWithVariants } from "@/types";
 
 const PRODUCT_SELECT = `
@@ -20,7 +22,7 @@ const PRODUCT_SELECT = `
 const CARD_LITE_SELECT =
   "id,brand,parent_sku,name,slug,category_id,collection_id,active,created_at," +
   "collection:collections(id,name,slug)," +
-  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at,attributes," +
+  "variants:product_variants(id,product_id,sku,color,color_group,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at,attributes," +
   "images:product_images(id,variant_id,url,thumb_url,alt_text,sort_order))";
 
 // The card list is remembered for 2 minutes inside the open page, so moving between Home, categories and
@@ -30,24 +32,6 @@ const CARD_LITE_SELECT =
 const FEED_TTL_MS = 2 * 60_000;
 let feedCache: { at: number; data: ProductWithVariants[] } | null = null;
 let feedInflight: Promise<ProductWithVariants[]> | null = null;
-
-// Average rating per design (product), for the "Top Rated" sort. One tiny row per reviewed product
-// (see migration 0040), remembered for 2 minutes. If it cannot be loaded, the sort simply falls back to Newest.
-let ratingCache: { at: number; data: Map<string, number> } | null = null;
-async function loadRatings(): Promise<Map<string, number>> {
-  if (ratingCache && Date.now() - ratingCache.at < FEED_TTL_MS) return ratingCache.data;
-  const map = new Map<string, number>();
-  try {
-    const { data, error } = await supabase.rpc("product_rating_summary");
-    if (!error && Array.isArray(data)) {
-      for (const r of data as { product_id: string; avg_rating: number | string }[]) map.set(r.product_id, Number(r.avg_rating));
-    }
-  } catch {
-    /* ignore: fall back to Newest order */
-  }
-  ratingCache = { at: Date.now(), data: map };
-  return map;
-}
 
 async function fetchFeedFromOwnServer(): Promise<ProductWithVariants[] | null> {
   if (import.meta.env.VITE_IMG_PROXY !== "1") return null;
@@ -118,6 +102,35 @@ export interface ProductFilterResult {
   /** Colour / size choices of the WHOLE category or collection (not narrowed by the colour/size/price/stock filters). */
   colors: string[];
   sizes: string[];
+}
+
+
+/** The colour that stands for a card: one with photos first, then the original (lowest sort order, oldest). */
+function pickRepresentative(list: ProductVariant[]): ProductVariant {
+  const noImg = (v: ProductVariant) => (v.images && v.images.length > 0 ? 0 : 1);
+  const time = (v: ProductVariant) => new Date(v.created_at).getTime() || 0;
+  return list.slice().sort((a, b) => noImg(a) - noImg(b) || (a.sort_order ?? 0) - (b.sort_order ?? 0) || time(a) - time(b))[0];
+}
+
+/**
+ * One card per MAIN colour of a design. Variations of the same Main Color (Red: maroon, wine) are ONE card;
+ * the variation colours only appear on the product's final page.
+ */
+export function groupByMainColor(product: ProductWithVariants, variants: ProductVariant[]): ListingCard[] {
+  const groups = new Map<string, ProductVariant[]>();
+  for (const v of variants) {
+    const k = mainColorKey(v);
+    const list = groups.get(k);
+    if (list) list.push(v);
+    else groups.set(k, [v]);
+  }
+  return Array.from(groups.values()).map((list) => ({ product, variant: pickRepresentative(list) }));
+}
+
+/** Every active colour of the design that shares this card's Main Color (their ratings make the card's rating). */
+export function groupVariantIds(product: ProductWithVariants, variant: ProductVariant): string[] {
+  const key = mainColorKey(variant);
+  return product.variants.filter((v) => v.active && mainColorKey(v) === key).map((v) => v.id);
 }
 
 /** Effective (sale-aware) minimum price across a product's active variants. */
@@ -217,40 +230,55 @@ export async function fetchProducts(filters: ProductFilters = {}): Promise<Produ
   }
   if (categoryId) parents = parents.filter((p) => p.category_id === categoryId);
 
-  // Every active colour of every design = one card. Order: newest colour first (see the sort below).
-  let cards: ListingCard[] = parents.map(sortVariantImages).flatMap((p) =>
+  // Every active colour of every design (variation colours included); they are merged into ONE card per
+  // Main Color further down, after the filters have picked the matching colours.
+  let rows: { product: ProductWithVariants; variant: ProductVariant }[] = parents.map(sortVariantImages).flatMap((p) =>
     p.variants
       .filter((v) => v.active && (!collectionId || variantCollectionId(p, v) === collectionId))
       .map((variant) => ({ product: p, variant }))
   );
 
-  // Choices shown in the filter panel come from the whole set, before the filters below narrow it.
-  const colors = Array.from(new Set(cards.map((c) => c.variant.color).filter((x): x is string => !!x)));
-  const sizes = collectSizes(cards.map((c) => ({ ...c.product, variants: [c.variant] })));
+  // Choices shown in the filter panel come from the whole set (Main Colors only), before the filters below narrow it.
+  const colorLabels = new Map<string, string>();
+  rows.forEach((r) => {
+    const label = mainColorLabel(r.variant);
+    if (label && !colorLabels.has(label.toLowerCase())) colorLabels.set(label.toLowerCase(), label);
+  });
+  const colors = Array.from(colorLabels.values()).sort((a, b) => a.localeCompare(b));
+  const sizes = collectSizes(rows.map((c) => ({ ...c.product, variants: [c.variant] })));
 
-  if (filters.color) cards = cards.filter((c) => c.variant.color === filters.color);
+  if (filters.color) {
+    const want = filters.color.trim().toLowerCase();
+    rows = rows.filter((c) => mainColorLabel(c.variant).toLowerCase() === want);
+  }
   if (filters.size) {
     const wanted = filters.size.toUpperCase();
-    cards = cards.filter((c) => variantSizes(c.variant).includes(wanted));
+    rows = rows.filter((c) => variantSizes(c.variant).includes(wanted));
   }
-  if (filters.inStockOnly) cards = cards.filter((c) => c.variant.is_available && c.variant.stock_quantity > 0);
-  if (typeof filters.minPrice === "number") cards = cards.filter((c) => effectivePrice(c.variant) >= (filters.minPrice as number));
-  if (typeof filters.maxPrice === "number") cards = cards.filter((c) => effectivePrice(c.variant) <= (filters.maxPrice as number));
+  if (filters.inStockOnly) rows = rows.filter((c) => c.variant.is_available && c.variant.stock_quantity > 0);
+  if (typeof filters.minPrice === "number") rows = rows.filter((c) => effectivePrice(c.variant) >= (filters.minPrice as number));
+  if (typeof filters.maxPrice === "number") rows = rows.filter((c) => effectivePrice(c.variant) <= (filters.maxPrice as number));
 
+  // Back to cards: one per design per Main Color.
+  const byProduct = new Map<string, { product: ProductWithVariants; variants: ProductVariant[] }>();
+  rows.forEach((r) => {
+    const entry = byProduct.get(r.product.id);
+    if (entry) entry.variants.push(r.variant);
+    else byProduct.set(r.product.id, { product: r.product, variants: [r.variant] });
+  });
+  let cards: ListingCard[] = Array.from(byProduct.values()).flatMap((e) => groupByMainColor(e.product, e.variants));
+
+  const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
   if (filters.sort === "price-asc") cards = cards.slice().sort((a, b) => effectivePrice(a.variant) - effectivePrice(b.variant));
   else if (filters.sort === "price-desc") cards = cards.slice().sort((a, b) => effectivePrice(b.variant) - effectivePrice(a.variant));
   else if (filters.sort === "rating") {
-    // Top Rated: highest average rating of the design first (every colour of a design shares its rating).
-    // Designs without any review go to the bottom, and everything with the same rating (or no rating)
-    // keeps the default "newest colour first" order (the sort is stable).
-    const ratings = await loadRatings();
-    const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
-    const r = (c: ListingCard) => ratings.get(c.product.id) ?? -1;
-    cards = cards.slice().sort((a, b) => t(b) - t(a)).sort((a, b) => r(b) - r(a));
+    // Top Rated: highest average rating of the card's Main Color first. Cards nobody has rated go to the
+    // bottom; equal ratings (and unrated cards) keep the default "newest first" order (the sort is stable).
+    const summary = await loadRatingSummary();
+    const rate = (c: ListingCard) => ratingFor(summary, c.product.id, groupVariantIds(c.product, c.variant)) ?? -1;
+    cards = cards.slice().sort((a, b) => t(b) - t(a)).sort((a, b) => rate(b) - rate(a));
   } else {
-    // newest / relevance: newest COLOUR first (same as the home page), so a new colour added to an old design shows at the top.
-    // Colours with the same time keep their order (the sort is stable).
-    const t = (c: ListingCard) => new Date(c.variant.created_at).getTime() || 0;
+    // newest / relevance: newest card first (same as the home page), so a new Main Color added to an old design shows at the top.
     cards = cards.slice().sort((a, b) => t(b) - t(a));
   }
 
@@ -368,21 +396,31 @@ export async function fetchHomeFeed(
 
   const data = await loadCardFeed();
 
+  // One card per design per Main Color (variations of a Main Color are one card). A collection gets its own cards,
+  // because a single colour can sit in a different collection than the rest of its design.
   const pool: SimilarItem[] = [];
+  const byCollection = new Map<string, SimilarItem[]>();
   data.map(sortVariantImages).forEach((product) => {
     if (categoryId && product.category_id !== categoryId) return; // category page: only this category
-    product.variants.filter((v) => v.active).forEach((variant) => pool.push({ product, variant }));
+    const active = product.variants.filter((v) => v.active);
+    pool.push(...groupByMainColor(product, active));
+    const perCollection = new Map<string, ProductVariant[]>();
+    active.forEach((v) => {
+      const cid = variantCollectionId(product, v);
+      if (!cid) return;
+      const list = perCollection.get(cid);
+      if (list) list.push(v);
+      else perCollection.set(cid, [v]);
+    });
+    perCollection.forEach((vs, cid) => {
+      const list = byCollection.get(cid) ?? [];
+      list.push(...groupByMainColor(product, vs));
+      byCollection.set(cid, list);
+    });
   });
-  pool.sort((a, b) => new Date(b.variant.created_at).getTime() - new Date(a.variant.created_at).getTime());
-
-  const byCollection = new Map<string, SimilarItem[]>();
-  pool.forEach((item) => {
-    const cid = variantCollectionId(item.product, item.variant);
-    if (!cid) return;
-    const list = byCollection.get(cid);
-    if (list) list.push(item);
-    else byCollection.set(cid, [item]);
-  });
+  const newestFirst = (a: SimilarItem, b: SimilarItem) => new Date(b.variant.created_at).getTime() - new Date(a.variant.created_at).getTime();
+  pool.sort(newestFirst);
+  byCollection.forEach((list) => list.sort(newestFirst));
 
   const collectionRows: HomeCollectionRow[] = [];
   collections.forEach((collection) => {
@@ -403,11 +441,24 @@ export async function fetchSimilarVariants(currentVariantId: string, limit = 8):
     .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())
     .slice(0, 24)
     .map(sortVariantImages);
+  // The card of the colour being viewed (all its variations) is left out; every other Main Color is one card.
+  let currentProductId: string | null = null;
+  let currentKey: string | null = null;
+  for (const product of all) {
+    const cur = product.variants.find((v) => v.id === currentVariantId);
+    if (cur) {
+      currentProductId = product.id;
+      currentKey = mainColorKey(cur);
+      break;
+    }
+  }
   const pool: SimilarItem[] = [];
   products.forEach((product) => {
-    product.variants
-      .filter((v) => v.active && v.id !== currentVariantId)
-      .forEach((variant) => pool.push({ product, variant }));
+    const variants = product.variants.filter((v) => {
+      if (!v.active || v.id === currentVariantId) return false;
+      return !(currentKey && product.id === currentProductId && mainColorKey(v) === currentKey);
+    });
+    pool.push(...groupByMainColor(product, variants));
   });
 
   for (let i = pool.length - 1; i > 0; i--) {
@@ -520,7 +571,7 @@ export async function upsertVariant(variant: Partial<ProductVariant>) {
  */
 export async function updateVariantQuick(
   id: string,
-  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">>
+  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity" | "color_group">>
 ) {
   // Availability always follows stock — any path that changes stock_quantity
   // (quick-edit here, or the full product form) must keep is_available in

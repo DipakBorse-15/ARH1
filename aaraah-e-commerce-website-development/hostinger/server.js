@@ -141,7 +141,7 @@ async function runApi(name, key, query, ttlMs, req, res) {
 const FEED_SELECT =
   "id,brand,parent_sku,name,slug,category_id,collection_id,active,created_at," +
   "collection:collections(id,name,slug)," +
-  "variants:product_variants(id,product_id,sku,color,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at,attributes," +
+  "variants:product_variants(id,product_id,sku,color,color_group,color_hex,price,sale_price,discount_percent,discount_amount,stock_quantity,is_available,active,collection_id,sort_order,created_at,attributes," +
   "images:product_images(id,variant_id,url,thumb_url,alt_text,sort_order))";
 const FEED_TTL_MS = 2 * 60_000;
 let feedState = null; // { at, br, gz, raw }

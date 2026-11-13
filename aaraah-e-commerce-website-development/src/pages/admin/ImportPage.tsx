@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { useToast } from "@/contexts/ToastContext";
 import { shortSlug } from "@/lib/slugs";
+import { normalizeMainColor } from "@/lib/mainColor";
 import { EXAMPLE_SKU_PREFIX, downloadListingSample } from "@/lib/listingSample";
 
 /**
@@ -142,8 +143,10 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
 
       return {
         sku,
+        // Map Color = Second Color (variation, shown only on the product page); Main Color = filter + card colour.
+        // If one of them is empty the other is used, so no colour is ever lost.
         color: firstValue(arr, colIndex, "Map Color") || firstValue(arr, colIndex, "Main Color"),
-        colorGroup: firstValue(arr, colIndex, "Main Color"),
+        colorGroup: normalizeMainColor(firstValue(arr, colIndex, "Main Color") || firstValue(arr, colIndex, "Map Color")),
         images,
         description: firstValue(arr, colIndex, "Product Description"),
         bullets,

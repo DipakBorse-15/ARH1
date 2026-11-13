@@ -13,6 +13,7 @@ import {
 } from "@/services/products";
 import { fetchAllCollectionsAdmin } from "@/services/collections";
 import { friendlyError } from "@/lib/supabase";
+import { COMMON_MAIN_COLORS, mainColorLabel, normalizeMainColor } from "@/lib/mainColor";
 import type { Collection, ProductVariant, ProductWithVariants } from "@/types";
 
 interface Draft {
@@ -116,6 +117,28 @@ export default function AdminProductsPage() {
       setSavingKey(null);
     }
   }
+
+  async function handleVariantMainColorCommit(productId: string, variant: ProductVariant, rawValue: string) {
+    const next = normalizeMainColor(rawValue);
+    if (next === normalizeMainColor(variant.color_group)) return; // unchanged, nothing to save
+    setSavingKey(`variant:${variant.id}`);
+    try {
+      await updateVariantQuick(variant.id, { color_group: next || null });
+      patchVariant(productId, variant.id, { color_group: next || null });
+      show(next ? `Main Color: ${next}` : "Main Color hata diya", "success");
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  // Names already used as Main Color anywhere (plus common ones) - offered as suggestions while typing.
+  const mainColorSuggestions = useMemo(() => {
+    const set = new Set<string>(COMMON_MAIN_COLORS);
+    products.forEach((p) => p.variants.forEach((v) => v.color_group && set.add(normalizeMainColor(v.color_group))));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products]);
 
   async function handleVariantSellingPriceCommit(productId: string, variant: ProductVariant, rawValue: string) {
     const nextSalePrice = Number(rawValue);
@@ -319,6 +342,11 @@ export default function AdminProductsPage() {
 
       {!loading && products.length > 0 && !isSearching && (
         <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+          <datalist id="main-color-suggestions">
+            {mainColorSuggestions.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-50 text-xs uppercase text-stone-500">
               <tr>
@@ -404,6 +432,7 @@ export default function AdminProductsPage() {
                           saving={savingKey === `variant:${v.id}`}
                           onCollectionChange={(collectionId) => handleVariantCollectionChange(p.id, v.id, collectionId)}
                           onPriceCommit={(raw) => handleVariantSellingPriceCommit(p.id, v, raw)}
+                          onMainColorCommit={(raw) => handleVariantMainColorCommit(p.id, v, raw)}
                           editHref={`/admin/products/${p.id}?variant=${v.id}`}
                         />
                       ))}
@@ -533,6 +562,7 @@ function VariantRow({
   saving,
   onCollectionChange,
   onPriceCommit,
+  onMainColorCommit,
   editHref,
 }: {
   product: ProductWithVariants;
@@ -541,10 +571,16 @@ function VariantRow({
   saving: boolean;
   onCollectionChange: (collectionId: string) => void;
   onPriceCommit: (rawValue: string) => void;
+  onMainColorCommit: (rawValue: string) => void;
   editHref: string;
 }) {
   const effectiveSellingPrice = variant.sale_price ?? variant.price;
   const [priceDraft, setPriceDraft] = useState(String(effectiveSellingPrice));
+  const [mainDraft, setMainDraft] = useState(variant.color_group ?? "");
+
+  useEffect(() => {
+    setMainDraft(variant.color_group ?? "");
+  }, [variant.color_group]);
 
   useEffect(() => {
     setPriceDraft(String(effectiveSellingPrice));
@@ -562,6 +598,20 @@ function VariantRow({
           <span>{variant.color || "Variant"}</span>
           <span className="text-xs text-stone-400">· {variant.sku}</span>
         </span>
+        <div className="mt-1 flex items-center gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-stone-400">Main Color</span>
+          <input
+            list="main-color-suggestions"
+            value={mainDraft}
+            disabled={saving}
+            placeholder={mainColorLabel(variant) || "e.g. Red"}
+            onChange={(e) => setMainDraft(e.target.value)}
+            onBlur={(e) => onMainColorCommit(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+            title="Customer filter aur card par yahi colour dikhta hai. Khali = upar wala Colour hi Main Color maana jayega."
+            className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-rose-900 focus:outline-none disabled:opacity-50"
+          />
+        </div>
       </td>
       <td className="p-3 text-stone-300">—</td>
       <td className="p-3">

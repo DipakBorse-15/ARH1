@@ -10,12 +10,13 @@ export interface Review {
   status: "published" | "hidden";
   created_at: string;
   user_id?: string;
+  variant_id?: string | null;
 }
 
 export async function fetchReviews(productId: string): Promise<Review[]> {
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, product_id, user_id, reviewer_name, rating, title, body, status, created_at")
+    .select("id, product_id, user_id, variant_id, reviewer_name, rating, title, body, status, created_at")
     .eq("product_id", productId)
     .eq("status", "published")
     .order("created_at", { ascending: false })
@@ -30,8 +31,21 @@ export async function canReview(productId: string): Promise<boolean> {
   return !!data;
 }
 
-export async function submitReview(productId: string, rating: number, title: string, body: string): Promise<void> {
-  const { error } = await supabase.rpc("submit_review", { p_product_id: productId, p_rating: rating, p_title: title, p_body: body });
+/** The colours of this design the signed-in customer has received (a review is for one colour). null = could not be loaded. */
+export async function fetchReviewableVariants(productId: string): Promise<{ variant_id: string; color: string | null }[] | null> {
+  const { data, error } = await supabase.rpc("reviewable_variants", { p_product_id: productId });
+  if (error || !Array.isArray(data)) return null;
+  return data as { variant_id: string; color: string | null }[];
+}
+
+export async function submitReview(productId: string, rating: number, title: string, body: string, variantId?: string | null): Promise<void> {
+  const { error } = await supabase.rpc("submit_review", {
+    p_product_id: productId,
+    p_rating: rating,
+    p_title: title,
+    p_body: body,
+    p_variant_id: variantId ?? null,
+  });
   if (error) throw new Error(error.message || "Could not save your review.");
 }
 

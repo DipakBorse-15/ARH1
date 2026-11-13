@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { normalizeMainColor } from "@/lib/mainColor";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { useToast } from "@/contexts/ToastContext";
@@ -209,7 +210,8 @@ export default function NewListingPage() {
   }
 
   function validateChild(): string | null {
-    if (!child.color.trim()) return "Colour likhna zaroori hai";
+    if (!child.color_group.trim()) return "Main Color likhna zaroori hai (jaise Red, Blue)";
+    if (!child.color.trim()) return "Second Color (variation) likhna zaroori hai";
     if (!child.sku.trim()) return "SKU likhna zaroori hai";
     const price = Number(child.price);
     if (!Number.isFinite(price) || price <= 0) return "Price 0 se zyada hona chahiye";
@@ -235,7 +237,7 @@ export default function NewListingPage() {
         product_id: parent.id,
         color: child.color.trim(),
         color_hex: child.color_hex,
-        color_group: child.color_group.trim() || null,
+        color_group: normalizeMainColor(child.color_group) || null,
         sku: child.sku.trim(),
         price: Number(child.price),
         sale_price: numOrNull(child.sale_price),
@@ -425,12 +427,12 @@ export default function NewListingPage() {
 
           <section className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-6 sm:grid-cols-2">
             <p className="sm:col-span-2 text-sm font-semibold text-stone-800">Colour, SKU, price</p>
-            <Field label="Colour *" value={child.color} onChange={(v) => setC("color", v)} placeholder="Royal Blue" />
+            <Field label="Main Color * (customer filter + card par dikhega)" value={child.color_group} onChange={(v) => setC("color_group", v)} placeholder="Blue" />
+            <Field label="Second Color * (variation, sirf product page par dikhega)" value={child.color} onChange={(v) => setC("color", v)} placeholder="Royal Blue" />
             <div>
               <label className={labelClass}>Colour hex (swatch)</label>
               <input type="color" value={child.color_hex} onChange={(e) => setC("color_hex", e.target.value)} className="h-9 w-full rounded-lg border border-stone-300" />
             </div>
-            <Field label="Main Color (color group)" value={child.color_group} onChange={(v) => setC("color_group", v)} placeholder="Blue" />
             <Field label="SKU *" value={child.sku} onChange={(v) => setC("sku", v)} placeholder="111S101-BLU" />
             <Field label="Price (₹) *" type="number" value={child.price} onChange={(v) => setC("price", v)} />
             <Field label="Sale price (₹)" type="number" value={child.sale_price} onChange={(v) => setC("sale_price", v)} />

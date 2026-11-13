@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { PriceDisplay } from "./PriceDisplay";
 import type { ProductVariant, ProductWithVariants } from "@/types";
+import { mainColorKey, mainColorLabel } from "@/lib/mainColor";
+import { ratingFor, useRatingSummary } from "@/services/ratings";
 
 // Must match colorSlug() on the product page, otherwise multi-word colours
 // ("Royal Blue") never match and the page falls back to the first colour.
@@ -18,13 +20,22 @@ function colorSlug(color: string | null) {
  */
 export function ProductCard({ product, variant }: { product: ProductWithVariants; variant?: ProductVariant }) {
   const [loaded, setLoaded] = useState(false);
+  const summary = useRatingSummary();
   const activeVariants = product.variants.filter((v) => v.active);
   const shown = variant ?? activeVariants[0];
   if (!shown) return null;
 
   const image = shown.images?.[0];
   const inStock = shown.is_available && shown.stock_quantity > 0;
-  const otherColourCount = activeVariants.length - 1;
+  // The card shows the MAIN colour only; variation colours (maroon, wine ...) appear on the product page.
+  const shownKey = mainColorKey(shown);
+  const mainLabel = mainColorLabel(shown);
+  const otherColourCount = new Set(activeVariants.map(mainColorKey)).size - 1;
+  const rating = ratingFor(
+    summary,
+    product.id,
+    activeVariants.filter((v) => mainColorKey(v) === shownKey).map((v) => v.id)
+  );
 
   return (
     <Link
@@ -64,12 +75,22 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
         <h3 className="truncate text-sm font-medium leading-snug text-stone-800" title={product.name}>
           {product.name}
         </h3>
-        {(shown.color || otherColourCount > 0) && (
-          <p className="text-xs text-stone-500">
-            {shown.color}
-            {otherColourCount > 0 && (
-              <span className="text-stone-400">
-                {shown.color ? " " : ""}(+{otherColourCount} Color{otherColourCount > 1 ? "s" : ""})
+        {(mainLabel || otherColourCount > 0 || rating !== null) && (
+          <p className="flex items-center justify-between gap-2 text-xs text-stone-500">
+            <span className="min-w-0 truncate">
+              {mainLabel}
+              {otherColourCount > 0 && (
+                <span className="text-stone-400">
+                  {mainLabel ? " " : ""}(+{otherColourCount} Color{otherColourCount > 1 ? "s" : ""})
+                </span>
+              )}
+            </span>
+            {rating !== null && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-stone-700" title={`${rating.toFixed(1)} out of 5`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#d97706" aria-hidden="true">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+                {rating.toFixed(1)}
               </span>
             )}
           </p>

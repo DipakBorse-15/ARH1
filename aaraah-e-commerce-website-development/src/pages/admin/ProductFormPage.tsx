@@ -16,6 +16,7 @@ import {
   uploadProductImage,
 } from "@/services/products";
 import { friendlyError } from "@/lib/supabase";
+import { COMMON_MAIN_COLORS, normalizeMainColor } from "@/lib/mainColor";
 import { formatINR } from "@/components/product/PriceDisplay";
 import type { Category, Collection, Product, ProductVariant } from "@/types";
 
@@ -34,7 +35,7 @@ const EMPTY_PRODUCT: Partial<Product> = {
   active: true,
 };
 
-const EMPTY_VARIANT = { color: "", color_hex: "#7a1730", size: "", sku: "", price: 0, sale_price: "", stock_quantity: 0 };
+const EMPTY_VARIANT = { color: "", color_group: "", color_hex: "#7a1730", size: "", sku: "", price: 0, sale_price: "", stock_quantity: 0 };
 
 export default function ProductFormPage() {
   const { id } = useParams();
@@ -133,7 +134,8 @@ export default function ProductFormPage() {
     try {
       await upsertVariant({
         product_id: product.id,
-        color: newVariant.color,
+        color: newVariant.color.trim(),
+        color_group: normalizeMainColor(newVariant.color_group) || normalizeMainColor(newVariant.color) || null,
         color_hex: newVariant.color_hex,
         attributes: newVariant.size.trim() ? { size: newVariant.size.trim() } : {},
         sku: newVariant.sku,
@@ -163,7 +165,7 @@ export default function ProductFormPage() {
       // on the site automatically, out of stock shows "Out of stock"
       // automatically. `active` stays true here; use "Delete variant" (or
       // the design-level Published toggle) to actually remove a listing.
-      await upsertVariant({ ...v, is_available: v.stock_quantity > 0, active: true });
+      await upsertVariant({ ...v, color_group: normalizeMainColor(v.color_group) || null, is_available: v.stock_quantity > 0, active: true });
       show("Variant updated", "success");
       if (product.id) load(product.id, true);
     } catch (err) {
@@ -339,9 +341,16 @@ export default function ProductFormPage() {
             ))}
           </div>
 
+          <datalist id="main-color-suggestions">
+            {Array.from(new Set([...COMMON_MAIN_COLORS, ...variants.map((x) => normalizeMainColor(x.color_group)).filter(Boolean)])).map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+
           <form onSubmit={handleAddVariant} className="grid gap-3 rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-5 sm:grid-cols-3">
             <p className="text-sm font-medium text-stone-700 sm:col-span-3">+ Add new colour variant</p>
-            <input placeholder="Colour (e.g. Red)" required value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} className={inputClass} />
+            <input list="main-color-suggestions" placeholder="Main Color * (filter + card, e.g. Red)" required value={newVariant.color_group} onChange={(e) => setNewVariant({ ...newVariant, color_group: e.target.value })} className={inputClass} />
+            <input placeholder="Second Color * (variation, e.g. Maroon)" required value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} className={inputClass} />
             <input type="color" value={newVariant.color_hex} onChange={(e) => setNewVariant({ ...newVariant, color_hex: e.target.value })} className="h-10 w-full rounded-lg border border-stone-300" />
             <input placeholder="Sizes (optional, e.g. S, M, L, XL)" value={newVariant.size} onChange={(e) => setNewVariant({ ...newVariant, size: e.target.value })} className={inputClass} />
             <input placeholder="SKU (unique)" required value={newVariant.sku} onChange={(e) => setNewVariant({ ...newVariant, sku: e.target.value })} className={inputClass} />
@@ -407,7 +416,16 @@ function VariantCard({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Labeled label="Colour">
+        <Labeled label="Main Color (customer filter + card par dikhta hai)">
+          <input
+            list="main-color-suggestions"
+            placeholder={local.color ?? "e.g. Red"}
+            value={local.color_group ?? ""}
+            onChange={(e) => setLocal({ ...local, color_group: e.target.value })}
+            className={inputClass}
+          />
+        </Labeled>
+        <Labeled label="Second Color (variation, sirf product page par dikhta hai)">
           <input value={local.color ?? ""} onChange={(e) => setLocal({ ...local, color: e.target.value })} className={inputClass} />
         </Labeled>
         <Labeled label="Colour hex">
