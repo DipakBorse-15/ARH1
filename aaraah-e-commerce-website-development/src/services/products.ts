@@ -571,7 +571,7 @@ export async function upsertVariant(variant: Partial<ProductVariant>) {
  */
 export async function updateVariantQuick(
   id: string,
-  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity" | "color_group">>
+  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity" | "color_group" | "color">>
 ) {
   // Availability always follows stock — any path that changes stock_quantity
   // (quick-edit here, or the full product form) must keep is_available in

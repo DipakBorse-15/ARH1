@@ -133,6 +133,25 @@ export default function AdminProductsPage() {
     }
   }
 
+  async function handleVariantSecondColorCommit(productId: string, variant: ProductVariant, rawValue: string) {
+    const next = rawValue.trim().replace(/\s+/g, " ");
+    if (!next) {
+      show("Second Color khali nahi ho sakta.", "error");
+      return;
+    }
+    if (next === (variant.color ?? "")) return; // unchanged, nothing to save
+    setSavingKey(`variant:${variant.id}`);
+    try {
+      await updateVariantQuick(variant.id, { color: next });
+      patchVariant(productId, variant.id, { color: next });
+      show(`Second Color: ${next}`, "success");
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
   // Names already used as Main Color anywhere (plus common ones) - offered as suggestions while typing.
   const mainColorSuggestions = useMemo(() => {
     const set = new Set<string>(COMMON_MAIN_COLORS);
@@ -433,6 +452,7 @@ export default function AdminProductsPage() {
                           onCollectionChange={(collectionId) => handleVariantCollectionChange(p.id, v.id, collectionId)}
                           onPriceCommit={(raw) => handleVariantSellingPriceCommit(p.id, v, raw)}
                           onMainColorCommit={(raw) => handleVariantMainColorCommit(p.id, v, raw)}
+                          onSecondColorCommit={(raw) => handleVariantSecondColorCommit(p.id, v, raw)}
                           editHref={`/admin/products/${p.id}?variant=${v.id}`}
                         />
                       ))}
@@ -563,6 +583,7 @@ function VariantRow({
   onCollectionChange,
   onPriceCommit,
   onMainColorCommit,
+  onSecondColorCommit,
   editHref,
 }: {
   product: ProductWithVariants;
@@ -572,11 +593,17 @@ function VariantRow({
   onCollectionChange: (collectionId: string) => void;
   onPriceCommit: (rawValue: string) => void;
   onMainColorCommit: (rawValue: string) => void;
+  onSecondColorCommit: (rawValue: string) => void;
   editHref: string;
 }) {
   const effectiveSellingPrice = variant.sale_price ?? variant.price;
   const [priceDraft, setPriceDraft] = useState(String(effectiveSellingPrice));
   const [mainDraft, setMainDraft] = useState(variant.color_group ?? "");
+  const [secondDraft, setSecondDraft] = useState(variant.color ?? "");
+
+  useEffect(() => {
+    setSecondDraft(variant.color ?? "");
+  }, [variant.color]);
 
   useEffect(() => {
     setMainDraft(variant.color_group ?? "");
@@ -598,7 +625,8 @@ function VariantRow({
           <span>{variant.color || "Variant"}</span>
           <span className="text-xs text-stone-400">· {variant.sku}</span>
         </span>
-        <div className="mt-1 flex items-center gap-1">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label className="flex items-center gap-1">
           <span className="text-[10px] uppercase tracking-wide text-stone-400">Main Color</span>
           <input
             list="main-color-suggestions"
@@ -611,6 +639,20 @@ function VariantRow({
             title="Customer filter aur card par yahi colour dikhta hai. Khali = upar wala Colour hi Main Color maana jayega."
             className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-rose-900 focus:outline-none disabled:opacity-50"
           />
+          </label>
+          <label className="flex items-center gap-1">
+            <span className="text-[10px] uppercase tracking-wide text-stone-400">Second Color</span>
+            <input
+              value={secondDraft}
+              disabled={saving}
+              placeholder="e.g. Maroon"
+              onChange={(e) => setSecondDraft(e.target.value)}
+              onBlur={(e) => onSecondColorCommit(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              title="Variation colour: sirf product ke final page par dikhta hai (cart/order me bhi yahi naam jata hai)."
+              className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-rose-900 focus:outline-none disabled:opacity-50"
+            />
+          </label>
         </div>
       </td>
       <td className="p-3 text-stone-300">—</td>
