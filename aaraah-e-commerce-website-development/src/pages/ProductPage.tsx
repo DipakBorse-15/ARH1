@@ -1,7 +1,7 @@
 import { WishlistButton } from "@/components/product/WishlistButton";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SEO } from "@/components/ui/SEO";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { VariantSelector } from "@/components/product/VariantSelector";
@@ -58,6 +58,14 @@ export default function ProductPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const rv = useReviews(product?.id);
+
+  // The link in the "delivered" email ends with #reviews: once the product has loaded, bring the review box into view.
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash !== "#reviews" || !product) return;
+    const t = setTimeout(() => document.getElementById("reviews")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    return () => clearTimeout(t);
+  }, [product?.id, location.hash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     load();
@@ -446,7 +454,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      <ReviewsSection productId={product.id} variants={product.variants.map((v) => ({ id: v.id, color: v.color }))} reviews={rv.reviews} average={rv.average} onChanged={rv.reload} />
+      <ReviewsSection productId={product.id} preferredVariantId={selectedVariant.id} variants={product.variants.map((v) => ({ id: v.id, color: v.color }))} reviews={rv.reviews} average={rv.average} onChanged={rv.reload} />
 
       {similar.length > 0 && (
         <section className="mt-16">

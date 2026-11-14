@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await admin
       .from("orders")
-      .select("*, items:order_items(*, variant:product_variants(product:products(slug)))")
+      .select("*, items:order_items(*, variant:product_variants(color, product:products(slug)))")
       .eq("id", order_id)
       .single();
     if (orderError || !order) return json({ error: "Order not found" }, 404);
@@ -67,13 +67,16 @@ Deno.serve(async (req) => {
     const orderLink = `https://aaraah.in/account/orders/${order.id}`;
 
     if (delivered) {
-      type Row = { product_name: string; color: string | null; variant?: { product?: { slug?: string } | { slug?: string }[] | null } | null };
+      type Row = { product_name: string; color: string | null; variant?: { color?: string | null; product?: { slug?: string } | { slug?: string }[] | null } | null };
       const reviewRows = (order.items || [])
         .map((i: Row) => {
           const prod = Array.isArray(i.variant?.product) ? i.variant?.product[0] : i.variant?.product;
           const slug = prod?.slug;
+          // ?variant=<colour> so the review form opens on the colour this customer received (same rule as the website's colorSlug)
+          const colourPart = i.variant?.color || i.color;
+          const variantQuery = colourPart ? `?variant=${encodeURIComponent(String(colourPart).toLowerCase().trim().replace(/\s+/g, "-"))}` : "";
           return `<li style="margin:6px 0">${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""}${
-            slug ? ` — <a href="https://aaraah.in/products/${encodeURIComponent(slug)}#reviews" style="color:#7a1730">Write a review</a>` : ""
+            slug ? ` — <a href="https://aaraah.in/products/${encodeURIComponent(slug)}${variantQuery}#reviews" style="color:#7a1730">Write a review</a>` : ""
           }</li>`;
         })
         .join("");

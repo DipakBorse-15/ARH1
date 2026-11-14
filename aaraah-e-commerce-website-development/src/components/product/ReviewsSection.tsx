@@ -38,12 +38,15 @@ export function useReviews(productId: string | undefined) {
 
 export function ReviewsSection({
   productId,
+  preferredVariantId,
   variants = [],
   reviews,
   average,
   onChanged,
 }: {
   productId: string;
+  /** The colour shown on the page: the review form starts with it (when the customer received that colour). */
+  preferredVariantId?: string | null;
   /** The colours of this design (to show which colour a review is for). */
   variants?: { id: string; color: string | null }[];
   reviews: Review[];
@@ -81,7 +84,7 @@ export function ReviewsSection({
         return;
       }
       setChoices(list);
-      setVariantId(list[0]?.variant_id ?? null);
+      setVariantId((preferredVariantId && list.find((c) => c.variant_id === preferredVariantId)?.variant_id) || list[0]?.variant_id || null);
       setAllowed(list.length > 0);
     });
     return () => {
