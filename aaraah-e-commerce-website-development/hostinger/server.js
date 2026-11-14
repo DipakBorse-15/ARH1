@@ -418,6 +418,55 @@ function sendFile(req, res, file, stat, ext, opts = {}) {
   stream.pipe(res);
 }
 
+/* The page's canonical link must already be in the HTML Google first downloads (the site only adds it with
+   JavaScript, which Google runs later). One address per page: the query part (?variant=, ?color=, ...) is dropped,
+   so every colour of a design points at /products/<design>. */
+const SITE_URL = "https://aaraah.in";
+const CANONICAL_PATH =
+  /^\/(?:products\/[^/]+|category\/[^/]+(?:\/all)?|collection\/[^/]+|about|contact|faq|privacy-policy|terms-and-conditions|returns-and-refunds|shipping-policy)?\/?$/;
+const escAttr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+let indexCache = { mtime: 0, raw: "" };
+
+function readIndexHtml() {
+  const file = path.join(DIST, "index.html");
+  const stat = fs.statSync(file);
+  if (indexCache.mtime !== stat.mtimeMs) indexCache = { mtime: stat.mtimeMs, raw: fs.readFileSync(file, "utf8") };
+  return indexCache.raw;
+}
+
+/** Sends index.html with the canonical link added. Returns false when this address should get the plain file. */
+function sendIndexWithCanonical(req, res, pathname) {
+  if (!CANONICAL_PATH.test(pathname)) return false;
+  let html;
+  try {
+    html = readIndexHtml();
+  } catch {
+    return false;
+  }
+  if (/rel=["']canonical["']/i.test(html) || !html.includes("</head>")) return false;
+  const clean = pathname.length > 1 ? pathname.replace(/\/+$/, "") : "/";
+  const withLink = html.replace("</head>", () => `  <link rel="canonical" href="${escAttr(SITE_URL + clean)}" />\n</head>`);
+  const headers = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-cache",
+    "X-Content-Type-Options": "nosniff",
+    Vary: "Accept-Encoding",
+  };
+  const accept = String(req.headers["accept-encoding"] || "");
+  let body = Buffer.from(withLink, "utf8");
+  if (/\bbr\b/.test(accept)) {
+    body = zlib.brotliCompressSync(body, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } });
+    headers["Content-Encoding"] = "br";
+  } else if (/\bgzip\b/.test(accept)) {
+    body = zlib.gzipSync(body, { level: 6 });
+    headers["Content-Encoding"] = "gzip";
+  }
+  headers["Content-Length"] = body.length;
+  res.writeHead(200, headers);
+  res.end(req.method === "HEAD" ? undefined : body);
+  return true;
+}
+
 function serveStatic(req, res, pathname) {
   let rel = "";
   try {
@@ -448,6 +497,7 @@ function serveStatic(req, res, pathname) {
     return;
   }
   // Every other address is a page of the single-page app.
+  if (sendIndexWithCanonical(req, res, pathname)) return;
   const indexFile = path.join(DIST, "index.html");
   try {
     sendFile(req, res, indexFile, fs.statSync(indexFile), ".html");

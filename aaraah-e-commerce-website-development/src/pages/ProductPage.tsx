@@ -235,8 +235,8 @@ export default function ProductPage() {
     });
   }
 
-  // Every colour has its own address (and canonical): /products/<slug>?variant=<colour>
-  const variantPath = `/products/${product.slug}${selectedVariant.color ? `?variant=${encodeURIComponent(colorSlug(selectedVariant.color))}` : ""}`;
+  // Google gets ONE canonical address per design, so every colour of a design counts as one page.
+  const canonicalProductPath = `/products/${product.slug}`;
 
   return (
     <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-8 sm:px-6">
@@ -245,7 +245,7 @@ export default function ProductPage() {
         description={variantSeoDescription(product, selectedVariant)}
         ogType="product"
         image={selectedVariant.images?.[0]?.url}
-        canonicalPath={variantPath}
+        canonicalPath={canonicalProductPath}
         jsonLd={{
           "@context": "https://schema.org",
           "@graph": [
@@ -257,7 +257,7 @@ export default function ProductPage() {
               color: selectedVariant.color || undefined,
               description: activeDescription || undefined,
               image: (selectedVariant.images || []).map((i) => i.url).slice(0, 5),
-              url: `${siteConfig.url}${variantPath}`,
+              url: `${siteConfig.url}${canonicalProductPath}`,
               ...(rv.count > 0
                 ? {
                     aggregateRating: { "@type": "AggregateRating", ratingValue: Number(rv.average.toFixed(1)), reviewCount: rv.count },
@@ -274,7 +274,7 @@ export default function ProductPage() {
                 "@type": "Offer",
                 priceCurrency: "INR",
                 price: sellingPrice,
-                url: `${siteConfig.url}${variantPath}`,
+                url: `${siteConfig.url}${canonicalProductPath}`,
                 availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
                 itemCondition: "https://schema.org/NewCondition",
                 seller: { "@type": "Organization", name: siteConfig.name },

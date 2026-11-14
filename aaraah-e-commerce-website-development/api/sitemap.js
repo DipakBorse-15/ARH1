@@ -3,8 +3,6 @@
 // Served at /sitemap.xml (see vercel.json). If the database cannot be reached it answers 503
 // (never a thin "static pages only" sitemap): Google retries later, and hostinger/server.js keeps
 // serving its last good copy meanwhile.
-import { colorSlug } from "./_lib/seoText.js";
-
 const SITE = "https://aaraah.in";
 
 const STATIC_PATHS = [
@@ -42,10 +40,10 @@ export default async function handler(req, res) {
   const urls = STATIC_PATHS.map((p) => ({ loc: SITE + p, priority: p === "/" ? "1.0" : "0.3" }));
   try {
     if (base && key) {
-      const [cats, colours, cols] = await Promise.all([
+      const [cats, designs, cols] = await Promise.all([
         rows(base, key, "categories", "slug", "&active=eq.true&order=slug"),
-        // Every active colour of every active parent gets its own address (own canonical, title, description).
-        rows(base, key, "product_variants", "color,updated_at,products!inner(slug)", "&active=eq.true&products.active=eq.true&order=id"),
+        // One address per design (all its colours are one page: /products/<slug>); only designs that have an active colour.
+        rows(base, key, "products", "slug,updated_at,product_variants!inner(id)", "&active=eq.true&product_variants.active=eq.true&order=slug"),
         rows(base, key, "collections", "slug", "&active=eq.true&order=slug").catch(() => []),
       ]);
       for (const c of cols) urls.push({ loc: `${SITE}/collection/${c.slug}`, priority: "0.7" });
@@ -53,11 +51,9 @@ export default async function handler(req, res) {
         urls.push({ loc: `${SITE}/category/${c.slug}`, priority: "0.8" });
         urls.push({ loc: `${SITE}/category/${c.slug}/all`, priority: "0.7" });
       }
-      for (const v of colours) {
-        const slug = v.products && v.products.slug;
-        if (!slug) continue;
-        const q = v.color ? `?variant=${encodeURIComponent(colorSlug(v.color))}` : "";
-        urls.push({ loc: `${SITE}/products/${slug}${q}`, priority: "0.6", lastmod: v.updated_at });
+      for (const p of designs) {
+        if (!p.slug) continue;
+        urls.push({ loc: `${SITE}/products/${p.slug}`, priority: "0.8", lastmod: p.updated_at });
       }
     }
   } catch (e) {

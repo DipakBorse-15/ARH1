@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { DashboardStats } from "@/types";
+import { LOW_STOCK_BELOW } from "@/lib/variantEdit";
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   // After "Reset orders" the customer count starts again from that moment.
@@ -28,7 +29,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "delivered"),
     customersQuery,
-    supabase.from("product_variants").select("id", { count: "exact", head: true }).lte("stock_quantity", 5).eq("active", true),
+    supabase.from("product_variants").select("id", { count: "exact", head: true }).lt("stock_quantity", LOW_STOCK_BELOW).eq("active", true),
     supabase.from("orders").select("total").eq("payment_status", "paid").neq("status", "cancelled"),
   ]);
 

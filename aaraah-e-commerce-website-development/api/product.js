@@ -103,7 +103,7 @@ export default async function handler(req, res) {
   const meta = [
     `<title>${esc(title)}</title>`,
     `<meta name="description" content="${esc(description)}">`,
-    `<link rel="canonical" href="${esc(url)}">`,
+    `<link rel="canonical" href="${esc(`${SITE}/products/${encodeURIComponent(product.slug)}`)}">`,
     `<meta property="og:site_name" content="AARAAH">`,
     `<meta property="og:type" content="product">`,
     `<meta property="og:title" content="${esc(title)}">`,
