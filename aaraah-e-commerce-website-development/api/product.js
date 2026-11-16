@@ -1,6 +1,6 @@
-// Vercel serverless function: serves a tiny HTML page with the right title, image and
+// Serves a tiny HTML page with the right title, image and
 // price for ONE product, only to link-preview bots (WhatsApp, Facebook, Telegram...).
-// vercel.json routes those bots here; normal visitors and Google get the regular site.
+// hostinger/server.js routes those bots here; normal visitors and Google get the regular site.
 import { colorSlug, variantSeoDescription, variantSeoTitle } from "./_lib/seoText.js";
 
 const SITE = "https://aaraah.in";

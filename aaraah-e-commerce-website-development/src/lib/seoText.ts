@@ -1,4 +1,4 @@
-// The real logic lives in api/_lib/seoText.js so the website and the Vercel functions (sitemap, link
+// The real logic lives in api/_lib/seoText.js so the website and the server functions (sitemap, link
 // previews) always build identical Google text. This file only re-exports it for the website code.
 export {
   variantSeoTitle,

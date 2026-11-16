@@ -1,6 +1,6 @@
-// Vercel serverless function: live sitemap built from the database, so new
+// Live sitemap built from the database, so new
 // categories, collections and products are picked up without re-uploading anything.
-// Served at /sitemap.xml (see vercel.json). If the database cannot be reached it answers 503
+// Served at /sitemap.xml (hostinger/server.js). If the database cannot be reached it answers 503
 // (never a thin "static pages only" sitemap): Google retries later, and hostinger/server.js keeps
 // serving its last good copy meanwhile.
 const SITE = "https://aaraah.in";

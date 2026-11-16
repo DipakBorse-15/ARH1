@@ -9,6 +9,8 @@ import {
   fetchProductByIdAdmin,
   upsertProduct,
   upsertVariant,
+  updateVariantFromForm,
+  VariantConflictError,
   deleteVariant,
   addVariantImage,
   deleteVariantImage,
@@ -131,11 +133,15 @@ export default function ProductFormPage() {
       show(numberProblem, "error");
       return;
     }
+    if (!normalizeMainColor(newVariant.color_group)) {
+      show("Main Color likhna zaroori hai (jaise Red, Blue).", "error");
+      return;
+    }
     try {
       await upsertVariant({
         product_id: product.id,
         color: newVariant.color.trim(),
-        color_group: normalizeMainColor(newVariant.color_group) || normalizeMainColor(newVariant.color) || null,
+        color_group: normalizeMainColor(newVariant.color_group),
         color_hex: newVariant.color_hex,
         attributes: newVariant.size.trim() ? { size: newVariant.size.trim() } : {},
         sku: newVariant.sku,
@@ -165,10 +171,22 @@ export default function ProductFormPage() {
       // on the site automatically, out of stock shows "Out of stock"
       // automatically. `active` stays true here; use "Delete variant" (or
       // the design-level Published toggle) to actually remove a listing.
-      await upsertVariant({ ...v, color_group: normalizeMainColor(v.color_group) || null, is_available: v.stock_quantity > 0, active: true });
+      const original = variants.find((x) => x.id === v.id);
+      const edited = { ...v, color_group: normalizeMainColor(v.color_group) };
+      if (!edited.color_group) {
+        show("Main Color likhna zaroori hai (jaise Red, Blue).", "error");
+        return;
+      }
+      if (original) await updateVariantFromForm(original, edited);
+      else await upsertVariant({ ...edited, is_available: v.stock_quantity > 0, active: true });
       show("Variant updated", "success");
       if (product.id) load(product.id, true);
     } catch (err) {
+      if (err instanceof VariantConflictError) {
+        show(err.message, "error");
+        if (product.id) load(product.id, true);
+        return;
+      }
       show(friendlyError(err), "error");
     }
   }

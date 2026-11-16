@@ -3,7 +3,7 @@ import { fetchOrderById } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import type { Order } from "@/types";
 
-/** Loads an order and keeps it fresh: re-checks every 8s while it is still
+/** Loads an order and keeps it fresh: re-checks every 8s (60s after 10 minutes) while it is still
  *  waiting on the shop (pending / payment not received), and whenever the
  *  customer comes back to the tab — so an admin's "Confirmed" shows up
  *  without a manual refresh. */
@@ -46,12 +46,19 @@ export function useLiveOrder(orderId: string | undefined) {
 
   useEffect(() => {
     if (!waiting) return;
-    const t = setInterval(refetch, 8000);
+    // Fast (8 s) for the first 10 minutes, then every 60 s; nothing is asked while the tab is hidden.
+    const startedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      if (document.visibilityState === "visible") refetch();
+      timer = setTimeout(tick, Date.now() - startedAt < 10 * 60_000 ? 8000 : 60_000);
+    };
+    timer = setTimeout(tick, 8000);
     const onVisible = () => document.visibilityState === "visible" && refetch();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", refetch);
     return () => {
-      clearInterval(t);
+      clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", refetch);
     };

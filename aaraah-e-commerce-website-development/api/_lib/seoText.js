@@ -1,5 +1,5 @@
 // ONE shared place for: Google title / description of a product colour, and the short web address (slug)
-// of a parent product. Used by the website (src/lib/seoText.ts, src/lib/slugs.ts) AND by the Vercel
+// of a parent product. Used by the website (src/lib/seoText.ts, src/lib/slugs.ts) AND by the server
 // functions (api/sitemap.js, api/product.js), so everyone produces exactly the same text.
 // The file name starts with "_" so Vercel does not treat it as a web address of its own.
 //

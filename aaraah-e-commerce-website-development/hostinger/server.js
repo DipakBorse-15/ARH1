@@ -1,6 +1,6 @@
 // AARAAH on Hostinger (Node.js web app). No extra npm packages: only Node's built-in modules.
 //
-// What this one small server does (it replaces what Vercel did for us):
+// What this one small server does (it replaced Vercel):
 //   1. Serves the built website from ../dist and gives every other page the index.html (so refresh never 404s).
 //   2. /sitemap.xml, /feed.xml and link-preview bots on /products/:slug -> the existing ../api/*.js code, unchanged.
 //      Results are remembered for a few minutes, so bots cannot make Supabase work (and send data) again and again.
@@ -59,7 +59,7 @@ const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".json", ".webmani
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 /* ------------------------------------------------------------------ */
-/* 1. The three old Vercel functions (api/*.js), run as they are       */
+/* 1. The three small functions in api/*.js, run as they are          */
 /* ------------------------------------------------------------------ */
 const handlers = {};
 async function loadHandler(name) {
@@ -96,10 +96,25 @@ function captureResponse() {
   return r;
 }
 
+// Link-preview lookups that are not in the cache cost one Supabase call each. A fake "bot" asking for random
+// product addresses must not be able to make unlimited calls: at most 60 new lookups a minute (real previews are far fewer).
+let lookupWindow = { at: 0, n: 0 };
+function productLookupAllowed() {
+  const now = Date.now();
+  if (now - lookupWindow.at > 60_000) lookupWindow = { at: now, n: 0 };
+  return ++lookupWindow.n <= 60;
+}
+
 async function runApi(name, key, query, ttlMs, req, res) {
   const now = Date.now();
   const hit = apiCache.get(key);
   let out = hit && now - hit.at < hit.ttl ? hit : null;
+
+  if (!out && name === "product" && !hit && !productLookupAllowed()) {
+    res.writeHead(429, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
+    res.end("Too many requests");
+    return;
+  }
 
   if (!out) {
     try {

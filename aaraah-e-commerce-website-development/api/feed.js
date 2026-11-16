@@ -1,5 +1,5 @@
-// Vercel serverless function: Google Merchant Center product feed (free listings), built live from the
-// database. One item per active colour of every active parent. Served at /feed.xml (see vercel.json).
+// Google Merchant Center product feed (free listings), built live from the
+// database. One item per active colour of every active parent. Served at /feed.xml (hostinger/server.js).
 // Merchant Center reads this web address on a schedule; nothing has to be uploaded by hand.
 import { colorSlug } from "./_lib/seoText.js";
 

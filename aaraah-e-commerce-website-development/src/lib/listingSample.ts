@@ -67,7 +67,7 @@ const DETAILS: string[][] = [
   ["Discount Amount", "Nahi", "Optional.", ""],
   ["Stock", "Nahi", "Kitne piece. Naye SKU me khali = 0. Purane SKU me khali = purana stock jaisa tha waisa hi rahega.", "5"],
   ["Map Color", "HAAN", "Second Color (variation): jaise Maroon, Wine. Sirf product ke final page par dikhta hai.", "Maroon"],
-  ["Main Color", "HAAN", "Customer filter aur card par yahi dikhta hai (jaise Red, Blue, Green). Same design ke do SKU ka Main Color same ho to wo ek hi card me aate hain. Khali chhodoge to Map Color hi Main Color ban jayega.", "Red"],
+  ["Main Color", "HAAN", "Customer filter aur card par yahi dikhta hai (jaise Red, Blue, Green). Same design ke do SKU ka Main Color same ho to wo ek hi card me aate hain. ZAROORI hai: khali chhodoge to wo colour import nahi hoga.", "Red"],
   ["Product Description", "Nahi", "Is colour ka description.", ""],
   ["Work Type", "Nahi", "", "Zari"],
   ["Work Pattern", "Nahi", "", "Woven"],

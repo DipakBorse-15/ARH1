@@ -13,10 +13,12 @@ export default function OrderConfirmationPage() {
   const orderNumber = (location.state as { orderNumber?: string } | null)?.orderNumber;
   const { order, loading, error, refetch } = useLiveOrder(orderId);
 
-  // Analytics: once per order, as soon as the order has loaded.
+  // Analytics: "Purchase" is sent once per order, only when the customer has really paid:
+  // the UTR / payment number was submitted, or the shop marked the payment received.
   const orderForTracking = order;
   useEffect(() => {
     if (!orderForTracking || orderForTracking.status === "cancelled") return;
+    if (!orderForTracking.payment_reference && orderForTracking.payment_status !== "paid") return;
     trackPurchase(
       orderForTracking.order_number,
       orderForTracking.total,

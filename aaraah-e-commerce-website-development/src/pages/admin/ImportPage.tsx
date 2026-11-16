@@ -146,7 +146,8 @@ function parseWorkbook(wb: XLSX.WorkBook): ParsedProduct[] {
         // Map Color = Second Color (variation, shown only on the product page); Main Color = filter + card colour.
         // If one of them is empty the other is used, so no colour is ever lost.
         color: firstValue(arr, colIndex, "Map Color") || firstValue(arr, colIndex, "Main Color"),
-        colorGroup: normalizeMainColor(firstValue(arr, colIndex, "Main Color") || firstValue(arr, colIndex, "Map Color")),
+        // Main Color is MANDATORY: it is never guessed from the second colour (a colour without it is skipped).
+        colorGroup: normalizeMainColor(firstValue(arr, colIndex, "Main Color")),
         images,
         description: firstValue(arr, colIndex, "Product Description"),
         bullets,
@@ -285,15 +286,20 @@ export default function ImportPage() {
     if (parsed.length === 0) return;
     setBusy(true);
     setLog([]);
+    let newPhotos = 0;
 
     for (const p of parsed) {
       try {
         const categoryId = matchCategory(p.productType, categories)?.id ?? null;
 
         // A colour without a real MRP (empty / 0) is never imported: it could be ordered for free.
-        const goodVariants = p.variants.filter((v) => v.price > 0);
-        for (const v of p.variants) if (!(v.price > 0)) addLog(`⚠️ ${v.sku}: MRP khali ya 0 hai, ye colour skip hua`);
-        if (goodVariants.length === 0) throw new Error("Kisi colour me MRP nahi hai, ye product skip hua.");
+        // A colour without a Main Color is never imported either (customers could not filter it).
+        const goodVariants = p.variants.filter((v) => v.price > 0 && v.colorGroup);
+        for (const v of p.variants) {
+          if (!(v.price > 0)) addLog(`⚠️ ${v.sku}: MRP khali ya 0 hai, ye colour skip hua`);
+          else if (!v.colorGroup) addLog(`⚠️ ${v.sku}: Main Color khali hai, ye colour skip hua`);
+        }
+        if (goodVariants.length === 0) throw new Error("Kisi colour me MRP ya Main Color nahi hai, ye product skip hua.");
 
         const { data: existing, error: findErr } = await supabase
           .from("products")
@@ -385,7 +391,10 @@ export default function ImportPage() {
           priorVariant ? updated++ : added++;
 
           if (v.images.length > 0) {
-            await supabase.from("product_images").delete().eq("variant_id", variant.id);
+            // Safe order: add the new photos first and remove the old ones only after that worked,
+            // so a failed insert never leaves a colour without photos.
+            const { data: oldImgs, error: oErr } = await supabase.from("product_images").select("id").eq("variant_id", variant.id);
+            if (oErr) throw oErr;
             const { error: iErr } = await supabase.from("product_images").insert(
               v.images.map((url, idx) => ({
                 variant_id: variant.id,
@@ -396,6 +405,12 @@ export default function ImportPage() {
               }))
             );
             if (iErr) throw iErr;
+            const oldIds = (oldImgs || []).map((r: { id: string }) => r.id);
+            if (oldIds.length > 0) {
+              const { error: dErr } = await supabase.from("product_images").delete().in("id", oldIds);
+              if (dErr) throw dErr;
+            }
+            newPhotos += v.images.length;
           }
         }
 
@@ -405,11 +420,13 @@ export default function ImportPage() {
       }
     }
 
+    if (newPhotos > 0) addLog("ℹ️ Nayi photos ke thumbnail abhi nahi bane: Admin → Photo Optimizer kholo aur \"thumbnails banao\" chalao.");
     setBusy(false);
     show("Import finished. Check the log below.", "success");
   }
 
   const badPrice = parsed.reduce((n, p) => n + p.variants.filter((v) => !(v.price > 0)).length, 0);
+  const badMain = parsed.reduce((n, p) => n + p.variants.filter((v) => v.price > 0 && !v.colorGroup).length, 0);
   const totalVariants = parsed.reduce((n, p) => n + p.variants.length, 0);
   const totalImages = parsed.reduce((n, p) => n + p.variants.reduce((m, v) => m + v.images.length, 0), 0);
 
@@ -464,6 +481,12 @@ export default function ImportPage() {
             </p>
           )}
 
+          {badMain > 0 && (
+            <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
+              {badMain} colour me Main Color khali hai. Main Color zaroori hai, isliye wo colour import me skip honge. Excel me &quot;Main Color&quot; bharke dobara upload karo.
+            </p>
+          )}
+
           <div className="mt-6 space-y-4">
             {parsed.map((p) => (
               <div key={p.parentSku} className="rounded-lg border border-stone-200 bg-white p-4">
@@ -490,7 +513,9 @@ export default function ImportPage() {
                         <div className="aspect-[3/4] w-full rounded" style={{ backgroundColor: hexFor(v.color) }} />
                       )}
                       <p className="mt-1 truncate text-[10px] text-stone-600">{v.color}</p>
-                      {v.price > 0 ? (
+                      {v.price > 0 && !v.colorGroup ? (
+                        <p className="text-[10px] font-semibold text-red-600">Main Color nahi · skip</p>
+                      ) : v.price > 0 ? (
                         <p className="text-[10px] font-semibold text-stone-900">
                           ₹{v.salePrice ?? v.price} · {v.images.length} img
                         </p>

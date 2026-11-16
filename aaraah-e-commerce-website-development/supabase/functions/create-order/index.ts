@@ -487,12 +487,8 @@ async function sendOrderReceivedEmail(
       <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
       ${discount > 0 ? `<p style="color:#047857;margin:0">Coupon ${esc(couponCode)}: −₹${esc(discount)}</p>` : ""}
       <p style="font-weight:bold">Total: ₹${esc(total)}</p>
-      ${
-        order.payment_method === "cod"
-          ? `<p><b>Payment:</b> Cash on delivery — pay ₹${esc(total)} when your order arrives. We will email you when it is confirmed and shipped.</p>`
-          : `<p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
-      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>`
-      }
+      <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
+      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>
       <p><a href="${link}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open my order</a></p>
       <p style="color:#78716c;font-size:13px">Questions? Reply to this email or WhatsApp us.</p>
     </div>`;

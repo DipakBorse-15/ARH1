@@ -10,6 +10,7 @@ import {
   updateProductQuick,
   updateVariantQuick,
   updateVariantsBulk,
+  type VariantGuard,
 } from "@/services/products";
 import { fetchAllCollectionsAdmin } from "@/services/collections";
 import { friendlyError } from "@/lib/supabase";
@@ -121,11 +122,15 @@ export default function AdminProductsPage() {
   async function handleVariantMainColorCommit(productId: string, variant: ProductVariant, rawValue: string) {
     const next = normalizeMainColor(rawValue);
     if (next === normalizeMainColor(variant.color_group)) return; // unchanged, nothing to save
+    if (!next) {
+      show("Main Color zaroori hai, khali nahi chhod sakte.", "error");
+      return;
+    }
     setSavingKey(`variant:${variant.id}`);
     try {
-      await updateVariantQuick(variant.id, { color_group: next || null });
-      patchVariant(productId, variant.id, { color_group: next || null });
-      show(next ? `Main Color: ${next}` : "Main Color hata diya", "success");
+      await updateVariantQuick(variant.id, { color_group: next });
+      patchVariant(productId, variant.id, { color_group: next });
+      show(`Main Color: ${next}`, "success");
     } catch (err) {
       show(friendlyError(err), "error");
     } finally {
@@ -235,7 +240,7 @@ export default function AdminProductsPage() {
   }
 
   async function handleSaveAll() {
-    type Edit = { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">> };
+    type Edit = { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">>; guard?: VariantGuard };
     const edits: Edit[] = [];
     for (const { variant } of searchMatches) {
       const d = drafts[variant.id];
@@ -249,7 +254,14 @@ export default function AdminProductsPage() {
       if (changedPrice) patch.sale_price = d.price;
       if (changedStock) patch.stock_quantity = d.stock_quantity;
       if (changedCollection) patch.collection_id = d.collection_id;
-      edits.push({ id: variant.id, patch });
+      // Guard: refuse the row if stock / price changed in the database after this page was loaded (e.g. a new order).
+      const guard: VariantGuard = {};
+      if (changedStock) guard.stock_quantity = variant.stock_quantity;
+      if (changedPrice) {
+        guard.price = variant.price;
+        guard.sale_price = variant.sale_price ?? null;
+      }
+      edits.push({ id: variant.id, patch, guard: Object.keys(guard).length ? guard : undefined });
     }
 
     if (edits.length === 0) {
@@ -270,7 +282,9 @@ export default function AdminProductsPage() {
     try {
       const { succeeded, failed } = await updateVariantsBulk(edits);
       if (succeeded.length > 0) show(`${succeeded.length} variant${succeeded.length > 1 ? "s" : ""} updated`, "success");
-      if (failed.length > 0) show(`${failed.length} failed to save — check SKUs for conflicts`, "error");
+      const changedMeanwhile = failed.filter((f) => /beech me badal/i.test(f.error)).length;
+      if (changedMeanwhile > 0) show(`${changedMeanwhile} colour beech me badal gaye (naya order ya dusra edit) — wo save nahi hue. Ab latest values dikh rahi hain, dobara karo.`, "error");
+      if (failed.length - changedMeanwhile > 0) show(`${failed.length - changedMeanwhile} failed to save — check SKUs for conflicts`, "error");
       await load();
       // Keep what you typed for the rows that failed, so you can fix and retry without re-entering.
       const failedIds = new Set(failed.map((f) => f.id));

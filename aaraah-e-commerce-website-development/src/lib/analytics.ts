@@ -1,6 +1,6 @@
 // Google Analytics 4 + Meta (Facebook) Pixel, switched on ONLY when their IDs are set as environment
 // variables (VITE_GA_ID = "G-XXXXXXXXXX", VITE_META_PIXEL_ID = "123456789012345"). No ID -> nothing is
-// loaded and nothing is sent. The IDs live in the hosting settings (Vercel today), not in the code, so
+// loaded and nothing is sent. The IDs live in the hosting settings (Hostinger), not in the code, so
 // they move with the site to any other host.
 //
 // Never throws: analytics must not be able to break shopping.
@@ -120,7 +120,7 @@ export function trackBeginCheckout(items: TrackItem[]) {
   });
 }
 
-/** Sent once per order, when the order is placed (the customer may still have to pay by UPI). */
+/** Sent once per order, when the customer has paid (UTR submitted or payment marked received). */
 export function trackPurchase(orderNumber: string, total: number, items: TrackItem[]) {
   safe(() => {
     const key = `aaraah_tracked_${orderNumber}`;

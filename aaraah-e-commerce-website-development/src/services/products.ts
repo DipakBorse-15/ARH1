@@ -569,9 +569,20 @@ export async function upsertVariant(variant: Partial<ProductVariant>) {
  * Partial update for an EXISTING variant only (id required) — same reasoning
  * as `updateProductQuick`. Use this for quick inline edits (price, collection).
  */
+/** What the page saw when it was opened. A save is refused when the database no longer has these values. */
+export type VariantGuard = { price?: number; sale_price?: number | null; stock_quantity?: number };
+
+/** Thrown when a colour was changed by someone/something else (e.g. a new order took stock) after the page was opened. */
+export class VariantConflictError extends Error {
+  constructor() {
+    super("Ye colour beech me badal gaya (naya order ya dusra edit). Page refresh karke dobara karo.");
+  }
+}
+
 export async function updateVariantQuick(
   id: string,
-  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity" | "color_group" | "color">>
+  patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity" | "color_group" | "color">>,
+  guard?: VariantGuard
 ) {
   // Availability always follows stock — any path that changes stock_quantity
   // (quick-edit here, or the full product form) must keep is_available in
@@ -580,18 +591,49 @@ export async function updateVariantQuick(
   if (patch.stock_quantity !== undefined) {
     fullPatch.is_available = patch.stock_quantity > 0;
   }
-  const { data, error } = await supabase.from("product_variants").update(fullPatch).eq("id", id).select().single();
+  let q = supabase.from("product_variants").update(fullPatch).eq("id", id);
+  // Compare-and-swap: only write if the guarded columns still hold what the page saw.
+  if (guard) {
+    if (guard.price !== undefined) q = q.eq("price", guard.price);
+    if (guard.sale_price !== undefined) q = guard.sale_price === null ? q.is("sale_price", null) : q.eq("sale_price", guard.sale_price);
+    if (guard.stock_quantity !== undefined) q = q.eq("stock_quantity", guard.stock_quantity);
+  }
+  const { data, error } = await q.select();
   if (error) throw error;
-  return data as ProductVariant;
+  if (!data || data.length === 0) {
+    if (guard) throw new VariantConflictError();
+    throw new Error("Variant not found");
+  }
+  return data[0] as ProductVariant;
+}
+
+/**
+ * Full product form: saves ONLY the fields that were changed in the form, and refuses (VariantConflictError)
+ * when price / sale price / stock changed in the database meanwhile.
+ */
+export async function updateVariantFromForm(original: ProductVariant, edited: ProductVariant) {
+  const skip = new Set(["images", "collection", "id", "created_at", "updated_at", "product", "is_available"]);
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(edited) as (keyof ProductVariant)[]) {
+    if (skip.has(key as string)) continue;
+    if (JSON.stringify(edited[key] ?? null) !== JSON.stringify(original[key] ?? null)) patch[key] = edited[key];
+  }
+  patch.active = true;
+  patch.is_available = edited.stock_quantity > 0;
+  const guard: VariantGuard = {};
+  if ("price" in patch) guard.price = original.price;
+  if ("sale_price" in patch) guard.sale_price = original.sale_price ?? null;
+  if ("stock_quantity" in patch) guard.stock_quantity = original.stock_quantity;
+  return updateVariantQuick(original.id, patch as Partial<ProductVariant> as never, Object.keys(guard).length ? guard : undefined);
 }
 
 /** Bulk "Save All" for the admin SKU-search quick-edit table. Each row is
  * saved independently so one bad row (e.g. a duplicate SKU conflict) doesn't
  * block the rest — failures are returned, not thrown. */
 export async function updateVariantsBulk(
-  edits: { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">> }[]
+  edits: { id: string; patch: Partial<Pick<ProductVariant, "price" | "sale_price" | "collection_id" | "stock_quantity">>; guard?: VariantGuard }[]
 ): Promise<{ succeeded: string[]; failed: { id: string; error: string }[] }> {
-  const results = await Promise.allSettled(edits.map((e) => updateVariantQuick(e.id, e.patch)));
+  const results = await Promise.allSettled(edits.map((e) => updateVariantQuick(e.id, e.patch, e.guard)));
   const succeeded: string[] = [];
   const failed: { id: string; error: string }[] = [];
   results.forEach((r, i) => {
