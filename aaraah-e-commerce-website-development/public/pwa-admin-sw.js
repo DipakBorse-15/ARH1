@@ -5,7 +5,7 @@
  *    it shows a simple "No internet" page instead of the browser's error.
  *  - It never stores pages, scripts, orders, prices or login data, so the app can never
  *    show you old data and a new site update is picked up on the next open.
- *  - Phase 4 will add push notifications to this same file.
+ *  - Push alerts (new order, UTR, paid cancel, low stock) are shown by the "push" handler at the bottom.
  */
 const OFFLINE_CACHE = "aaraah-admin-offline-v1";
 const OFFLINE_URL = "/pwa-admin-offline.html";
@@ -27,6 +27,43 @@ self.addEventListener("activate", (event) => {
         names.filter((n) => n.startsWith("aaraah-admin-") && n !== OFFLINE_CACHE).map((n) => caches.delete(n))
       );
       await self.clients.claim();
+    })()
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "AARAAH", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "AARAAH", {
+      body: data.body || "",
+      icon: "/pwa-admin-192.png",
+      badge: "/favicon-48.png",
+      tag: data.tag || undefined,
+      renotify: !!data.tag,
+      data: { url: data.url || "/admin/orders" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/admin/orders";
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const w of wins) {
+        if (w.url.includes("/admin") && "focus" in w) {
+          await w.focus();
+          if ("navigate" in w) await w.navigate(url).catch(() => {});
+          return;
+        }
+      }
+      await self.clients.openWindow(url);
     })()
   );
 });

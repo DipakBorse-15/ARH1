@@ -416,6 +416,8 @@ Deno.serve(async (req) => {
           orderItems as Record<string, unknown>[],
           total
         ).catch((e) => console.error("admin new-order email failed", e)),
+        // Phone alert for the admin app (needs the send-push function + secret PUSH_KEY; silently skipped if missing).
+        sendNewOrderPush(order.id, order.order_number, payload.full_name, total).catch((e) => console.error("push failed", e)),
       ]);
     };
     // deno-lint-ignore no-explicit-any
@@ -429,6 +431,22 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected server error" }, 500);
   }
 });
+
+async function sendNewOrderPush(orderId: string, orderNumber: string, name: string, total: number) {
+  const key = Deno.env.get("PUSH_KEY");
+  const base = Deno.env.get("SUPABASE_URL");
+  if (!key || !base) return;
+  await fetch(`${base}/functions/v1/send-push`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-push-key": key },
+    body: JSON.stringify({
+      title: `Naya order: ${orderNumber}`,
+      body: `Rs ${total} - ${name}`,
+      url: `/admin/orders/${orderId}`,
+      tag: `order-${orderId}`,
+    }),
+  });
+}
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
