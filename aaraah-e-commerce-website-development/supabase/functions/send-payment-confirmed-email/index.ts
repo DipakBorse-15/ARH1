@@ -25,6 +25,22 @@ const corsHeaders = {
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
+
+// 2-step login: an admin who has an authenticator app must have entered the code in this session
+// (the token then carries aal2). The token itself is already verified by getUser().
+function jwtAal(authHeader: string): string {
+  try {
+    const part = authHeader.replace(/^Bearer\s+/i, "").split(".")[1];
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof json.aal === "string" ? json.aal : "aal1";
+  } catch {
+    return "aal1";
+  }
+}
+function needsCode(user: { factors?: Array<{ status?: string }> | null }, authHeader: string): boolean {
+  return (user.factors ?? []).some((f) => f.status === "verified") && jwtAal(authHeader) !== "aal2";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -45,6 +61,7 @@ Deno.serve(async (req) => {
     // actually be staff, not just any logged-in customer.
     const { data: profile } = await admin.from("profiles").select("role").eq("user_id", userData.user.id).maybeSingle();
     if (profile?.role !== "admin") return json({ error: "Forbidden" }, 403);
+    if (needsCode(userData.user, authHeader)) return json({ error: "Forbidden" }, 403);
 
     const { order_id } = await req.json();
     if (!order_id) return json({ error: "order_id is required" }, 400);

@@ -2,6 +2,7 @@
 // price for ONE product, only to link-preview bots (WhatsApp, Facebook, Telegram...).
 // hostinger/server.js routes those bots here; normal visitors and Google get the regular site.
 import { colorSlug, variantSeoDescription, variantSeoTitle } from "./_lib/seoText.js";
+import { sbHeaders } from "./_lib/sbHeaders.js";
 
 const SITE = "https://aaraah.in";
 
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
     const select = "name,slug,brand,description,category:categories(name),variants:product_variants(color,fabric_type,work_type,work_pattern,best_for,included_components,price,sale_price,stock_quantity,is_available,active,sort_order,images:product_images(url,sort_order))";
     const r = await fetch(
       `${base}/rest/v1/products?select=${encodeURIComponent(select)}&slug=eq.${encodeURIComponent(slug)}&active=eq.true&limit=1`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+      { headers: sbHeaders(key) }
     );
     if (!r.ok) return notFound();
     const rows = await r.json();
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
       // Older web address of a product whose address was shortened -> permanent redirect to the new one.
       const o = await fetch(
         `${base}/rest/v1/products?select=slug&old_slugs=cs.${encodeURIComponent(`{${slug}}`)}&active=eq.true&limit=1`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+        { headers: sbHeaders(key) }
       );
       const found = o.ok ? await o.json() : [];
       if (found && found[0] && found[0].slug) {

@@ -17,6 +17,7 @@ export const adminLinks: AdminLink[] = [
   { to: "/admin/orders", label: "Orders" },
   { to: "/admin/coupons", label: "Coupons" },
   { to: "/admin/reviews", label: "Reviews" },
+  { to: "/admin/security", label: "Security (2-step)" },
 ];
 
 /**
@@ -30,4 +31,5 @@ export const moreLinks: AdminLink[] = [
   { to: "/admin/collections", label: "Collections" },
   { to: "/admin/coupons", label: "Coupons" },
   { to: "/admin/reviews", label: "Reviews" },
+  { to: "/admin/security", label: "Security (2-step)" },
 ];

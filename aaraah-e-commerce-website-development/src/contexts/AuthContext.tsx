@@ -11,6 +11,9 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  /** True when this account has 2-step login switched on but the code has not been entered in this session yet. */
+  mfaRequired: boolean;
+  refreshMfa: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string, fullName: string, mobile: string) => Promise<{ error?: string }>;
   requestPasswordReset: (email: string) => Promise<{ error?: string }>;
@@ -33,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mfaRequired, setMfaRequired] = useState(false);
   const navigate = useNavigate();
   // Which user's profile is already loaded (so token refreshes / tab focus do not show a spinner again).
   const profileUserId = useRef<string | null>(null);
@@ -52,6 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileUserId.current = userId;
   }
 
+  /** Reads the assurance level from the stored session (no network call). */
+  async function checkMfa() {
+    try {
+      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      setMfaRequired(!!data && data.currentLevel !== "aal2" && data.nextLevel === "aal2");
+    } catch {
+      setMfaRequired(false);
+    }
+  }
+
   function metaMobileOf(u: User | null | undefined): string | undefined {
     const m = u?.user_metadata?.mobile;
     return typeof m === "string" && m ? m : undefined;
@@ -67,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setUser((prev) => sameUser(prev, data.session?.user));
       if (data.session?.user) {
-        await loadProfile(data.session.user.id, metaMobileOf(data.session.user));
+        await Promise.all([loadProfile(data.session.user.id, metaMobileOf(data.session.user)), checkMfa()]);
       }
       setLoading(false);
     });
@@ -91,13 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // A new sign-in: hold the "checking" state until the role is known, so the admin pages
           // do not bounce a real admin to the login page while the profile is still loading.
           setLoading(true);
-          loadProfile(uid, metaMobileOf(newSession.user)).finally(() => setLoading(false));
+          Promise.all([loadProfile(uid, metaMobileOf(newSession.user)), checkMfa()]).finally(() => setLoading(false));
         } else {
           loadProfile(uid, metaMobileOf(newSession.user));
+          void checkMfa();
         }
       } else {
         profileUserId.current = null;
         setProfile(null);
+        setMfaRequired(false);
       }
     });
 
@@ -150,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await supabase.auth.signOut();
     setProfile(null);
+    setMfaRequired(false);
   }
 
   async function refreshProfile() {
@@ -159,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = profile?.role === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signIn, signUp, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, mfaRequired, refreshMfa: checkMfa, signIn, signUp, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

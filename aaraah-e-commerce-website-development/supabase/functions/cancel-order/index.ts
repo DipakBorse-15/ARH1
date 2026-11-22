@@ -28,6 +28,22 @@ const ADMIN_CANCELLABLE = ["pending", "confirmed", "processing"];
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
+
+// 2-step login: an admin who has an authenticator app must have entered the code in this session
+// (the token then carries aal2). The token itself is already verified by getUser().
+function jwtAal(authHeader: string): string {
+  try {
+    const part = authHeader.replace(/^Bearer\s+/i, "").split(".")[1];
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof json.aal === "string" ? json.aal : "aal1";
+  } catch {
+    return "aal1";
+  }
+}
+function needsCode(user: { factors?: Array<{ status?: string }> | null }, authHeader: string): boolean {
+  return (user.factors ?? []).some((f) => f.status === "verified") && jwtAal(authHeader) !== "aal2";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -50,7 +66,8 @@ Deno.serve(async (req) => {
     if (!orderId || typeof orderId !== "string") return json({ error: "order_id is required" }, 400);
 
     const { data: profile } = await admin.from("profiles").select("role").eq("user_id", userId).maybeSingle();
-    const isAdmin = profile?.role === "admin";
+    // An admin who skipped the 2-step code is treated like a normal customer (own orders only).
+    const isAdmin = profile?.role === "admin" && !needsCode(userData.user, authHeader);
 
     const { data: order, error: orderError } = await admin
       .from("orders")

@@ -48,6 +48,7 @@ const AdminHomeEditorPage = lazy(() => import("@/pages/admin/HomeEditorPage"));
 const WishlistPage = lazy(() => import("@/pages/account/WishlistPage"));
 const AdminCouponsPage = lazy(() => import("@/pages/admin/CouponsPage"));
 const AdminReviewsPage = lazy(() => import("@/pages/admin/ReviewsPage"));
+const AdminSecurityPage = lazy(() => import("@/pages/admin/AdminSecurityPage"));
 
 // Normalize basename: BrowserRouter expects no trailing slash (except root "/").
 const basename = siteConfig.basePath === "/" ? "/" : siteConfig.basePath.replace(/\/$/, "");
@@ -117,6 +118,7 @@ export default function App() {
                     <Route path="orders" element={<AdminOrdersRoute />} />
                     <Route path="coupons" element={<AdminCouponsPage />} />
                     <Route path="reviews" element={<AdminReviewsPage />} />
+                    <Route path="security" element={<AdminSecurityPage />} />
                     <Route path="orders/:orderId" element={<AdminOrderDetailRoute />} />
                   </Route>
                 </Route>

@@ -4,6 +4,7 @@ import { SEO } from "@/components/ui/SEO";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { LoadingState } from "@/components/ui/States";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { useAdminPwa } from "@/lib/adminPwa";
 
 /**
@@ -13,7 +14,7 @@ import { useAdminPwa } from "@/lib/adminPwa";
  */
 export default function AdminLoginPage() {
   useAdminPwa();
-  const { user, loading, isAdmin, signIn, signOut } = useAuth();
+  const { user, loading, isAdmin, mfaRequired, refreshMfa, signIn, signOut } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
   // Only ever go back to an admin page (never to a shop page).
@@ -23,6 +24,30 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState("");
+
+  /** Second step: the 6-digit code from the authenticator app. */
+  async function handleCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const { data: list, error: listError } = await supabase.auth.mfa.listFactors();
+      const factor = list?.totp?.[0];
+      if (listError || !factor) throw new Error("Authenticator app nahi mila.");
+      const { data: ch, error: chError } = await supabase.auth.mfa.challenge({ factorId: factor.id });
+      if (chError || !ch) throw new Error(chError?.message || "Code check nahi ho paya.");
+      const { error: vError } = await supabase.auth.mfa.verify({ factorId: factor.id, challengeId: ch.id, code: code.trim() });
+      if (vError) throw new Error("Code galat hai. App me naya 6-digit code dekho aur dobara daalo.");
+      setCode("");
+      await refreshMfa();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Code check nahi ho paya.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +61,7 @@ export default function AdminLoginPage() {
   }
 
   if (loading) return <LoadingState label="Checking your session…" />;
-  if (user && isAdmin) return <Navigate to={target} replace />;
+  if (user && isAdmin && !mfaRequired) return <Navigate to={target} replace />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4 py-10">
@@ -47,7 +72,34 @@ export default function AdminLoginPage() {
           <h1 className="mt-3 font-serif text-2xl font-bold text-rose-900">Aaraah Admin</h1>
         </div>
 
-        {user && !isAdmin ? (
+        {user && isAdmin && mfaRequired ? (
+          <form onSubmit={handleCode} className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6">
+            {error && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+            <p className="text-sm text-stone-700">Authenticator app ka 6-digit code daalo.</p>
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="6-digit code"
+              className="w-full rounded-lg border border-stone-300 px-3 py-3 text-center text-lg tracking-widest focus:border-rose-900 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={busy || code.length !== 6}
+              className="w-full rounded-full bg-rose-900 py-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:opacity-50"
+            >
+              {busy ? "Check ho raha hai…" : "Verify"}
+            </button>
+            <button type="button" onClick={() => signOut()} className="w-full py-2 text-xs font-medium text-stone-500 underline">
+              Sign out
+            </button>
+          </form>
+        ) : user && !isAdmin ? (
           <div className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6">
             <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
               <b>{user.email}</b> ek admin account nahi hai. Admin email se sign in karo.

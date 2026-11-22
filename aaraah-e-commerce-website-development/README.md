@@ -28,7 +28,7 @@ needs a rebuild. Never put a Supabase secret (`sb_secret_...`) key in the fronte
 ## Folders
 ```
 hostinger/server.js     Node server (see above)
-api/                    sitemap, feed, product preview code used by server.js (vercel.json is only for the old Vercel rollback)
+api/                    sitemap, feed, product preview code used by server.js (Vercel is no longer used)
 src/                    components, pages (storefront, account, admin), contexts, services (DB calls), lib (pure logic), types
 public/                 favicons, robots.txt, admin phone-app (PWA) files
 supabase/migrations/    SQL history (run by hand in the Supabase SQL Editor, in number order; uploading to GitHub does not run them)

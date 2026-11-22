@@ -2,6 +2,7 @@
 // database. One item per active colour of every active parent. Served at /feed.xml (hostinger/server.js).
 // Merchant Center reads this web address on a schedule; nothing has to be uploaded by hand.
 import { colorSlug } from "./_lib/seoText.js";
+import { sbHeaders } from "./_lib/sbHeaders.js";
 
 const SITE = "https://aaraah.in";
 const GOOGLE_CATEGORY = "Apparel & Accessories > Clothing > Traditional & Ceremonial Clothing > Saris & Lehengas";
@@ -21,7 +22,7 @@ async function rows(base, key, select, extra) {
   const out = [];
   for (let offset = 0; offset < 50000; offset += 1000) {
     const res = await fetch(`${base}/rest/v1/product_variants?select=${encodeURIComponent(select)}${extra}&limit=1000&offset=${offset}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers: sbHeaders(key),
     });
     if (!res.ok) throw new Error(`product_variants: ${res.status}`);
     const page = await res.json();

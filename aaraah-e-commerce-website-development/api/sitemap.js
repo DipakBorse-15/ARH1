@@ -1,3 +1,4 @@
+import { sbHeaders } from "./_lib/sbHeaders.js";
 // Live sitemap built from the database, so new
 // categories, collections and products are picked up without re-uploading anything.
 // Served at /sitemap.xml (hostinger/server.js). If the database cannot be reached it answers 503
@@ -21,7 +22,7 @@ async function rows(base, key, table, select, extra = "") {
   const out = [];
   for (let offset = 0; offset < 50000; offset += 1000) {
     const res = await fetch(`${base}/rest/v1/${table}?select=${select}${extra}&limit=1000&offset=${offset}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers: sbHeaders(key),
     });
     if (!res.ok) throw new Error(`${table}: ${res.status}`);
     const page = await res.json();

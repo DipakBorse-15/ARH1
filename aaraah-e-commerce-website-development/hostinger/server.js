@@ -17,6 +17,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import crypto from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { sbHeaders } from "../api/_lib/sbHeaders.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(HERE, "..");
@@ -169,7 +170,7 @@ async function buildFeed() {
   for (let offset = 0; offset < 20000; offset += 1000) {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/products?select=${encodeURIComponent(FEED_SELECT)}&active=eq.true&order=id.asc&limit=1000&offset=${offset}`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) }
+      { headers: sbHeaders(key), signal: AbortSignal.timeout(20_000) }
     );
     if (!res.ok) throw new Error(`products ${res.status}`);
     const page = await res.json();
