@@ -11,7 +11,7 @@ export interface CheckoutPayload {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "upi";
+  payment_method: "cod" | "upi" | "razorpay";
   coupon_code?: string;
   /** true when the order is a "Buy Now" (not from the cart): the server must leave the cart alone. */
   buy_now?: boolean;
@@ -168,6 +168,67 @@ export async function reopenOrderAdmin(orderId: string): Promise<void> {
   }
 }
 
+/** Online (Razorpay) orders wait this many minutes for payment. Same as expire_razorpay_orders(30) in migration 0045. */
+export const RAZORPAY_PAY_MINUTES = 30;
+
+/** When an unpaid online order is cancelled automatically. */
+export function razorpayExpiryAt(createdAt: string | Date): Date {
+  return new Date(new Date(createdAt).getTime() + RAZORPAY_PAY_MINUTES * 60_000);
+}
+
+/** Customer-facing name of a payment method. */
+export function paymentMethodLabel(method: string): string {
+  if (method === "razorpay") return "Online (Razorpay)";
+  if (method === "upi") return "UPI";
+  if (method === "cod") return "Cash on delivery";
+  return method;
+}
+
+/** The razorpay-payment function refused with a message meant for the customer. */
+export class PaymentError extends Error {}
+
+async function callRazorpayFunction<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("razorpay-payment", { body });
+  if (error) {
+    let message = "";
+    try {
+      const res = (error as { context?: Response }).context;
+      if (res) message = (await res.json())?.error ?? "";
+    } catch {
+      /* fall through */
+    }
+    if (message) throw new PaymentError(message);
+    throw error;
+  }
+  if (data?.error) throw new PaymentError(data.error);
+  return data as T;
+}
+
+export interface RazorpayPayInfo {
+  key_id: string;
+  razorpay_order_id: string;
+  /** In paise. */
+  amount: number;
+  currency: string;
+  expires_at: string;
+}
+
+/** What the Razorpay payment window needs for the customer's own unpaid order. */
+export function getRazorpayPayInfo(orderId: string): Promise<RazorpayPayInfo> {
+  return callRazorpayFunction<RazorpayPayInfo>({ action: "pay_info", order_id: orderId });
+}
+
+export interface RazorpaySuccess {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+/** Right after the payment window says "success": the server checks the payment and marks the order paid. */
+export function verifyRazorpayPayment(orderId: string, r: RazorpaySuccess): Promise<{ status: "paid" | "refunded"; message?: string }> {
+  return callRazorpayFunction({ action: "verify", order_id: orderId, ...r });
+}
+
 /** Daytime orders wait this many hours for payment. */
 export const UNPAID_HOURS = 3;
 
@@ -186,8 +247,11 @@ export function unpaidExpiryAt(createdAt: string | Date): Date {
   return new Date(day - IST);
 }
 
-/** Unpaid UPI order with no UTR sent whose cancel time has passed — will be (or can be) cancelled. */
+/** Unpaid online order (or old UPI order with no UTR sent) whose cancel time has passed — will be (or can be) cancelled. */
 export function isExpiredUnpaid(o: { payment_method: string; payment_status: string; status: string; payment_reference?: string | null; created_at: string }): boolean {
+  if (o.payment_method === "razorpay") {
+    return o.payment_status === "pending" && o.status === "pending" && Date.now() > razorpayExpiryAt(o.created_at).getTime();
+  }
   return (
     o.payment_method === "upi" &&
     o.payment_status === "pending" &&

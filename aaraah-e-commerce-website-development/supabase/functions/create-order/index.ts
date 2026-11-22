@@ -6,9 +6,15 @@
 // Deploy:   supabase functions deploy create-order
 // Invoke:   supabase.functions.invoke('create-order', { body: { items, address, payment_method } })
 //
+// Payment: Razorpay only. This function reserves the stock, saves the order as "pending / payment pending"
+// and creates the matching Razorpay order. The customer then pays in the Razorpay window on the order page;
+// the `razorpay-payment` function marks the order paid (and sends the mails / phone alert / empties the cart).
+// An order that is not paid within 30 minutes is cancelled by the database job (migration 0045), stock goes back.
+//
 // Required secrets (set with `supabase secrets set`):
 //   SUPABASE_URL              (auto-provided)
 //   SUPABASE_SERVICE_ROLE_KEY (auto-provided, never sent to the frontend)
+//   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET  (Razorpay dashboard -> API keys; test keys first, live keys later)
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -27,7 +33,7 @@ interface Payload {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "upi";
+  payment_method: "cod" | "upi" | "razorpay";
   coupon_code?: string;
   /** "Buy Now" order (not from the cart): the customer's cart must be left untouched. */
   buy_now?: boolean;
@@ -41,10 +47,11 @@ function normalizeMobile(value: unknown): string | null {
   return m ? m[1] : null;
 }
 
-const VALID_PAYMENT_METHODS = new Set(["cod", "upi"]);
+const VALID_PAYMENT_METHODS = new Set(["cod", "upi", "razorpay"]);
+// Only Razorpay is switched on. The old manual UPI + UTR flow is off (old UPI orders still work in the admin).
 // Cash on Delivery is switched off for launch. To turn it back on, add "cod" here
 // (and set COD_ENABLED = true in src/pages/CheckoutPage.tsx).
-const ENABLED_PAYMENT_METHODS = new Set(["upi"]);
+const ENABLED_PAYMENT_METHODS = new Set(["razorpay"]);
 
 const SHIPPING_FEE = 0; // Flat free shipping for now — adjust as needed.
 const corsHeaders = {
@@ -87,7 +94,7 @@ Deno.serve(async (req) => {
       return json({ error: "Invalid payment method" }, 400);
     }
     if (!ENABLED_PAYMENT_METHODS.has(payload.payment_method)) {
-      return json({ error: "Cash on Delivery is coming soon. Please pay via UPI." }, 400);
+      return json({ error: "Cash on Delivery is coming soon. Please pay online." }, 400);
     }
 
     // ---- Input checks (never trust the browser) --------------------------------
@@ -198,6 +205,18 @@ Deno.serve(async (req) => {
       // The order moved on (cancelled / paid) in the meantime: fall through and treat this as a fresh order.
     }
 
+    // A customer keeps at most ONE unpaid online order: an older one they left without paying (closed the payment
+    // window, then changed the cart) is cancelled first, so its stock is free again and a one-piece saree does not
+    // look "sold out" to its own buyer. If that old payment still arrives later, razorpay-payment re-opens it
+    // (stock permitting) or refunds it automatically.
+    await admin
+      .from("orders")
+      .update({ status: "cancelled", cancel_reason: "abandoned" })
+      .eq("user_id", userId)
+      .eq("payment_method", "razorpay")
+      .eq("status", "pending")
+      .eq("payment_status", "pending");
+
     const variantIds = payload.items.map((i) => i.variant_id);
     const { data: variants, error: variantError } = await admin
       .from("product_variants")
@@ -283,7 +302,7 @@ Deno.serve(async (req) => {
     }
 
     const total = subtotal - discount + SHIPPING_FEE;
-    // A UPI order of Rs 0 can never be paid (and would only be auto-cancelled), so such a coupon is not accepted.
+    // An online order of Rs 0 can never be paid (and would only be auto-cancelled), so such a coupon is not accepted.
     if (total < 1) {
       return json({ error: "This coupon would make the whole order free. Please add more items or use a smaller coupon." }, 400);
     }
@@ -313,6 +332,7 @@ Deno.serve(async (req) => {
         coupon_code: appliedCode,
         discount_amount: discount,
         total,
+        buy_now: buyNow,
       })
       .select()
       .single();
@@ -393,38 +413,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Clear purchased items from the cart — but NOT for a "Buy Now" order: that item was never bought from the cart.
-    if (!buyNow) {
-      await admin.from("cart_items").delete().eq("user_id", userId).in("variant_id", variantIds);
+    // Create the matching Razorpay order (the payment window needs it). If Razorpay cannot be reached the order is
+    // cancelled right away (the stock trigger puts the stock back) and the customer can simply try again.
+    let razorpayOrderId: string;
+    try {
+      razorpayOrderId = await createRazorpayOrder(order.id, order.order_number, total);
+    } catch (e) {
+      console.error("razorpay order failed", e);
+      await admin.from("orders").update({ status: "cancelled", cancel_reason: "abandoned" }).eq("id", order.id);
+      return json({ error: "Online payment is not available right now. Please try again in a few minutes." }, 400);
+    }
+    const { error: linkError } = await admin.from("orders").update({ razorpay_order_id: razorpayOrderId }).eq("id", order.id);
+    if (linkError) {
+      console.error(linkError);
+      await admin.from("orders").update({ status: "cancelled", cancel_reason: "abandoned" }).eq("id", order.id);
+      return json({ error: "Could not start the payment. Please try again." }, 500);
     }
 
-    // Emails never slow down or fail the order: they are sent in the background (Supabase keeps the function
-    // alive until they finish). Customer: "Order received" now, then "Payment received" once confirmed
-    // (send-payment-confirmed-email), or "Order cancelled" if not paid in time. Replies go to aaraah.in@gmail.com.
-    // The shop owner also gets a short "new order" email so night orders are not missed.
-    const sendMails = async () => {
-      await Promise.allSettled([
-        sendOrderReceivedEmail(
-          { id: order.id, order_number: order.order_number, full_name: payload.full_name, email: payload.email, payment_method: payload.payment_method },
-          orderItems as Record<string, unknown>[],
-          total,
-          discount,
-          appliedCode
-        ).catch((e) => console.error("order-received email failed", e)),
-        sendAdminNewOrderEmail(
-          { id: order.id, order_number: order.order_number, full_name: payload.full_name, mobile: payload.mobile, city: payload.city, state: payload.state },
-          orderItems as Record<string, unknown>[],
-          total
-        ).catch((e) => console.error("admin new-order email failed", e)),
-        // Phone alert for the admin app (needs the send-push function + secret PUSH_KEY; silently skipped if missing).
-        sendNewOrderPush(order.id, order.order_number, payload.full_name, total).catch((e) => console.error("push failed", e)),
-      ]);
-    };
-    // deno-lint-ignore no-explicit-any
-    const runtime = (globalThis as any).EdgeRuntime;
-    if (runtime && typeof runtime.waitUntil === "function") runtime.waitUntil(sendMails());
-    else await sendMails();
-
+    // No mail, phone alert or cart change here: all of that happens when the money really arrives
+    // (razorpay-payment function). An order that is never paid is cancelled after 30 minutes without disturbing anyone.
     return json({ order_id: order.id, order_number: order.order_number, total });
   } catch (err) {
     console.error(err);
@@ -432,90 +439,25 @@ Deno.serve(async (req) => {
   }
 });
 
-async function sendNewOrderPush(orderId: string, orderNumber: string, name: string, total: number) {
-  const key = Deno.env.get("PUSH_KEY");
-  const base = Deno.env.get("SUPABASE_URL");
-  if (!key || !base) return;
-  await fetch(`${base}/functions/v1/send-push`, {
+// Razorpay Orders API: amount is in paise. `receipt` = our order number (max 40 characters).
+async function createRazorpayOrder(orderId: string, orderNumber: string, totalRupees: number): Promise<string> {
+  const keyId = Deno.env.get("RAZORPAY_KEY_ID");
+  const keySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
+  if (!keyId || !keySecret) throw new Error("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET secrets are not set");
+  const res = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-push-key": key },
+    headers: { Authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      title: `Naya order: ${orderNumber}`,
-      body: `Rs ${total} - ${name}`,
-      url: `/admin/orders/${orderId}`,
-      tag: `order-${orderId}`,
+      amount: Math.round(totalRupees * 100),
+      currency: "INR",
+      receipt: orderNumber,
+      notes: { order_id: orderId, order_number: orderNumber },
     }),
+    signal: AbortSignal.timeout(10000),
   });
-}
-
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-
-// Short "new order" email to the shop owner. Needs RESEND_API_KEY; optional secret ADMIN_NOTIFY_EMAIL (default: aaraah.in@gmail.com).
-async function sendAdminNewOrderEmail(
-  order: { id: string; order_number: string; full_name: string; mobile: string; city: string; state: string },
-  items: Record<string, unknown>[],
-  total: number
-) {
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) return;
-  const to = Deno.env.get("ADMIN_NOTIFY_EMAIL") || "aaraah.in@gmail.com";
-  const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
-  const lines = items
-    .map((i) => `<li>${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</li>`)
-    .join("");
-  const html = `
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#7a1730">New order — ${esc(order.order_number)}</h2>
-      <p><b>₹${esc(total)}</b> · ${esc(order.full_name)} · ${esc(order.mobile)} · ${esc(order.city)}, ${esc(order.state)}</p>
-      <ul>${lines}</ul>
-      <p>Payment abhi pending hai (UPI). UTR aane ya paisa aane par admin me <b>Confirm</b> karo.</p>
-      <p><a href="https://aaraah.in/admin/orders/${esc(order.id)}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open order</a></p>
-    </div>`;
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject: `New order ${order.order_number} — ₹${total}`, html }),
-    signal: AbortSignal.timeout(5000),
-  });
-}
-
-// Needs RESEND_API_KEY (and RESEND_FROM). Without the key this quietly does nothing.
-async function sendOrderReceivedEmail(
-  order: { id: string; order_number: string; full_name: string; email: string; payment_method: string },
-  items: Record<string, unknown>[],
-  total: number,
-  discount = 0,
-  couponCode: string | null = null
-) {
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key || !order.email) return;
-  const from = Deno.env.get("RESEND_FROM") || "AARAAH <onboarding@resend.dev>";
-  const rows = items
-    .map(
-      (i) =>
-        `<tr><td style="padding:4px 0">${esc(i.product_name)}${i.color ? ` (${esc(i.color)})` : ""} × ${esc(i.quantity)}</td><td style="padding:4px 0;text-align:right">₹${esc(i.line_total)}</td></tr>`
-    )
-    .join("");
-  const link = `https://aaraah.in/account/orders/${order.id}`;
-  const html = `
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-      <h2 style="color:#7a1730">We received your order — ${esc(order.order_number)}</h2>
-      <p>Hi ${esc(order.full_name)}, thank you for shopping with AARAAH.</p>
-      <table style="width:100%;border-collapse:collapse;margin:16px 0">${rows}</table>
-      ${discount > 0 ? `<p style="color:#047857;margin:0">Coupon ${esc(couponCode)}: −₹${esc(discount)}</p>` : ""}
-      <p style="font-weight:bold">Total: ₹${esc(total)}</p>
-      <p><b>Next step:</b> pay ₹${esc(total)} by UPI using the QR code on your order page, then enter the UTR / transaction number there.
-      Orders without payment are cancelled automatically (3 hours in the daytime, 10:00 AM next morning for night orders) so the stock can go to other customers.</p>
-      <p><a href="${link}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open my order</a></p>
-      <p style="color:#78716c;font-size:13px">Questions? Reply to this email or WhatsApp us.</p>
-    </div>`;
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, reply_to: "aaraah.in@gmail.com", to: [order.email], subject: `Order received — ${order.order_number}`, html }),
-    signal: AbortSignal.timeout(5000),
-  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || typeof data?.id !== "string") throw new Error(`Razorpay ${res.status}: ${data?.error?.description ?? "no order id"}`);
+  return data.id;
 }
 
 function json(body: unknown, status = 200) {

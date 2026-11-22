@@ -187,6 +187,7 @@ async function sendAdminRefundEmail(order: {
   mobile: string;
   total: number;
   payment_reference: string | null;
+  razorpay_payment_id?: string | null;
   items?: { product_name: string; color: string | null; quantity: number }[];
 }) {
   const key = Deno.env.get("RESEND_API_KEY");
@@ -200,9 +201,9 @@ async function sendAdminRefundEmail(order: {
     <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
       <h2 style="color:#7a1730">Paid order cancelled — refund karna hai</h2>
       <p>Customer ne apna <b>paid</b> order <b>${esc(order.order_number)}</b> cancel kiya. Stock wapas aa gaya.</p>
-      <p><b>₹${esc(order.total)}</b> wapas dena hai · ${esc(order.full_name)} · ${esc(order.mobile)}${order.payment_reference ? ` · UTR ${esc(order.payment_reference)}` : ""}</p>
+      <p><b>₹${esc(order.total)}</b> wapas dena hai · ${esc(order.full_name)} · ${esc(order.mobile)}${order.payment_reference ? ` · UTR ${esc(order.payment_reference)}` : ""}${order.razorpay_payment_id ? ` · Razorpay ${esc(order.razorpay_payment_id)}` : ""}</p>
       <ul>${lines}</ul>
-      <p>Paisa wapas karne ke baad order me <b>Refund mark</b> karo.</p>
+      <p>Razorpay dashboard (Payments → payment kholo → Refund) se paisa wapas karo, phir order me <b>Refund mark</b> karo.</p>
       <p><a href="https://aaraah.in/admin/orders/${esc(order.id)}" style="display:inline-block;background:#7a1730;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none">Open order</a></p>
     </div>`;
   await fetch("https://api.resend.com/emails", {

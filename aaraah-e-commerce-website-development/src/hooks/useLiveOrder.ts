@@ -42,7 +42,7 @@ export function useLiveOrder(orderId: string | undefined) {
   const waiting =
     !!order &&
     order.status !== "cancelled" &&
-    (order.status === "pending" || (order.payment_method === "upi" && order.payment_status !== "paid"));
+    (order.status === "pending" || ((order.payment_method === "upi" || order.payment_method === "razorpay") && order.payment_status !== "paid"));
 
   useEffect(() => {
     if (!waiting) return;

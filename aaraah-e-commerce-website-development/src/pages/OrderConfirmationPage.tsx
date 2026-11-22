@@ -4,17 +4,20 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
+import { RazorpayPaymentCard } from "@/components/payment/RazorpayPaymentCard";
+import { paymentMethodLabel } from "@/services/orders";
 import { useLiveOrder } from "@/hooks/useLiveOrder";
 import { trackPurchase } from "@/lib/analytics";
 
 export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
-  const orderNumber = (location.state as { orderNumber?: string } | null)?.orderNumber;
+  const navState = location.state as { orderNumber?: string; autoPay?: boolean } | null;
+  const orderNumber = navState?.orderNumber;
   const { order, loading, error, refetch } = useLiveOrder(orderId);
 
   // Analytics: "Purchase" is sent once per order, only when the customer has really paid:
-  // the UTR / payment number was submitted, or the shop marked the payment received.
+  // the payment arrived (online), or the UTR was submitted / the shop marked an old UPI payment received.
   const orderForTracking = order;
   useEffect(() => {
     if (!orderForTracking || orderForTracking.status === "cancelled") return;
@@ -31,7 +34,7 @@ export default function OrderConfirmationPage() {
 
   const shownNumber = order?.order_number || orderNumber;
   const isCancelled = order?.status === "cancelled";
-  // Paid UPI orders (or cash-on-delivery, which is confirmed at once) get the thank-you; an unpaid UPI order waits.
+  // Paid orders (or cash-on-delivery, which is confirmed at once) get the thank-you; an unpaid order waits for its payment.
   const isPaid = !!order && (order.payment_status === "paid" || order.payment_method === "cod");
 
   return (
@@ -58,9 +61,14 @@ export default function OrderConfirmationPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-3xl">⏳</div>
           <h1 className="font-serif text-3xl font-semibold text-stone-900">Order placed</h1>
           <p className="mt-2 text-stone-500">
-            Order <span className="font-semibold text-stone-800">{shownNumber}</span> is waiting for payment confirmation.
+            Order <span className="font-semibold text-stone-800">{shownNumber}</span>{" "}
+            {order?.payment_method === "razorpay" ? "is waiting for your payment." : "is waiting for payment confirmation."}
           </p>
-          <p className="mt-2 text-sm font-semibold text-amber-800">Please do not refresh or close this page. It updates by itself once your payment is confirmed.</p>
+          <p className="mt-2 text-sm font-semibold text-amber-800">
+            {order?.payment_method === "razorpay"
+              ? "Complete the payment below. This page updates by itself once the payment is done."
+              : "Please do not refresh or close this page. It updates by itself once your payment is confirmed."}
+          </p>
         </>
       )}
 
@@ -68,7 +76,7 @@ export default function OrderConfirmationPage() {
         <div className="mt-8 rounded-2xl border border-stone-200 p-5 text-left">
           <div className="mb-3 flex justify-between text-sm">
             <span className="text-stone-500">Payment method</span>
-            <span className="font-medium uppercase text-stone-800">{order.payment_method}</span>
+            <span className="font-medium text-stone-800">{paymentMethodLabel(order.payment_method)}</span>
           </div>
           <div className="mb-3 flex justify-between text-sm">
             <span className="text-stone-500">Status</span>
@@ -81,6 +89,7 @@ export default function OrderConfirmationPage() {
         </div>
       )}
 
+      {order && <RazorpayPaymentCard order={order} autoOpen={!!navState?.autoPay} onPaid={refetch} />}
       {order && <UpiPaymentCard order={order} onSubmitted={refetch} />}
 
       <div className="mt-8 flex justify-center gap-3">

@@ -86,6 +86,13 @@ export default function AdminOrderDetailPage() {
       return;
     }
 
+    // An online (Razorpay) order becomes confirmed + paid by itself when the money arrives. Confirming it by hand would
+    // mean shipping without payment.
+    if (status === "confirmed" && order.payment_method === "razorpay" && order.payment_status !== "paid") {
+      show("Razorpay payment abhi nahi aaya. Paisa aate hi order apne aap Confirmed ho jata hai (30 minute me nahi aaya to cancel ho jata hai).", "error");
+      return;
+    }
+
     const alsoMarkPaid = status === "confirmed" && order.payment_method === "upi" && order.payment_status !== "paid";
     if (alsoMarkPaid && !confirm(`Confirm you've received ₹${order.total} via UPI for this order?`)) return;
 
@@ -154,6 +161,10 @@ export default function AdminOrderDetailPage() {
     }
     if (order.payment_status === "refunded" || order.shipped_at) {
       show("Refunded ya shipped order dobara open nahi ho sakta.", "error");
+      return;
+    }
+    if (order.payment_method === "razorpay" && order.payment_status !== "paid") {
+      show("Is online order ka paisa nahi aaya. Agar customer ne late payment kar diya to order apne aap dobara khul jata hai (stock ho to).", "error");
       return;
     }
     if (!confirm(`Kya ₹${order.total} tumhare UPI app / bank me aa chuka hai?\n\nOK dabane par order dobara Confirmed + Paid ho jayega, stock wapas lagega aur customer ko "Payment received" email jayegi.`)) return;
@@ -343,6 +354,19 @@ export default function AdminOrderDetailPage() {
               </span>
             )}
           </p>
+          {order.payment_method === "razorpay" && (
+            <p className={`mt-2 rounded-lg p-2 text-sm ${order.razorpay_payment_id ? "bg-emerald-50 text-emerald-800" : "bg-stone-50 text-stone-500"}`}>
+              {order.razorpay_payment_id ? (
+                <>
+                  Razorpay payment: <span className="break-all font-semibold">{order.razorpay_payment_id}</span>
+                  {order.paid_at && <span className="ml-1 text-xs">({new Date(order.paid_at).toLocaleString("en-IN")})</span>}
+                  <span className="mt-1 block text-xs">Refund dena ho to Razorpay dashboard → Payments → ye payment kholo → Refund. Phir yahan Refund mark karo.</span>
+                </>
+              ) : (
+                "Online payment abhi nahi aaya. Aate hi order apne aap Confirmed ho jayega."
+              )}
+            </p>
+          )}
           {order.payment_method === "upi" && (
             <p className={`mt-2 rounded-lg p-2 text-sm ${order.payment_reference ? "bg-emerald-50 text-emerald-800" : "bg-stone-50 text-stone-500"}`}>
               {order.payment_reference ? (

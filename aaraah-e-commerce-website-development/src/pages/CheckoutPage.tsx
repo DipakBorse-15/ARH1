@@ -9,7 +9,6 @@ import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
 import { PlaceOrderError, placeOrder } from "@/services/orders";
 import { previewCoupon } from "@/services/coupons";
-import { siteConfig } from "@/config/site";
 import { friendlyError } from "@/lib/supabase";
 import { isValidMobile, normalizeMobile } from "@/lib/validators";
 import { trackBeginCheckout } from "@/lib/analytics";
@@ -36,7 +35,7 @@ interface FormState {
   city: string;
   state: string;
   pincode: string;
-  payment_method: "cod" | "upi";
+  payment_method: "cod" | "upi" | "razorpay";
 }
 
 const EMPTY_FORM: FormState = {
@@ -48,7 +47,7 @@ const EMPTY_FORM: FormState = {
   city: "",
   state: "",
   pincode: "",
-  payment_method: "upi",
+  payment_method: "razorpay",
 };
 
 export default function CheckoutPage() {
@@ -190,14 +189,10 @@ export default function CheckoutPage() {
       return;
     }
     if (form.payment_method === "cod" && !COD_ENABLED) {
-      show("Cash on Delivery is coming soon. Please pay via UPI.", "error");
+      show("Cash on Delivery is coming soon. Please pay online.", "error");
       return;
     }
     if (!validate()) return;
-    if (form.payment_method === "upi" && !siteConfig.upiConfigured) {
-      show("Online payment is being set up. Please contact us on WhatsApp to order.", "error");
-      return;
-    }
     if (submitLock.current) return;
     submitLock.current = true;
 
@@ -232,7 +227,8 @@ export default function CheckoutPage() {
       });
 
       await refresh(); // cart is re-read either way (never throws; Buy Now leaves the cart as it was)
-      navigate(`/order-confirmation/${result.order_id}`, { state: { orderNumber: result.order_number } });
+      // autoPay: the order page opens the Razorpay payment window by itself (once).
+      navigate(`/order-confirmation/${result.order_id}`, { state: { orderNumber: result.order_number, autoPay: true } });
     } catch (err) {
       // The server's own reason ("sold out", "coupon expired", "valid mobile number" ...) is meant for the customer.
       show(err instanceof PlaceOrderError ? err.message : friendlyError(err, "Could not place your order. Please try again."), "error");
@@ -326,13 +322,16 @@ export default function CheckoutPage() {
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Coming Soon</span>
                 )}
               </label>
-              <label className="mt-2 flex items-center gap-3 rounded-lg border border-stone-200 p-3 text-sm">
+              <label className="mt-2 flex items-center gap-3 rounded-lg border border-rose-900 bg-rose-50/40 p-3 text-sm">
                 <input
                   type="radio"
-                  checked={form.payment_method === "upi"}
-                  onChange={() => setForm({ ...form, payment_method: "upi" })}
+                  checked={form.payment_method === "razorpay"}
+                  onChange={() => setForm({ ...form, payment_method: "razorpay" })}
                 />
-                Pay via UPI (scan QR after placing order)
+                <span>
+                  Pay online — UPI, Cards, Netbanking, Wallets
+                  <span className="block text-xs text-stone-500">Secure payment by Razorpay. The payment window opens after you tap the button.</span>
+                </span>
               </label>
             </div>
           </div>
@@ -410,7 +409,7 @@ export default function CheckoutPage() {
               disabled={submitting}
               className="mt-5 w-full rounded-full bg-rose-900 py-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:opacity-50"
             >
-              {submitting ? "Placing order…" : "Place Order"}
+              {submitting ? "Please wait…" : `Pay ${formatINR(total)}`}
             </button>
           </div>
         </form>

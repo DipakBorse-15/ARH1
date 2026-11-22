@@ -5,9 +5,10 @@ import { SEO } from "@/components/ui/SEO";
 import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
+import { RazorpayPaymentCard } from "@/components/payment/RazorpayPaymentCard";
 import { useLiveOrder } from "@/hooks/useLiveOrder";
 import { useToast } from "@/contexts/ToastContext";
-import { CancelOrderError, cancelOrder } from "@/services/orders";
+import { CancelOrderError, cancelOrder, paymentMethodLabel } from "@/services/orders";
 import { friendlyError } from "@/lib/supabase";
 import { imgSrc } from "@/lib/imgProxy";
 
@@ -119,7 +120,7 @@ export default function OrderDetailPage() {
         </div>
         <div className="rounded-2xl border border-stone-200 p-5">
           <h2 className="mb-2 text-sm font-semibold text-stone-900">Payment</h2>
-          <p className="text-sm text-stone-600 capitalize">Method: {order.payment_method}</p>
+          <p className="text-sm text-stone-600">Method: {paymentMethodLabel(order.payment_method)}</p>
           <p className="text-sm text-stone-600 capitalize">Status: {order.payment_status}</p>
           <div className="mt-3 space-y-1 border-t border-stone-200 pt-3 text-sm">
             <div className="flex justify-between">
@@ -177,6 +178,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
+      <RazorpayPaymentCard order={order} onPaid={refetch} />
       <UpiPaymentCard order={order} onSubmitted={refetch} />
     </div>
   );

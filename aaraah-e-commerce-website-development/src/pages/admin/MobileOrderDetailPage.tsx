@@ -115,6 +115,8 @@ export default function MobileOrderDetailPage() {
   const isCod = o.payment_method === "cod";
   const paidOrCod = o.payment_status === "paid" || isCod;
   const upiUnpaid = o.payment_method === "upi" && o.payment_status !== "paid";
+  // Online (Razorpay) orders confirm themselves when the money arrives: no manual confirm.
+  const razorpayUnpaid = o.payment_method === "razorpay" && o.payment_status !== "paid";
   const status = o.status;
 
   // ---------- actions ----------
@@ -245,7 +247,8 @@ export default function MobileOrderDetailPage() {
   const canShip = status === "confirmed" || status === "processing";
   const showShipCard = canShip || status === "shipped" || status === "delivered";
   const canCancel = status === "pending" || status === "confirmed" || status === "processing";
-  const canReopen = status === "cancelled" && o.payment_status !== "refunded" && !o.shipped_at;
+  // An online order whose money never came cannot be re-opened by hand (a late payment re-opens it by itself).
+  const canReopen = status === "cancelled" && o.payment_status !== "refunded" && !o.shipped_at && !razorpayUnpaid;
   const canRefund = o.payment_status === "paid" && (status === "cancelled" || status === "shipped" || status === "delivered");
 
   return (
@@ -297,15 +300,19 @@ export default function MobileOrderDetailPage() {
           {status === "pending" && (
             <>
               <p className="mb-3 text-xs text-stone-500">
-                {upiUnpaid
+                {razorpayUnpaid
+                  ? "Customer ne abhi online payment nahi kiya. Paisa aate hi order apne aap Confirmed ho jayega; 30 minute me nahi aaya to apne aap cancel ho jayega."
+                  : upiUnpaid
                   ? o.payment_reference
                     ? `Customer ne UTR bheja hai: ${o.payment_reference}. Apna UPI app / bank check karo, paisa aaya ho tabhi confirm karo.`
                     : "Customer ne abhi UTR nahi bheja. Paisa aa gaya ho tabhi confirm karo."
                   : "COD order. Confirm karne par customer ko email jayega."}
               </p>
-              <button type="button" disabled={!!busy} onClick={confirmOrder} className={primaryBtn}>
-                {busy === "confirm" ? "Confirming…" : upiUnpaid ? "Payment received · Confirm order" : "Confirm order"}
-              </button>
+              {!razorpayUnpaid && (
+                <button type="button" disabled={!!busy} onClick={confirmOrder} className={primaryBtn}>
+                  {busy === "confirm" ? "Confirming…" : upiUnpaid ? "Payment received · Confirm order" : "Confirm order"}
+                </button>
+              )}
             </>
           )}
 
@@ -476,6 +483,18 @@ export default function MobileOrderDetailPage() {
         {isCod && o.payment_status !== "paid" && status !== "cancelled" && (
           <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm font-medium text-amber-800">
             COD: delivery par {formatINR(Number(o.total))} lena hai
+          </p>
+        )}
+        {o.payment_method === "razorpay" && (
+          <p className={`mt-2 rounded-lg p-2 text-sm ${o.razorpay_payment_id ? "bg-emerald-50 text-emerald-800" : "bg-stone-50 text-stone-500"}`}>
+            {o.razorpay_payment_id ? (
+              <>
+                Razorpay payment: <span className="break-all font-semibold">{o.razorpay_payment_id}</span>
+                {o.paid_at && <span className="ml-1 text-xs">({formatWhen(o.paid_at)})</span>}
+              </>
+            ) : (
+              "Online payment abhi nahi aaya."
+            )}
           </p>
         )}
         {o.payment_method === "upi" && (

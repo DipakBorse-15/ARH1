@@ -209,6 +209,12 @@ export interface Order {
   /** UTR / transaction number the customer typed after paying by UPI. */
   payment_reference?: string | null;
   payment_reference_at?: string | null;
+  /** Razorpay online payment: the Razorpay order made at checkout and, once paid, the payment id (needed to refund in the Razorpay dashboard). */
+  razorpay_order_id?: string | null;
+  razorpay_payment_id?: string | null;
+  paid_at?: string | null;
+  /** "Buy Now" order (not from the cart). */
+  buy_now?: boolean;
   /** Coupon applied at checkout and the amount it took off (already included in `total`). */
   coupon_code?: string | null;
   discount_amount?: number | null;
