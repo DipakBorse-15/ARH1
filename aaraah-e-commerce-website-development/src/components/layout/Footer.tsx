@@ -80,7 +80,7 @@ export function Footer() {
           <Link to="/contact" className="hover:text-rose-900">Contact Us</Link>
           <Link to="/faq" className="hover:text-rose-900">FAQs</Link>
           <Link to="/shipping-policy" className="hover:text-rose-900">Shipping Policy</Link>
-          <Link to="/returns-and-refunds" className="hover:text-rose-900">Returns &amp; Refunds</Link>
+          <Link to="/returns-and-refunds" className="hover:text-rose-900">Cancellation &amp; Refund Policy</Link>
           <Link to="/privacy-policy" className="hover:text-rose-900">Privacy Policy</Link>
           <Link to="/terms-and-conditions" className="hover:text-rose-900">Terms &amp; Conditions</Link>
         </nav>

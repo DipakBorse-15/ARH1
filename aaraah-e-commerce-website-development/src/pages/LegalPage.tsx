@@ -6,7 +6,7 @@ type DocKey = "privacy" | "terms" | "returns" | "shipping";
 type Section = { heading: string; body: string[] };
 type Doc = { title: string; path: string; intro: string; sections: Section[] };
 
-const UPDATED = "20 October 2026";
+const UPDATED = "22 November 2026";
 const EMAIL = siteConfig.supportEmail;
 const PHONE = siteConfig.supportPhone;
 
@@ -42,9 +42,9 @@ const DOCS: Record<DocKey, Doc> = {
     ],
   },
   returns: {
-    title: "Returns & Refunds",
+    title: "Cancellation & Refund Policy",
     path: "/returns-and-refunds",
-    intro: `We want you to love what you order from ${siteConfig.name}. This policy explains when you can return an item and how refunds work.`,
+    intro: `We want you to love what you order from ${siteConfig.name}. This policy explains how to cancel an order, when you can return an item, and how and when refunds are paid.`,
     sections: [
       {
         heading: "When you can return",
@@ -68,13 +68,25 @@ const DOCS: Record<DocKey, Doc> = {
       {
         heading: "Refunds",
         body: [
-          "Once the returned item is received and checked, the refund is processed to the original payment method (UPI/bank account) within 5–7 business days.",
+          "Once the returned item is received and checked, the refund is processed to the original payment method (UPI / bank account / card) within 5–7 business days. Your bank may take a few more days to show it.",
           "Shipping charges, if any were paid, are non-refundable except when the return is due to our error.",
+          "If a return is not approved (for example the item shows signs of use), we will tell you the reason by email or WhatsApp.",
         ],
       },
       {
-        heading: "Cancellations",
-        body: ["You can cancel an order before it is shipped from Account → My Orders, or by contacting us. If you have already paid, the amount will be refunded."],
+        heading: "Order cancellation by you",
+        body: [
+          "You can cancel an order before it is shipped from Account → My Orders, or by contacting us. Once an order is shipped it cannot be cancelled; you may use the return process above after delivery.",
+          "If you have already paid for a cancelled order, the full amount is refunded to the original payment method within 5–7 business days.",
+        ],
+      },
+      {
+        heading: "Order cancellation by us",
+        body: ["We may cancel an order if the item is out of stock, the price was shown wrongly, or payment could not be verified. In that case any amount you paid is refunded in full within 5–7 business days. An unpaid order may be cancelled automatically if payment is not completed in time."],
+      },
+      {
+        heading: "Payment failed or money deducted twice",
+        body: [`If money was deducted but no order was created, or you were charged twice, write to ${EMAIL} with your order number or payment reference (UTR / transaction ID). We will check and refund the extra amount within 5–7 business days.`],
       },
     ],
   },
@@ -97,23 +109,40 @@ const DOCS: Record<DocKey, Doc> = {
       },
       {
         heading: "Payments",
-        body: ["Payments are made by UPI directly to our account. We do not store your UPI PIN, card or bank login details."],
+        body: [
+          "Payments are made by UPI directly to our account and/or through our payment gateway partner (such as Razorpay), which may offer UPI, cards, net banking and wallets.",
+          "Card, UPI PIN and bank login details are entered only on the payment partner's secure page. We do not see or store them. We keep only your order amount, payment status and payment reference (such as UTR or transaction ID).",
+        ],
       },
       {
         heading: "Sharing",
         body: ["We share only what is needed with service providers who help us run the store, such as delivery partners (name, address, mobile number), our email provider and our hosting/database provider. We may also share information if required by law."],
       },
       {
-        heading: "Cookies and local storage",
-        body: ["We use your browser's storage to keep you signed in and remember your cart. You can clear it from your browser settings at any time."],
+        heading: "Cookies, local storage and analytics",
+        body: [
+          "We use your browser's storage to keep you signed in and remember your cart. You can clear it from your browser settings at any time.",
+          "We use Google Analytics and Meta (Facebook) Pixel to understand how visitors use the site and to measure our advertising. These tools may set cookies and receive information such as pages viewed and device type. You can block cookies in your browser or use the opt-out tools of Google and Meta.",
+        ],
+      },
+      {
+        heading: "How long we keep data and security",
+        body: [
+          "We keep order records as long as needed for accounting, tax and legal requirements, and account details until you ask us to delete them.",
+          "We use secure (HTTPS) connections and access controls to protect your data. No system is 100% secure, but we take reasonable steps to protect it.",
+        ],
+      },
+      {
+        heading: "Children",
+        body: ["Our store is meant for adults. We do not knowingly collect information from children under 18."],
       },
       {
         heading: "Your choices",
         body: [`You can view and update your name, mobile number and addresses in your account. To ask for your data to be corrected or deleted, contact us at ${EMAIL}.`],
       },
       {
-        heading: "Contact",
-        body: [`Questions about this policy: ${EMAIL} or ${PHONE}.`],
+        heading: "Contact and grievances",
+        body: [`Questions or complaints about this policy or your data: ${EMAIL} or ${PHONE} (${siteConfig.sellerAddress}). We reply within 2 business days. We may update this policy from time to time; the date above shows the latest version.`],
       },
     ],
   },
@@ -132,7 +161,8 @@ const DOCS: Record<DocKey, Doc> = {
       {
         heading: "Orders and payment",
         body: [
-          "An order is confirmed only after we receive and verify your payment. Currently payment is accepted by UPI. Cash on Delivery is not available at this time.",
+          "An order is confirmed only after we receive and verify your payment. Payment is accepted by UPI and, where shown at checkout, through our payment gateway partner (such as Razorpay). Cash on Delivery is not available at this time.",
+          "Payments are processed by the payment partner under its own terms. If a payment fails, any amount debited is returned by your bank or by us as described in our Cancellation & Refund Policy.",
           "You may also contact us on WhatsApp to place an order; such orders follow the same policies.",
         ],
       },
@@ -142,7 +172,7 @@ const DOCS: Record<DocKey, Doc> = {
       },
       {
         heading: "Shipping, returns and refunds",
-        body: ["Shipping, returns and refunds are governed by our Shipping Policy and Returns & Refunds policy."],
+        body: ["Shipping, cancellations, returns and refunds are governed by our Shipping Policy and Cancellation & Refund Policy."],
       },
       {
         heading: "Intellectual property",
@@ -154,7 +184,7 @@ const DOCS: Record<DocKey, Doc> = {
       },
       {
         heading: "Governing law",
-        body: ["These terms are governed by the laws of India."],
+        body: ["These terms are governed by the laws of India. Courts at Surat, Gujarat have jurisdiction over any dispute."],
       },
       {
         heading: "Contact",
@@ -166,7 +196,7 @@ const DOCS: Record<DocKey, Doc> = {
 
 const LINKS: { key: DocKey; label: string }[] = [
   { key: "shipping", label: "Shipping Policy" },
-  { key: "returns", label: "Returns & Refunds" },
+  { key: "returns", label: "Cancellation & Refund Policy" },
   { key: "privacy", label: "Privacy Policy" },
   { key: "terms", label: "Terms & Conditions" },
 ];

@@ -41,7 +41,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is your return policy?",
-    a: "You can request a return within 7 days of delivery if the item is damaged, defective or not what you ordered. Please contact us within 48 hours of delivery with photos. Details are on the Returns & Refunds page.",
+    a: "You can request a return within 7 days of delivery if the item is damaged, defective or not what you ordered. Please contact us within 48 hours of delivery with photos. Details are on the Cancellation & Refund Policy page.",
   },
   {
     q: "Do I need an account to shop?",
