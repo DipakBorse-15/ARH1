@@ -5,6 +5,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { useToast } from "@/contexts/ToastContext";
 import { CancelOrderError, cancelOrder, fetchOrderById, reopenOrderAdmin, saveShippingDetails, sendShippedEmail, updateOrderPaymentStatus, updateOrderStatus } from "@/services/orders";
+import { markRefundedGuarded } from "@/services/adminOrders";
 import { friendlyError, supabase } from "@/lib/supabase";
 import type { Order, OrderStatus } from "@/types";
 
@@ -135,8 +136,13 @@ export default function AdminOrderDetailPage() {
       await handleReopen();
       return;
     }
+    if (word === "refund" || word === "refunded") {
+      setCommand("");
+      await handleMarkRefunded();
+      return;
+    }
     if (order?.status === "cancelled") {
-      show('Ye order cancelled hai. Sirf "reopen" type kar sakte ho (paisa aaya ho tabhi).', "error");
+      show('Ye order cancelled hai. Sirf "reopen" ya "refunded" type kar sakte ho.', "error");
       return;
     }
     if (word === "shipped") {
@@ -150,6 +156,40 @@ export default function AdminOrderDetailPage() {
     }
     setCommand("");
     await handleStatusChange(target);
+  }
+
+  // The money was given back to the customer (done in the Razorpay dashboard / UPI app): only record it here.
+  // Same rule as the phone admin: only a PAID order that is cancelled / shipped / delivered can be marked refunded.
+  async function handleMarkRefunded() {
+    if (!order) return;
+    if (order.payment_status === "refunded") {
+      show("Ye order pehle se refunded mark hai.", "error");
+      return;
+    }
+    if (order.payment_status !== "paid") {
+      show("Sirf paid order refunded mark ho sakta hai.", "error");
+      return;
+    }
+    if (order.status !== "cancelled" && order.status !== "shipped" && order.status !== "delivered") {
+      show('Pehle order cancel karo (type "cancel"), phir refund mark karo.', "error");
+      return;
+    }
+    const extra = order.status === "cancelled" ? "" : "\n\nDhyan do: return aaya maal ka stock apne aap nahi badhega. Products mein stock khud badhao.";
+    if (!confirm(`Customer ko ₹${order.total} wapas de diya?\n\nPayment 'refunded' mark ho jayegi.${extra}`)) return;
+    setUpdating(true);
+    try {
+      const ok = await markRefundedGuarded(order.id);
+      if (!ok) {
+        show("Order abhi kisi aur ne badal diya. Page refresh karke dobara dekho.", "error");
+      } else {
+        show("Payment refunded mark ho gayi", "success");
+      }
+      await load(order.id);
+    } catch (err) {
+      show(friendlyError(err), "error");
+    } finally {
+      setUpdating(false);
+    }
   }
 
   // Cancelled -> confirmed + paid again (e.g. the customer paid after the auto-cancel). Stock is taken again.
@@ -270,11 +310,11 @@ export default function AdminOrderDetailPage() {
             <p className="w-full text-xs text-stone-500">
               {order.status === "cancelled" ? (
                 <>
-                  <b>reopen</b> = order dobara Confirmed + Paid (stock wapas lagega, customer ko &quot;Payment received&quot; email). Pehle apna UPI app check karo, paisa aaya ho tabhi.
+                  <b>reopen</b> = order dobara Confirmed + Paid (stock wapas lagega, customer ko &quot;Payment received&quot; email). Pehle apna UPI app check karo, paisa aaya ho tabhi. <b>refunded</b> = customer ko paisa wapas de diya (Paid order ke liye).
                 </>
               ) : (
                 <>
-                  <b>confirm</b> = confirmed{order.payment_method === "upi" && order.payment_status !== "paid" ? " (also marks the UPI payment received)" : ""} · <b>process</b> = processing · <b>delivered</b> = delivered · <b>cancel</b> = cancelled. Shipping: use the box below. Status can only move forward.
+                  <b>confirm</b> = confirmed{order.payment_method === "upi" && order.payment_status !== "paid" ? " (also marks the UPI payment received)" : ""} · <b>process</b> = processing · <b>delivered</b> = delivered · <b>cancel</b> = cancelled · <b>refunded</b> = paisa wapas de diya (cancelled / shipped / delivered paid order). Shipping: use the box below. Status can only move forward.
                 </>
               )}
             </p>
@@ -367,6 +407,17 @@ export default function AdminOrderDetailPage() {
               )}
             </p>
           )}
+          {order.payment_status === "paid" && (order.status === "cancelled" || order.status === "shipped" || order.status === "delivered") && (
+            <button
+              type="button"
+              onClick={() => void handleMarkRefunded()}
+              disabled={updating}
+              className="mt-3 rounded-full border border-rose-900 px-4 py-2 text-xs font-semibold text-rose-900 hover:bg-rose-50 disabled:opacity-40"
+            >
+              Payment refunded (mark)
+            </button>
+          )}
+          {order.payment_status === "refunded" && <p className="mt-2 text-xs font-medium text-stone-500">Refund ho chuka hai (mark kiya hua).</p>}
           {order.payment_method === "upi" && (
             <p className={`mt-2 rounded-lg p-2 text-sm ${order.payment_reference ? "bg-emerald-50 text-emerald-800" : "bg-stone-50 text-stone-500"}`}>
               {order.payment_reference ? (

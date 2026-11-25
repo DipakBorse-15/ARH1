@@ -78,7 +78,7 @@ export default function AdminOrdersPage() {
   }
 
   async function expireUnpaid() {
-    if (!confirm(`Cancel all unpaid UPI orders whose payment time is over (where the customer has not sent a UTR)? Their stock goes back.`)) return;
+    if (!confirm(`Cancel all unpaid orders whose payment time is over (online: 30 minutes; old UPI orders: without a UTR)? Their stock goes back.`)) return;
     setBusy(true);
     try {
       const n = await expireUnpaidOrdersAdmin();

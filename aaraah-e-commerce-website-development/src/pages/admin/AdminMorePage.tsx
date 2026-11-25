@@ -6,7 +6,7 @@ import { moreLinks } from "@/layouts/adminLinks";
 import { disablePush, enablePush, getPushState, type PushState } from "@/lib/pushNotifications";
 import { useToast } from "@/contexts/ToastContext";
 
-/** Switch for phone alerts: new order, UTR submitted, paid order cancelled, low stock. */
+/** Switch for phone alerts: new paid order, paid order cancelled, low stock. */
 function PushAlertsCard({ userId }: { userId: string }) {
   const { show } = useToast();
   const [state, setState] = useState<PushState | "loading">("loading");
@@ -43,7 +43,7 @@ function PushAlertsCard({ userId }: { userId: string }) {
   return (
     <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4">
       <p className="text-sm font-semibold text-stone-800">Phone alerts</p>
-      <p className="mt-1 text-xs text-stone-500">Naya order, UTR aaya, paid order cancel, stock 5 se kam.</p>
+      <p className="mt-1 text-xs text-stone-500">Naya paid order, paid order cancel, stock 5 se kam.</p>
       {state === "unsupported" ? (
         <p className="mt-3 text-xs text-stone-600">Ye browser alerts support nahi karta. App ko Chrome se home screen par add karo.</p>
       ) : state === "blocked" ? (
