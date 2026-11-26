@@ -25,7 +25,7 @@ interface Pending {
  * that did not enter the code.
  */
 export default function AdminSecurityPage() {
-  const { refreshMfa } = useAuth();
+  const { refreshMfa, user } = useAuth();
   const { show } = useToast();
   const [loading, setLoading] = useState(true);
   const [factors, setFactors] = useState<Factor[]>([]);
@@ -58,9 +58,11 @@ export default function AdminSecurityPage() {
           await supabase.auth.mfa.unenroll({ factorId: f.id });
         }
       }
+      // The authenticator app shows "AARAAH" + the e-mail of THIS account, so two admin accounts can never be mixed up.
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: `Aaraah Admin ${new Date().toISOString().slice(0, 16).replace("T", " ")}`,
+        issuer: "AARAAH",
+        friendlyName: user?.email || `Aaraah Admin ${new Date().toISOString().slice(0, 16).replace("T", " ")}`,
       });
       if (enrollError || !data) throw new Error(enrollError?.message || "Could not start setup");
       setPending({ factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret });
@@ -144,6 +146,9 @@ export default function AdminSecurityPage() {
       {error && <p className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
 
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-stone-700">
+          Aap abhi is account me login ho: <b className="break-all text-stone-900">{user?.email || "—"}</b>. 2-step login isi account ke liye set hoga.
+        </p>
         <p className="text-sm font-semibold text-stone-800">
           Status:{" "}
           <span className={active ? "text-emerald-700" : "text-amber-700"}>{active ? "Chalu hai" : "Band hai"}</span>
@@ -166,7 +171,7 @@ export default function AdminSecurityPage() {
         {pending && (
           <form onSubmit={confirmEnroll} className="mt-4 space-y-3">
             <ol className="list-decimal space-y-1 pl-5 text-xs text-stone-600">
-              <li>Phone me Google Authenticator ya Microsoft Authenticator kholo.</li>
+              <li>Phone me Google Authenticator ya Microsoft Authenticator kholo (app me "AARAAH" aur upar wala email dikhna chahiye).</li>
               <li>"+" dabao, "Scan QR code" chuno aur neeche ka QR scan karo.</li>
               <li>App me jo 6-digit code dikhe wo yahan daalo.</li>
             </ol>

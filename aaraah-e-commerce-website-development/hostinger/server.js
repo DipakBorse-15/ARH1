@@ -60,6 +60,102 @@ const COMPRESSIBLE = new Set([".html", ".js", ".mjs", ".css", ".json", ".webmani
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 /* ------------------------------------------------------------------ */
+/* 0. Security headers (every response)                                */
+/* ------------------------------------------------------------------ */
+// CSP_MODE (hPanel -> Environment variables): "enforce" (default) | "report-only" | "off".
+// If a page ever breaks because of the policy, set CSP_MODE=report-only and the site works again after the redeploy.
+const CSP_MODE = String(process.env.CSP_MODE || "enforce").trim().toLowerCase();
+let SUPABASE_ORIGIN = "";
+let SUPABASE_WSS = "";
+try {
+  const u = new URL(SUPABASE_URL);
+  SUPABASE_ORIGIN = u.origin;
+  SUPABASE_WSS = `wss://${u.host}`;
+} catch {
+  /* not configured: only 'self' is allowed */
+}
+const CSP = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'self'",
+  // inline: the small route-restore snippet in index.html + Google Analytics / Meta Pixel start-up code
+  "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://www.googletagmanager.com https://*.google-analytics.com https://connect.facebook.net",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_WSS} https://api.razorpay.com https://lumberjack.razorpay.com https://lumberjack-cx.razorpay.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://www.facebook.com https://connect.facebook.net`.replace(/\s+/g, " ").trim(),
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com https://www.googletagmanager.com https://www.facebook.com https://td.doubleclick.net",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "report-uri /csp-report",
+].join("; ");
+const CSP_HEADER = CSP_MODE === "off" ? null : CSP_MODE === "report-only" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
+
+function applySecurityHeaders(res) {
+  res.setHeader("Strict-Transport-Security", "max-age=31536000");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), usb=(), bluetooth=()");
+  if (CSP_HEADER) res.setHeader(CSP_HEADER, CSP);
+}
+
+// Browsers report blocked things to /csp-report. Only a short line goes to the log (at most 20 a minute).
+let cspLog = { at: 0, n: 0 };
+function handleCspReport(req, res) {
+  let size = 0;
+  let text = "";
+  req.on("data", (c) => {
+    size += c.length;
+    if (size <= 8192) text += c.toString("utf8");
+  });
+  req.on("end", () => {
+    const now = Date.now();
+    if (now - cspLog.at > 60_000) cspLog = { at: now, n: 0 };
+    if (++cspLog.n <= 20) log("csp-report", text.slice(0, 400).replace(/\s+/g, " "));
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    res.end();
+  });
+  req.on("error", () => res.destroy());
+}
+
+/* ------------------------------------------------------------------ */
+/* 0b. Limits that protect Supabase (egress / request count)           */
+/* ------------------------------------------------------------------ */
+// "Miss" = a photo that is not on this server's disk yet, so Supabase has to be asked. Real visitors cause few misses
+// (each photo only once). Someone asking for thousands of different addresses is stopped: such a request is simply sent
+// to Supabase directly (302), so a real visitor never loses a photo and this server does no work for the attacker.
+const MISS_PER_IP_PER_MIN = Number(process.env.IMG_MISS_PER_IP_MIN) || 90;
+const MISS_GLOBAL_PER_MIN = Number(process.env.IMG_MISS_GLOBAL_MIN) || 900;
+const missByIp = new Map(); // ip -> { at, n }
+let missGlobal = { at: 0, n: 0 };
+function clientIp(req) {
+  // The LAST address in x-forwarded-for was added by the proxy in front of us (the first one can be faked by the visitor).
+  const parts = String(req.headers["x-forwarded-for"] || "").split(",").map((x) => x.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : (req.socket && req.socket.remoteAddress) || "?";
+}
+function missAllowed(req) {
+  const now = Date.now();
+  if (now - missGlobal.at > 60_000) missGlobal = { at: now, n: 0 };
+  if (++missGlobal.n > MISS_GLOBAL_PER_MIN) return false;
+  const ip = clientIp(req);
+  let b = missByIp.get(ip);
+  if (!b || now - b.at > 60_000) {
+    if (missByIp.size >= 5000) missByIp.clear();
+    b = { at: now, n: 0 };
+    missByIp.set(ip, b);
+  }
+  return ++b.n <= MISS_PER_IP_PER_MIN;
+}
+// A photo address that Supabase said "does not exist" is remembered for 2 minutes.
+const notFoundUntil = new Map(); // cache key -> expiry ms
+function rememberNotFound(key) {
+  if (notFoundUntil.size >= 2000) notFoundUntil.delete(notFoundUntil.keys().next().value);
+  notFoundUntil.set(key, Date.now() + 120_000);
+}
+
+/* ------------------------------------------------------------------ */
 /* 1. The three small functions in api/*.js, run as they are          */
 /* ------------------------------------------------------------------ */
 const handlers = {};
@@ -331,6 +427,17 @@ async function serveImage(req, res, pathname) {
   let entry = readCached(key);
   const hit = !!entry;
   if (!entry) {
+    const nf = notFoundUntil.get(key);
+    if (nf && nf > Date.now()) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=120" });
+      res.end("Not found");
+      return;
+    }
+    if (!inflight.has(key) && !missAllowed(req)) {
+      res.writeHead(302, { Location: upstreamUrl, "Cache-Control": "no-store" });
+      res.end();
+      return;
+    }
     try {
       let p = inflight.get(key);
       if (!p) {
@@ -346,6 +453,7 @@ async function serveImage(req, res, pathname) {
       return;
     }
     if (entry.notFound) {
+      rememberNotFound(key);
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=300" });
       res.end("Not found");
       return;
@@ -528,6 +636,16 @@ function serveStatic(req, res, pathname) {
 /* ------------------------------------------------------------------ */
 const server = http.createServer(async (req, res) => {
   try {
+    applySecurityHeaders(res);
+    if ((req.url || "").length > 2048) {
+      res.writeHead(414, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+      res.end("URI too long");
+      return;
+    }
+    if (req.method === "POST" && (req.url || "").split("?")[0] === "/csp-report") {
+      handleCspReport(req, res);
+      return;
+    }
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405, { Allow: "GET, HEAD" });
       res.end();
