@@ -54,6 +54,13 @@ const VALID_PAYMENT_METHODS = new Set(["cod", "upi", "razorpay"]);
 const ENABLED_PAYMENT_METHODS = new Set(["razorpay"]);
 
 const SHIPPING_FEE = 0; // Flat free shipping for now — adjust as needed.
+
+// Order-attempt limits per customer (protects the stock and the payment gateway from someone who keeps creating
+// orders and abandoning them). A normal customer never comes near these. Retrying the SAME order within 2 minutes
+// is not counted (it gets the same order back).
+const MAX_ORDERS_PER_HOUR = 8;
+const MAX_ORDERS_PER_DAY = 25;
+const MAX_UNPAID_CANCELLED_PER_DAY = 6;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -203,6 +210,30 @@ Deno.serve(async (req) => {
         return json({ order_id: duplicate.id, order_number: duplicate.order_number, total: duplicate.total });
       }
       // The order moved on (cancelled / paid) in the meantime: fall through and treat this as a fresh order.
+    }
+
+    // ---- Too many attempts? (one small read; if it fails the customer is NOT blocked) ----------------------
+    {
+      const dayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const hourAgoMs = Date.now() - 60 * 60 * 1000;
+      const { data: attempts, error: attemptsError } = await admin
+        .from("orders")
+        .select("created_at, status, payment_status")
+        .eq("user_id", userId)
+        .gte("created_at", dayAgoIso)
+        .limit(200);
+      if (!attemptsError && attempts) {
+        const lastHour = attempts.filter((r: { created_at: string }) => new Date(r.created_at).getTime() >= hourAgoMs).length;
+        const unpaidCancelled = attempts.filter(
+          (r: { status: string; payment_status: string }) => r.status === "cancelled" && r.payment_status !== "paid"
+        ).length;
+        if (lastHour >= MAX_ORDERS_PER_HOUR || attempts.length >= MAX_ORDERS_PER_DAY || unpaidCancelled >= MAX_UNPAID_CANCELLED_PER_DAY) {
+          return json(
+            { error: "Too many order attempts in a short time. Please wait a while and try again, or contact us on WhatsApp." },
+            429
+          );
+        }
+      }
     }
 
     // A customer keeps at most ONE unpaid online order: an older one they left without paying (closed the payment

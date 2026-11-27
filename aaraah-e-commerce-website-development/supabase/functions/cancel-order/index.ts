@@ -29,7 +29,7 @@ const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
 
-// 2-step login: an admin who has an authenticator app must have entered the code in this session
+// 2-step login: an admin must have entered the authenticator code in this session
 // (the token then carries aal2). The token itself is already verified by getUser().
 function jwtAal(authHeader: string): string {
   try {
@@ -39,9 +39,6 @@ function jwtAal(authHeader: string): string {
   } catch {
     return "aal1";
   }
-}
-function needsCode(user: { factors?: Array<{ status?: string }> | null }, authHeader: string): boolean {
-  return (user.factors ?? []).some((f) => f.status === "verified") && jwtAal(authHeader) !== "aal2";
 }
 
 Deno.serve(async (req) => {
@@ -66,8 +63,9 @@ Deno.serve(async (req) => {
     if (!orderId || typeof orderId !== "string") return json({ error: "order_id is required" }, 400);
 
     const { data: profile } = await admin.from("profiles").select("role").eq("user_id", userId).maybeSingle();
-    // An admin who skipped the 2-step code is treated like a normal customer (own orders only).
-    const isAdmin = profile?.role === "admin" && !needsCode(userData.user, authHeader);
+    // Admin power needs the 2-step code (aal2) ALWAYS. An admin session without the code is treated like a
+    // normal customer (own orders only) - same rule as the database (migration 0047).
+    const isAdmin = profile?.role === "admin" && jwtAal(authHeader) === "aal2";
 
     const { data: order, error: orderError } = await admin
       .from("orders")
