@@ -20,12 +20,16 @@ function colorSlug(color: string | null) {
  */
 export function ProductCard({ product, variant, eager = false }: { product: ProductWithVariants; variant?: ProductVariant; eager?: boolean }) {
   const [loaded, setLoaded] = useState(false);
+  // 2nd photo is fetched only once the mouse first touches the card (no extra image traffic otherwise; phones never load it).
+  const [hovered, setHovered] = useState(false);
+  const [loaded2, setLoaded2] = useState(false);
   const summary = useRatingSummary();
   const activeVariants = product.variants.filter((v) => v.active);
   const shown = variant ?? activeVariants[0];
   if (!shown) return null;
 
   const image = shown.images?.[0];
+  const image2 = shown.images?.[1];
   const inStock = shown.is_available && shown.stock_quantity > 0;
   // The card shows the MAIN colour only; variation colours (maroon, wine ...) appear on the product page.
   const shownKey = mainColorKey(shown);
@@ -40,7 +44,8 @@ export function ProductCard({ product, variant, eager = false }: { product: Prod
   return (
     <Link
       to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(colorSlug(shown.color))}` : ""}`}
-      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-rose-900 hover:shadow-xl hover:shadow-rose-900/20"
+      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:border-rose-900"
+      onMouseEnter={() => setHovered(true)}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
         {image ? (
@@ -57,6 +62,18 @@ export function ProductCard({ product, variant, eager = false }: { product: Prod
                 loaded ? "opacity-100" : "opacity-0"
               }`}
             />
+            {hovered && image2 && (
+              <img
+                src={thumbUrl(image2)}
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                onLoad={() => setLoaded2(true)}
+                className={`absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-300 ${
+                  loaded2 ? "opacity-0 group-hover:opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
           </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-stone-300">No Image</div>
