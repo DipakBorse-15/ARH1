@@ -273,12 +273,22 @@ async function buildFeed() {
     out.push(...page);
     if (page.length < 1000) break;
   }
+  // A card needs only the cover photo and the hover photo, so keep just the first two photos of each colour
+  // (the product page loads its own full photo list). This makes the list the browser downloads much smaller.
+  for (const p of out) {
+    for (const v of p.variants || []) {
+      if (Array.isArray(v.images)) {
+        v.images = v.images.slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).slice(0, 2);
+      }
+    }
+  }
   const raw = Buffer.from(JSON.stringify(out));
   return {
     at: Date.now(),
     raw,
     br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } }),
     gz: zlib.gzipSync(raw),
+    products: out,
   };
 }
 
@@ -839,9 +849,49 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------------------ */
+/* 5. Warm-up after every start / deploy                               */
+/* ------------------------------------------------------------------ */
+// A fresh deploy starts with an empty memory and possibly an empty photo cache, so the first visitors would wait for
+// Supabase. Right after start we load the product list and fetch the cover photos of the newest colours through our own
+// /img route (same cache path real visitors use). A photo already on disk costs nothing.
+async function warmUp() {
+  try {
+    const st = await buildFeed();
+    feedState = st;
+    const variants = [];
+    for (const p of st.products || []) for (const v of p.variants || []) if (v.active && v.images && v.images[0]) variants.push(v);
+    variants.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const urls = [];
+    for (const v of variants.slice(0, 60)) {
+      const u = v.images[0].thumb_url || v.images[0].url;
+      if (u && u.startsWith(STORAGE_PREFIX)) urls.push(`/img/${u.slice(STORAGE_PREFIX.length)}`);
+    }
+    let next = 0;
+    let done = 0;
+    const worker = async () => {
+      while (next < urls.length) {
+        const u = urls[next++];
+        try {
+          const r = await fetch(`http://127.0.0.1:${PORT}${u}`, { signal: AbortSignal.timeout(20_000) });
+          await r.arrayBuffer();
+          done++;
+        } catch {
+          /* a photo that fails here is simply fetched on the first real visit */
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    log(`warm-up done: product list + ${done}/${urls.length} cover photos`);
+  } catch (err) {
+    log("warm-up skipped:", err && err.message);
+  }
+}
+
 server.keepAliveTimeout = 65_000;
 server.listen(PORT, () => {
   log(`AARAAH server on port ${PORT} | dist: ${DIST} | img cache: ${cacheReady ? IMG_CACHE_DIR : "off"} | supabase: ${SUPABASE_URL ? "set" : "NOT SET"}`);
+  if (SUPABASE_URL && cacheReady) setTimeout(() => void warmUp(), 3000).unref();
 });
 
 process.on("unhandledRejection", (err) => log("unhandledRejection", err && err.message));

@@ -36,7 +36,19 @@ let feedInflight: Promise<ProductWithVariants[]> | null = null;
 async function fetchFeedFromOwnServer(): Promise<ProductWithVariants[] | null> {
   if (import.meta.env.VITE_IMG_PROXY !== "1") return null;
   try {
-    const res = await fetch("/data/products-feed", { headers: { Accept: "application/json" } });
+    // index.html may already have started this download (Home / category pages); use it once, then ask normally.
+    const w = window as unknown as { __aaraahFeed?: Promise<Response> };
+    const early = w.__aaraahFeed;
+    w.__aaraahFeed = undefined;
+    let res: Response | null = null;
+    if (early) {
+      try {
+        res = await early;
+      } catch {
+        res = null;
+      }
+    }
+    if (!res || !res.ok) res = await fetch("/data/products-feed", { headers: { Accept: "application/json" } });
     if (!res.ok) return null;
     const json = await res.json();
     return Array.isArray(json) ? (json as ProductWithVariants[]) : null;

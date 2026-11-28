@@ -12,9 +12,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@500&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Cinzel:wght@500&display=swap"
+      />
+    </noscript>
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
@@ -30,6 +38,17 @@
       content="Shop premium sarees, kurtis, kurta sets, lehengas, dupattas and more at AARAAH. Elegant, modern Indian ethnic wear with free shipping across India."
     />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Home and category pages need the product list: start downloading it right now, while the app code is
+      // still loading, instead of after it (the app picks this request up; see src/services/products.ts).
+      (function (l) {
+        if (l.pathname === "/" || /^\/category\/[^/]+\/?$/.test(l.pathname)) {
+          try {
+            window.__aaraahFeed = fetch("/data/products-feed", { headers: { Accept: "application/json" } });
+          } catch (e) {}
+        }
+      })(window.location);
+    </script>
     <script>
       // GitHub Pages SPA fallback: restores the real route that 404.html
       // encoded into the query string before redirecting to index.html.
