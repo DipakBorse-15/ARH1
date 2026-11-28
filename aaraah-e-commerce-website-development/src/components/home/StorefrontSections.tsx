@@ -322,7 +322,7 @@ function LatestLaunches({ items, category }: { items: SimilarItem[]; category?: 
           <p className="mt-1 text-sm text-stone-500">Fresh off the loom — our newest arrivals</p>
         </div>
       )}
-      <ProductGrid items={items} columnsClass="grid-cols-2 md:grid-cols-4" />
+      <ProductGrid items={items} columnsClass="grid-cols-2 md:grid-cols-4" eagerCount={4} />
     </section>
   );
 }

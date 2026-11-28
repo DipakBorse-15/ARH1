@@ -21,6 +21,8 @@ export interface CreateOrderResponse {
   order_id: string;
   order_number: string;
   total: number;
+  /** What the payment window needs; sent along so the order page does not have to ask again (older answers may not have it). */
+  pay?: RazorpayPayInfo;
 }
 
 /** The create-order function refused with a message written for the customer ("sold out", "coupon expired" ...). Show it as it is. */

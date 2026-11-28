@@ -591,6 +591,130 @@ function sendIndexWithCanonical(req, res, pathname) {
   return true;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* 3b. Product pages: title, description, price and structured data   */
+/*     are written into the HTML for EVERY visitor (and Google)        */
+/* ------------------------------------------------------------------ */
+// Until now Google got an empty page and had to run JavaScript to learn what a product is. Now the first HTML already
+// says it. Everybody gets the same HTML (no special treatment of Googlebot), and the website replaces it with the same
+// facts after loading. Old product addresses (old_slugs) answer with a real 301 to the new address.
+// Switch off (if ever needed): hPanel -> Environment variables -> SEO_INJECT = off.
+const SEO_INJECT = String(process.env.SEO_INJECT || "on").trim().toLowerCase() !== "off";
+const productMetaCache = new Map(); // slug -> { at, data }
+const productMetaInflight = new Map(); // slug -> Promise
+const PRODUCT_META_MAX = 500;
+
+async function getProductMeta(slug) {
+  const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !key || !slug || slug.length > 200) return null;
+  const now = Date.now();
+  const hit = productMetaCache.get(slug);
+  if (hit && now - hit.at < (hit.data.type === "ok" ? 5 * 60_000 : 60_000)) return hit.data;
+  if (productMetaInflight.has(slug)) return productMetaInflight.get(slug);
+  if (!hit && !productLookupAllowed()) return null; // same limit as link previews: fake addresses cannot make Supabase work
+  const job = (async () => {
+    try {
+      const mod = await import(pathToFileURL(path.join(APP_ROOT, "api", "_lib", "productMeta.js")).href);
+      const data = await mod.fetchProductMeta(SUPABASE_URL, key, slug);
+      if (productMetaCache.size >= PRODUCT_META_MAX) productMetaCache.delete(productMetaCache.keys().next().value);
+      productMetaCache.set(slug, { at: Date.now(), data });
+      return data;
+    } catch (err) {
+      log("product meta error", slug, err && err.message);
+      return hit ? hit.data : null; // Supabase hiccup: the last good answer, or the normal page
+    } finally {
+      productMetaInflight.delete(slug);
+    }
+  })();
+  productMetaInflight.set(slug, job);
+  return job;
+}
+
+function injectProductHead(html, d) {
+  if (!html.includes("</head>")) return null;
+  const e = escAttr;
+  let out = html
+    .replace(/<title>[\s\S]*?<\/title>/i, "")
+    .replace(/<meta\s[^>]*?(?:name|property)\s*=\s*["'](?:description|og:[^"']+|twitter:[^"']+)["'][^>]*>/gi, "")
+    .replace(/<link\s[^>]*?rel\s*=\s*["']canonical["'][^>]*>/gi, "");
+  const image = d.image || `${SITE_URL}/icon-512.png`;
+  const head = [
+    `<title>${e(d.title)}</title>`,
+    `<meta name="description" content="${e(d.description)}" />`,
+    `<link rel="canonical" href="${e(d.canonical)}" />`,
+    `<meta property="og:site_name" content="AARAAH" />`,
+    `<meta property="og:type" content="product" />`,
+    `<meta property="og:title" content="${e(d.title)}" />`,
+    `<meta property="og:description" content="${e(d.description)}" />`,
+    `<meta property="og:url" content="${e(d.canonical)}" />`,
+    `<meta property="og:image" content="${e(image)}" />`,
+    d.price != null ? `<meta property="product:price:amount" content="${e(d.price)}" />` : "",
+    d.price != null ? `<meta property="product:price:currency" content="INR" />` : "",
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${e(d.title)}" />`,
+    `<meta name="twitter:description" content="${e(d.description)}" />`,
+    `<meta name="twitter:image" content="${e(image)}" />`,
+    // data-ssr-ld: the website removes this copy once it writes its own (so there is never a double).
+    `<script type="application/ld+json" data-ssr-ld="1">${JSON.stringify(d.jsonLd).replace(/</g, "\\u003c")}</script>`,
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+  out = out.replace("</head>", () => `    ${head}\n  </head>`);
+  const plain = `<noscript><h1>${e(d.name)}</h1>${d.price != null ? `<p>Rs. ${e(d.price)}</p>` : ""}<p>${e(d.description)}</p></noscript>`;
+  out = out.replace('<div id="root"></div>', (m) => m + plain);
+  return out;
+}
+
+function sendHtml(req, res, html) {
+  const headers = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-cache",
+    "X-Content-Type-Options": "nosniff",
+    Vary: "Accept-Encoding",
+  };
+  const accept = String(req.headers["accept-encoding"] || "");
+  let body = Buffer.from(html, "utf8");
+  if (/\bbr\b/.test(accept)) {
+    body = zlib.brotliCompressSync(body, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } });
+    headers["Content-Encoding"] = "br";
+  } else if (/\bgzip\b/.test(accept)) {
+    body = zlib.gzipSync(body, { level: 6 });
+    headers["Content-Encoding"] = "gzip";
+  }
+  headers["Content-Length"] = body.length;
+  res.writeHead(200, headers);
+  res.end(req.method === "HEAD" ? undefined : body);
+}
+
+/** Returns true when it answered. False = serve the page the usual way (unknown product, Supabase trouble, ...). */
+async function serveProductPage(req, res, rawSlug, search) {
+  let slug = rawSlug;
+  try {
+    slug = decodeURIComponent(rawSlug);
+  } catch {
+    /* keep raw */
+  }
+  const data = await getProductMeta(slug);
+  if (!data) return false;
+  if (data.type === "redirect") {
+    res.writeHead(301, { Location: `/products/${encodeURIComponent(data.slug)}${search || ""}`, "Cache-Control": "public, max-age=3600" });
+    res.end();
+    return true;
+  }
+  if (data.type !== "ok") return false;
+  let html;
+  try {
+    html = readIndexHtml();
+  } catch {
+    return false;
+  }
+  const out = injectProductHead(html, data);
+  if (!out) return false;
+  sendHtml(req, res, out);
+  return true;
+}
+
 function serveStatic(req, res, pathname) {
   let rel = "";
   try {
@@ -700,6 +824,7 @@ const server = http.createServer(async (req, res) => {
       await runApi("product", `product:${slug}:${q.variant || ""}`, q, 5 * 60_000, req, res);
       return;
     }
+    if (prod && SEO_INJECT && (req.method === "GET" || req.method === "HEAD") && (await serveProductPage(req, res, prod[1], url.search))) return;
     if (pathname.startsWith("/api/")) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
       res.end("Not found");

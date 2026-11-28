@@ -89,6 +89,8 @@ export function SEO({ title, description, image, canonicalPath, jsonLd, ogType =
 
     let scriptEl: HTMLScriptElement | null = null;
     if (jsonLdText) {
+      // The server already put a first copy in the HTML for crawlers; keep only one.
+      document.head.querySelectorAll("script[data-ssr-ld]").forEach((n) => n.remove());
       scriptEl = document.createElement("script");
       scriptEl.type = "application/ld+json";
       scriptEl.textContent = jsonLdText;

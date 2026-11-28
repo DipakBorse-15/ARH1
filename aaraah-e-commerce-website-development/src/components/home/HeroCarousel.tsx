@@ -109,6 +109,8 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   <img
                     src={imgSrc(logo)}
                     alt={settings?.site_name || "AARAAH"}
+                    fetchPriority="high"
+                    decoding="async"
                     className="max-h-[86%] max-w-[86%] object-contain"
                   />
                 </div>

@@ -61,6 +61,7 @@ const SHIPPING_FEE = 0; // Flat free shipping for now — adjust as needed.
 const MAX_ORDERS_PER_HOUR = 8;
 const MAX_ORDERS_PER_DAY = 25;
 const MAX_UNPAID_CANCELLED_PER_DAY = 6;
+const PAY_MINUTES = 30; // keep the same as PAY_MINUTES in razorpay-payment (and expire_razorpay_orders(30), migration 0045)
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -152,14 +153,23 @@ Deno.serve(async (req) => {
     const wantedKey = itemKey(payload.items);
     const wantedDetails = detailsKey({ ...payload, address_line2: payload.address_line2 ?? "" });
     const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: recentOrders } = await admin
+    // Two independent reads at the same time (saves one round trip).
+    const [{ data: recentOrders }, attemptsRes] = await Promise.all([
+      admin
       .from("orders")
       .select("id, order_number, total, coupon_code, payment_reference, full_name, mobile, email, address_line1, address_line2, city, state, pincode, items:order_items(variant_id, quantity)")
       .eq("user_id", userId)
       .eq("status", "pending")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
-      .limit(5);
+      .limit(5),
+      admin
+        .from("orders")
+        .select("created_at, status, payment_status")
+        .eq("user_id", userId)
+        .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .limit(200),
+    ]);
     type RecentOrder = {
       id: string;
       order_number: string;
@@ -214,14 +224,8 @@ Deno.serve(async (req) => {
 
     // ---- Too many attempts? (one small read; if it fails the customer is NOT blocked) ----------------------
     {
-      const dayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const hourAgoMs = Date.now() - 60 * 60 * 1000;
-      const { data: attempts, error: attemptsError } = await admin
-        .from("orders")
-        .select("created_at, status, payment_status")
-        .eq("user_id", userId)
-        .gte("created_at", dayAgoIso)
-        .limit(200);
+      const { data: attempts, error: attemptsError } = attemptsRes;
       if (!attemptsError && attempts) {
         const lastHour = attempts.filter((r: { created_at: string }) => new Date(r.created_at).getTime() >= hourAgoMs).length;
         const unpaidCancelled = attempts.filter(
@@ -417,11 +421,19 @@ Deno.serve(async (req) => {
     // set) if a concurrent order already took the remaining stock.
     const outOfStockSkus: string[] = [];
     const failedVariantIds: string[] = [];
-    for (const item of payload.items) {
-      const { error: stockError } = await admin.rpc("decrement_variant_stock", {
-        p_variant_id: item.variant_id,
-        p_quantity: item.quantity,
-      });
+    // Every colour is its own row and each call is atomic, so all of them can run at the same time.
+    const stockResults = await Promise.all(
+      payload.items.map(async (item) => ({
+        item,
+        stockError: (
+          await admin.rpc("decrement_variant_stock", {
+            p_variant_id: item.variant_id,
+            p_quantity: item.quantity,
+          })
+        ).error,
+      }))
+    );
+    for (const { item, stockError } of stockResults) {
       if (stockError) {
         const variant = variants?.find((v: { id: string }) => v.id === item.variant_id);
         outOfStockSkus.push(variant?.sku ?? item.variant_id);
@@ -463,7 +475,15 @@ Deno.serve(async (req) => {
 
     // No mail, phone alert or cart change here: all of that happens when the money really arrives
     // (razorpay-payment function). An order that is never paid is cancelled after 30 minutes without disturbing anyone.
-    return json({ order_id: order.id, order_number: order.order_number, total });
+    // The payment window needs these; sending them now saves the order page a second server call.
+    const payInfo = {
+      key_id: Deno.env.get("RAZORPAY_KEY_ID"),
+      razorpay_order_id: razorpayOrderId,
+      amount: Math.round(total * 100),
+      currency: "INR",
+      expires_at: new Date(new Date(order.created_at).getTime() + PAY_MINUTES * 60_000).toISOString(),
+    };
+    return json({ order_id: order.id, order_number: order.order_number, total, pay: payInfo });
   } catch (err) {
     console.error(err);
     return json({ error: "Unexpected server error" }, 500);

@@ -18,7 +18,7 @@ function colorSlug(color: string | null) {
  * (possibly multi-colour) product this card represents — pass it explicitly
  * when flattening a product's variants into individual grid cards.
  */
-export function ProductCard({ product, variant }: { product: ProductWithVariants; variant?: ProductVariant }) {
+export function ProductCard({ product, variant, eager = false }: { product: ProductWithVariants; variant?: ProductVariant; eager?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const summary = useRatingSummary();
   const activeVariants = product.variants.filter((v) => v.active);
@@ -49,7 +49,9 @@ export function ProductCard({ product, variant }: { product: ProductWithVariants
             <img
               src={thumbUrl(image)}
               alt={image.alt_text || product.name}
-              loading="lazy"
+              loading={eager ? "eager" : "lazy"}
+              fetchPriority={eager ? "high" : undefined}
+              decoding="async"
               onLoad={() => setLoaded(true)}
               className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-110 ${
                 loaded ? "opacity-100" : "opacity-0"

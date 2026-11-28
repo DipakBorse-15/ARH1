@@ -173,7 +173,7 @@ export function ProductListingPage({ mode }: { mode: Mode }) {
               <p className="mt-2 text-sm text-stone-500">New styles are on their way. Please check back soon.</p>
             </div>
           )}
-          {!loading && !error && !(mode === "collection" && total === 0 && !filtersActive) && <ProductGrid items={cards} />}
+          {!loading && !error && !(mode === "collection" && total === 0 && !filtersActive) && <ProductGrid items={cards} eagerCount={4} />}
 
           {!loading && !error && totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-2">

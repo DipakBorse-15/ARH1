@@ -3,7 +3,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { openRazorpayCheckout } from "@/lib/razorpay";
-import { getRazorpayPayInfo, razorpayExpiryAt, verifyRazorpayPayment } from "@/services/orders";
+import { getRazorpayPayInfo, razorpayExpiryAt, verifyRazorpayPayment, type RazorpayPayInfo } from "@/services/orders";
 import { siteConfig } from "@/config/site";
 import type { Order } from "@/types";
 
@@ -14,7 +14,18 @@ import type { Order } from "@/types";
  * The order becomes "paid" on the server (razorpay-payment function); this card only opens the window and asks the
  * server to check the result. Razorpay also tells the server directly (webhook), so even a closed browser is fine.
  */
-export function RazorpayPaymentCard({ order, autoOpen, onPaid }: { order: Order; autoOpen?: boolean; onPaid?: () => void }) {
+export function RazorpayPaymentCard({
+  order,
+  autoOpen,
+  prefetchedPay,
+  onPaid,
+}: {
+  order: Order;
+  autoOpen?: boolean;
+  /** Payment details that came back with the order itself; used once for the automatic opening, so no extra server call is needed. */
+  prefetchedPay?: RazorpayPayInfo;
+  onPaid?: () => void;
+}) {
   const { show } = useToast();
   const { refresh: refreshCart } = useCart();
   const [busy, setBusy] = useState<"" | "opening" | "verifying">("");
@@ -22,6 +33,7 @@ export function RazorpayPaymentCard({ order, autoOpen, onPaid }: { order: Order;
   // After a successful payment the button must never come back (no double payment while we confirm).
   const [paidNow, setPaidNow] = useState(false);
   const autoTried = useRef(false);
+  const prefetchedUsed = useRef(false);
 
   const visible = order.payment_method === "razorpay" && order.payment_status !== "paid" && order.status !== "cancelled";
   const deadline = razorpayExpiryAt(order.created_at);
@@ -33,7 +45,9 @@ export function RazorpayPaymentCard({ order, autoOpen, onPaid }: { order: Order;
     setNote(null);
     setBusy("opening");
     try {
-      const info = await getRazorpayPayInfo(order.id);
+      const pre = prefetchedUsed.current ? undefined : prefetchedPay;
+      prefetchedUsed.current = true;
+      const info = pre?.razorpay_order_id && new Date(pre.expires_at).getTime() > Date.now() ? pre : await getRazorpayPayInfo(order.id);
       // Close the window a minute before the order is cancelled, so nobody pays into a cancelled order.
       const secondsLeft = Math.floor((new Date(info.expires_at).getTime() - Date.now()) / 1000) - 60;
       if (secondsLeft < 30) {

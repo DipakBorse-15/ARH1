@@ -8,6 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/contexts/ToastContext";
 import { fetchAddresses, saveAddressIfNew } from "@/services/addresses";
 import { PlaceOrderError, placeOrder } from "@/services/orders";
+import { loadRazorpayScript } from "@/lib/razorpay";
 import { previewCoupon } from "@/services/coupons";
 import { friendlyError } from "@/lib/supabase";
 import { isValidMobile, normalizeMobile } from "@/lib/validators";
@@ -52,6 +53,10 @@ const EMPTY_FORM: FormState = {
 
 export default function CheckoutPage() {
   const location = useLocation();
+  // Start loading the Razorpay payment script while the customer fills the form, so the window opens at once later.
+  useEffect(() => {
+    void loadRazorpayScript().catch(() => {});
+  }, []);
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { items: cartItems, subtotal: cartSubtotal, refresh } = useCart();
@@ -226,9 +231,9 @@ export default function CheckoutPage() {
         buy_now: !!directItem,
       });
 
-      await refresh(); // cart is re-read either way (never throws; Buy Now leaves the cart as it was)
+      void refresh(); // cart is re-read in the background (never throws; Buy Now leaves the cart as it was) - the payment page must not wait for it
       // autoPay: the order page opens the Razorpay payment window by itself (once).
-      navigate(`/order-confirmation/${result.order_id}`, { state: { orderNumber: result.order_number, autoPay: true } });
+      navigate(`/order-confirmation/${result.order_id}`, { state: { orderNumber: result.order_number, autoPay: true, payInfo: result.pay } });
     } catch (err) {
       // The server's own reason ("sold out", "coupon expired", "valid mobile number" ...) is meant for the customer.
       show(err instanceof PlaceOrderError ? err.message : friendlyError(err, "Could not place your order. Please try again."), "error");

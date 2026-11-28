@@ -5,6 +5,7 @@ import { LoadingState, ErrorState } from "@/components/ui/States";
 import { formatINR } from "@/components/product/PriceDisplay";
 import { UpiPaymentCard } from "@/components/payment/UpiPaymentCard";
 import { RazorpayPaymentCard } from "@/components/payment/RazorpayPaymentCard";
+import type { RazorpayPayInfo } from "@/services/orders";
 import { paymentMethodLabel } from "@/services/orders";
 import { useLiveOrder } from "@/hooks/useLiveOrder";
 import { trackPurchase } from "@/lib/analytics";
@@ -12,7 +13,7 @@ import { trackPurchase } from "@/lib/analytics";
 export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
-  const navState = location.state as { orderNumber?: string; autoPay?: boolean } | null;
+  const navState = location.state as { orderNumber?: string; autoPay?: boolean; payInfo?: RazorpayPayInfo } | null;
   const orderNumber = navState?.orderNumber;
   const { order, loading, error, refetch } = useLiveOrder(orderId);
 
@@ -89,7 +90,7 @@ export default function OrderConfirmationPage() {
         </div>
       )}
 
-      {order && <RazorpayPaymentCard order={order} autoOpen={!!navState?.autoPay} onPaid={refetch} />}
+      {order && <RazorpayPaymentCard order={order} autoOpen={!!navState?.autoPay} prefetchedPay={navState?.payInfo} onPaid={refetch} />}
       {order && <UpiPaymentCard order={order} onSubmitted={refetch} />}
 
       <div className="mt-8 flex justify-center gap-3">

@@ -8,6 +8,7 @@ export function ProductGrid({
   emptyMessage,
   byVariant = false,
   columnsClass = "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+  eagerCount = 0,
 }: {
   products?: ProductWithVariants[];
   /** Pre-flattened (product, variant) pairs — e.g. cross-product recommendations. Takes priority over `products`. */
@@ -17,6 +18,8 @@ export function ProductGrid({
   byVariant?: boolean;
   /** Tailwind grid-cols classes; the homepage passes a strict 4-per-row layout. */
   columnsClass?: string;
+  /** The first few photos (the ones visible without scrolling) load at once instead of lazily. */
+  eagerCount?: number;
 }) {
   const cards = items
     ? items.map((it) => ({ key: it.variant.id, product: it.product, variant: it.variant }))
@@ -34,7 +37,7 @@ export function ProductGrid({
         // Capped stagger: a long grid still settles in quickly instead of a
         // slow cascading tail down the page.
         <div key={c.key} className="animate-fade-rise-in" style={{ animationDelay: `${Math.min(i, 7) * 100}ms` }}>
-          <ProductCard product={c.product} variant={c.variant} />
+          <ProductCard product={c.product} variant={c.variant} eager={i < eagerCount} />
         </div>
       ))}
     </div>

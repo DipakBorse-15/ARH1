@@ -18,6 +18,8 @@ const NAV_LINE =
 // Web menu font: Cinzel Medium (500), loaded once from Google Fonts.
 function ensureMenuFont() {
   if (document.getElementById("menu-font-cinzel")) return;
+  // index.html already loads Cinzel together with the other fonts (one request instead of two).
+  if (document.querySelector('link[href*="family=Cinzel"]')) return;
   const link = document.createElement("link");
   link.id = "menu-font-cinzel";
   link.rel = "stylesheet";
