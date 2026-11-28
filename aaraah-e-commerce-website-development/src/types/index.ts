@@ -269,6 +269,9 @@ export interface SiteSettings {
   announcement2_link: string | null;
   announcement2_active: boolean;
   font_family: string;
+  /** Public social profile links (footer icons). Empty/null = icon hidden. */
+  instagram_url?: string | null;
+  facebook_url?: string | null;
   /** Seconds each uploaded hero banner stays before the next one (default banner is fixed 5 s). */
   hero_slide_seconds?: number;
   /** Set when the admin resets orders; "Total Customers" only counts sign-ups after this time. */

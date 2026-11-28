@@ -40,7 +40,7 @@ export function ProductCard({ product, variant, eager = false }: { product: Prod
   return (
     <Link
       to={`/products/${product.slug}${shown.color ? `?variant=${encodeURIComponent(colorSlug(shown.color))}` : ""}`}
-      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-3 hover:scale-[1.03] hover:border-rose-900 hover:shadow-2xl hover:shadow-rose-900/40"
+      className="group block overflow-hidden rounded-2xl border border-stone-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-rose-900 hover:shadow-xl hover:shadow-rose-900/20"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-stone-100">
         {image ? (
@@ -53,7 +53,7 @@ export function ProductCard({ product, variant, eager = false }: { product: Prod
               fetchPriority={eager ? "high" : undefined}
               decoding="async"
               onLoad={() => setLoaded(true)}
-              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-110 ${
+              className={`h-full w-full object-cover object-top transition-opacity duration-500 ${
                 loaded ? "opacity-100" : "opacity-0"
               }`}
             />

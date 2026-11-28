@@ -33,7 +33,7 @@ export default function Home() {
               logo: settings?.logo_url || `${siteConfig.url}/icon-512.png`,
               email: siteConfig.supportEmail,
               telephone: siteConfig.supportPhone,
-              sameAs: [siteConfig.social.instagram, siteConfig.social.facebook],
+              sameAs: [settings ? settings.instagram_url : siteConfig.social.instagram, settings ? settings.facebook_url : siteConfig.social.facebook].filter(Boolean),
               address: { "@type": "PostalAddress", addressLocality: "Surat", addressRegion: "Gujarat", addressCountry: "IN" },
               contactPoint: {
                 "@type": "ContactPoint",

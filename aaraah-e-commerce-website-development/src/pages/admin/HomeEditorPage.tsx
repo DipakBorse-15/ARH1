@@ -12,7 +12,7 @@ import type { Category } from "@/types";
 import { FONT_OPTIONS, applySiteFont } from "@/config/fonts";
 import type { HeroSlide, SiteSettings } from "@/types";
 
-type Tab = "branding" | "offer" | "banners";
+type Tab = "branding" | "offer" | "banners" | "social";
 
 /** Storage keys reject spaces/special characters — keep only safe ones. */
 function safeFileName(name: string): string {
@@ -23,6 +23,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "branding", label: "Logo & Font" },
   { id: "offer", label: "Offer Strip" },
   { id: "banners", label: "Hero Banners" },
+  { id: "social", label: "Social Links" },
 ];
 
 export default function AdminHomeEditorPage() {
@@ -54,6 +55,7 @@ export default function AdminHomeEditorPage() {
       {tab === "branding" && <BrandingTab />}
       {tab === "offer" && <OfferStripTab />}
       {tab === "banners" && <BannersTab />}
+      {tab === "social" && <SocialLinksTab />}
     </div>
   );
 }
@@ -85,6 +87,12 @@ function useSettingsForm() {
 
   async function save() {
     if (!settings) return;
+    const insta = (settings.instagram_url || "").trim();
+    const fb = (settings.facebook_url || "").trim();
+    if ((insta && !/^https?:\/\//i.test(insta)) || (fb && !/^https?:\/\//i.test(fb))) {
+      show("Social link https:// se shuru hona chahiye", "error");
+      return;
+    }
     setSaving(true);
     try {
       await updateSiteSettings({
@@ -98,6 +106,8 @@ function useSettingsForm() {
         announcement2_text: settings.announcement2_text,
         announcement2_link: settings.announcement2_link,
         announcement2_active: settings.announcement2_active,
+        instagram_url: insta || null,
+        facebook_url: fb || null,
       });
       setDirty(false);
       show("Saved", "success");
@@ -221,6 +231,46 @@ function BrandingTab() {
         </p>
       </section>
 
+      <SaveBar dirty={dirty} saving={saving} onSave={save} />
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/* Social links tab: Instagram / Facebook icons shown in the footer       */
+/* ---------------------------------------------------------------------- */
+
+function SocialLinksTab() {
+  const { settings, patch, loading, saving, dirty, save } = useSettingsForm();
+  if (loading || !settings) return <LoadingState label="Loading…" />;
+  return (
+    <div className="max-w-2xl space-y-6">
+      <section className="rounded-2xl border border-stone-200 bg-white p-5">
+        <h2 className="mb-1 text-sm font-semibold text-stone-900">Social Links</h2>
+        <p className="mb-4 text-xs text-stone-500">
+          Yahan link daalo to website ke har page ke footer me Instagram / Facebook ka icon dikhega. Khali chhodoge to wo icon nahi dikhega.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Instagram link</label>
+            <input
+              value={settings.instagram_url || ""}
+              onChange={(e) => patch({ instagram_url: e.target.value })}
+              placeholder="https://www.instagram.com/..."
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-stone-600">Facebook link</label>
+            <input
+              value={settings.facebook_url || ""}
+              onChange={(e) => patch({ facebook_url: e.target.value })}
+              placeholder="https://www.facebook.com/..."
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </section>
       <SaveBar dirty={dirty} saving={saving} onSave={save} />
     </div>
   );
