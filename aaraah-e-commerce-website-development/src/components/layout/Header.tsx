@@ -7,6 +7,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useNavCategories, useNavCollections } from "@/hooks/useNavCategories";
 import { categoryHref } from "@/lib/categoryLinks";
 import { imgSrc } from "@/lib/imgProxy";
+import { SocialLinks } from "@/components/layout/SocialLinks";
 
 // Web menu look: Cinzel capitals; on hover the item fills with deep maroon, the text turns
 // white and a gold line draws in under it (with a clear gap between the text and the line).
@@ -199,6 +200,7 @@ export function Header() {
               );
             })}
           </div>
+          <SocialLinks label="Follow us" className="mt-4 border-t border-stone-200 pt-4" />
         </div>
       )}
     </header>

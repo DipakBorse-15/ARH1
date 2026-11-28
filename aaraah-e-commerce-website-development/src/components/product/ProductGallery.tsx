@@ -16,13 +16,13 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
 
   return (
     <div className="flex min-w-0 max-w-full flex-col-reverse gap-3 md:flex-row">
-      <div className="flex max-w-full gap-2 overflow-x-auto md:max-h-[calc(100vh-7rem)] md:flex-col md:overflow-y-auto md:overflow-x-hidden">
+      <div className="flex max-w-full gap-2 overflow-x-auto md:flex-col md:overflow-visible">
         {images.map((img, idx) => (
           <button
             key={img.id}
             onClick={() => setActive(idx)}
             aria-label={`View image ${idx + 1}`}
-            className={`aspect-[2/3] w-14 flex-shrink-0 overflow-hidden rounded-lg border-2 bg-stone-100 ${
+            className={`aspect-[3/4] w-14 flex-shrink-0 overflow-hidden rounded-lg border-2 bg-stone-100 ${
               idx === active ? "border-rose-900" : "border-transparent"
             }`}
           >
@@ -30,14 +30,14 @@ export function ProductGallery({ images, alt }: { images: ProductImage[]; alt: s
           </button>
         ))}
       </div>
-      <div className="flex min-h-[320px] min-w-0 flex-1 items-start justify-center overflow-hidden rounded-2xl bg-stone-100 md:items-center">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-2xl bg-stone-100">
         {/* key={current.id} remounts the img on every change, re-triggering
             the crossfade — a soft swap instead of a hard cut. */}
         <img
           key={current.id}
           src={imgSrc(current.url)}
           alt={current.alt_text || alt}
-          className="h-auto w-full animate-fade-in object-contain md:max-h-[calc(100vh-7rem)] md:w-auto md:max-w-full"
+          className="aspect-[3/4] w-full animate-fade-in object-cover"
         />
       </div>
     </div>
